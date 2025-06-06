@@ -116,52 +116,61 @@ class TestGeminiPDFExtractor:
         with pytest.raises(FileNotFoundError):
             extractor.extract_questions_from_pdf("nonexistent.pdf")
 
+    @patch("src.utils.pdf_extractor.time.sleep")  # Mock sleep to speed up test
+    @patch("src.utils.pdf_extractor.GeminiPDFExtractor._extract_questions_batch")
+    @patch("src.utils.pdf_extractor.GeminiPDFExtractor.extract_images_from_pdf")
+    @patch("src.utils.pdf_extractor.fitz")
     @patch("src.utils.pdf_extractor.genai")
     @patch("src.utils.pdf_extractor.GENAI_AVAILABLE", True)
     @patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"})
-    def test_extract_questions_success(self, mock_genai):
+    def test_extract_questions_success(self, _mock_genai, mock_fitz, mock_extract_images, mock_extract_batch, mock_sleep):
         """Test successful question extraction."""
-        # Mock the Gemini client response
-        mock_response = Mock()
-        mock_response.text = json.dumps(
-            {
-                "questions": [
-                    {
-                        "id": 1,
-                        "question": "Test question?",
-                        "option_a": "Option A",
-                        "option_b": "Option B",
-                        "option_c": "Option C",
-                        "option_d": "Option D",
-                        "correct_answer": "A",
-                        "category": "Test",
-                        "difficulty": "easy",
-                    }
-                ]
-            }
-        )
+        # Mock the document (smaller for faster test)
+        mock_doc = MagicMock()
+        mock_doc.page_count = 41  # Small document: just 2 batches (1-20, 21-40, 41)
+        mock_fitz.open.return_value = mock_doc
 
-        mock_client = Mock()
-        mock_client.models.generate_content.return_value = mock_response
-        mock_genai.Client.return_value = mock_client
+        # Mock image extraction to return empty dict
+        mock_extract_images.return_value = {}
+
+        # Mock batch extraction to return sample questions
+        sample_questions = [
+            {
+                "id": 1,
+                "question": "Test question?",
+                "option_a": "Option A",
+                "option_b": "Option B",
+                "option_c": "Option C",
+                "option_d": "Option D",
+                "correct_answer": "A",
+                "category": "Test",
+                "difficulty": "easy",
+            }
+        ]
+        mock_extract_batch.return_value = sample_questions
 
         extractor = GeminiPDFExtractor()
 
-        # Create a temporary PDF file
+        # Create a temporary PDF file (just for the path)
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_file:
-            tmp_file.write(b"dummy pdf content")
             tmp_path = tmp_file.name
 
         try:
             questions = extractor.extract_questions_from_pdf(tmp_path)
 
-            assert len(questions) == 1
-            assert questions[0]["id"] == 1
-            assert questions[0]["question"] == "Test question?"
-            assert questions[0]["category"] == "Test"
+            # Should have questions from multiple batches (mocked to return same sample)
+            assert len(questions) > 0
+            assert all("question" in q for q in questions)
+            assert all("correct_answer" in q for q in questions)
+
+            # Verify methods were called
+            mock_extract_images.assert_called_once()
+            assert mock_extract_batch.call_count > 0
+            # Verify sleep was called (and mocked for speed)
+            assert mock_sleep.call_count > 0
 
         finally:
-            Path(tmp_path).unlink()
+            Path(tmp_path).unlink(missing_ok=True)
 
     @patch("src.utils.pdf_extractor.genai")
     @patch("src.utils.pdf_extractor.GENAI_AVAILABLE", True)

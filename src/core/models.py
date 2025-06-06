@@ -63,6 +63,26 @@ class QuestionData(BaseModel):
     correct: str = Field(..., description="Correct answer")
     category: str = Field(..., description="Question category")
     difficulty: Difficulty = Field(Difficulty.MEDIUM, description="Question difficulty")
+    # Enhanced fields for image support and state questions
+    question_type: str = Field(
+        "general", description="Type: 'general' or 'state_specific'"
+    )
+    state: str | None = Field(
+        None, description="Federal state for state-specific questions"
+    )
+    page_number: int | None = Field(
+        None, description="PDF page number where question appears"
+    )
+    is_image_question: bool = Field(
+        False, description="Whether question includes images"
+    )
+    image_paths: list[str] = Field(
+        default_factory=list,
+        description="List of image paths for multi-image questions (in order)",
+    )
+    image_mapping: str | None = Field(
+        None, description="How images map to options: 'single' or 'option_images'"
+    )
 
     @field_validator("correct")
     @classmethod
@@ -89,6 +109,19 @@ class Question(Base):
     correct = Column(String(500), nullable=False)
     category = Column(String(100), nullable=False)
     difficulty = Column(String(20), nullable=False, default=Difficulty.MEDIUM.value)
+    # Enhanced fields for image support and state questions
+    question_type = Column(String(20), nullable=False, default="general")
+    state = Column(
+        String(100), nullable=True
+    )  # Federal state for state-specific questions
+    page_number = Column(
+        Integer, nullable=True
+    )  # PDF page number where question appears
+    is_image_question = Column(
+        Integer, nullable=False, default=0
+    )  # SQLite boolean as int
+    image_paths = Column(Text, nullable=True)  # JSON serialized list of image paths
+    image_mapping = Column(String(50), nullable=True)  # 'single' or 'option_images'
     created_at = Column(
         DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
     )

@@ -9,7 +9,6 @@ import click
 from rich.console import Console
 
 from src.core.settings import get_settings, has_gemini_config
-from src.utils.pdf_extractor import extract_questions_to_csv
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -33,8 +32,24 @@ logger = logging.getLogger(__name__)
     is_flag=True,
     help="Force extraction even if CSV already exists",
 )
+@click.option(
+    "--resume",
+    is_flag=True,
+    help="Resume from checkpoint if available",
+)
+@click.option(
+    "--clear-checkpoint",
+    is_flag=True,
+    help="Clear existing checkpoint and start fresh",
+)
 @click.version_option(version="0.1.0", prog_name="integran-extract-questions")
-def main(pdf_path: Path | None, csv_path: Path | None, force: bool) -> None:
+def main(
+    pdf_path: Path | None,
+    csv_path: Path | None,
+    force: bool,
+    resume: bool,
+    clear_checkpoint: bool,
+) -> None:
     """Extract questions from PDF using Gemini Pro 2.5.
 
     This utility is used to generate the questions CSV file from the official PDF.
@@ -80,21 +95,48 @@ def main(pdf_path: Path | None, csv_path: Path | None, force: bool) -> None:
         console.print("- GCP_REGION")
         return
 
-    console.print("[blue]Starting extraction with Gemini Pro 2.5...[/blue]")
+    # Handle checkpoint options
+    checkpoint_file = Path("data/extraction_checkpoint.json")
+
+    if clear_checkpoint and checkpoint_file.exists():
+        checkpoint_file.unlink()
+        console.print("[yellow]🗑️  Cleared existing checkpoint[/yellow]")
+
+    if resume and checkpoint_file.exists():
+        console.print("[blue]📂 Resuming from checkpoint...[/blue]")
+    elif resume:
+        console.print("[yellow]⚠️  No checkpoint found, starting fresh[/yellow]")
+
+    console.print("[blue]Starting extraction with checkpoint support...[/blue]")
+    console.print("Key improvements:")
+    console.print("- ✅ Continuous ID numbering (1-300 general, 301-460 state)")
+    console.print("- ✅ Page number tracking")
+    console.print("- ✅ Multi-image question support (Bild 1-4)")
+    console.print("- ✅ Resume capability on failure")
 
     try:
-        success = extract_questions_to_csv(pdf_path, csv_path)
+        from src.utils.pdf_extractor import extract_with_enhanced_checkpoint
+
+        success, total_questions = extract_with_enhanced_checkpoint(pdf_path, csv_path)
 
         if success:
             console.print(
-                f"[green]✅ Successfully extracted questions to {csv_path}[/green]"
+                f"[green]✅ Successfully extracted {total_questions} questions to {csv_path}[/green]"
             )
+            console.print("Files created:")
+            console.print(f"- {csv_path}")
+            console.print(f"- {csv_path.with_suffix('.json')}")
+            console.print(f"- {checkpoint_file}")
         else:
             console.print("[red]❌ Extraction failed or skipped[/red]")
             console.print("Check the logs for more details.")
+            if checkpoint_file.exists():
+                console.print("Resume with: --resume")
 
     except Exception as e:
         console.print(f"[red]❌ Error during extraction: {e}[/red]")
+        if checkpoint_file.exists():
+            console.print("[yellow]💾 Progress saved. Resume with: --resume[/yellow]")
         raise click.ClickException(str(e)) from e
 
 

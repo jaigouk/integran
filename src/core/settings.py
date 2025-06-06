@@ -50,10 +50,10 @@ class Settings(BaseSettings):
         default="data/questions.json", alias="INTEGRAN_QUESTIONS_JSON_PATH"
     )
     questions_csv_path: str = Field(
-        default="docs/questions.csv", alias="INTEGRAN_QUESTIONS_CSV_PATH"
+        default="data/questions.csv", alias="INTEGRAN_QUESTIONS_CSV_PATH"
     )
     pdf_path: str = Field(
-        default="docs/gesamtfragenkatalog-lebenindeutschland.pdf",
+        default="data/gesamtfragenkatalog-lebenindeutschland.pdf",
         alias="INTEGRAN_PDF_PATH",
     )
 
