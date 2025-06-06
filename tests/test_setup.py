@@ -7,7 +7,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pytest
 from click.testing import CliRunner
 
 from src.setup import _create_config_file, _create_sample_questions, main
@@ -42,9 +41,7 @@ class TestMainCommand:
         mock_db = Mock()
         mock_db_class.return_value = mock_db
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Mock Path.exists to return False for questions file
-            with patch("src.setup.Path") as mock_path_class:
+        with tempfile.TemporaryDirectory(), patch("src.setup.Path") as mock_path_class:
                 mock_questions_file = Mock()
                 mock_questions_file.exists.return_value = False
                 mock_path_class.return_value = mock_questions_file
@@ -67,16 +64,14 @@ class TestMainCommand:
     @patch("src.setup._create_config_file")
     @patch("src.setup._create_sample_questions")
     def test_setup_with_sample_questions(
-        self, mock_create_sample, mock_create_config, mock_print, mock_db_class
+        self, mock_create_sample, _mock_create_config, mock_print, mock_db_class
     ):
         """Test setup with sample questions creation."""
         mock_db = Mock()
         mock_db.load_questions.return_value = 3
         mock_db_class.return_value = mock_db
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Mock Path.exists to return False for questions file (doesn't exist)
-            with patch("src.setup.Path") as mock_path_class:
+        with tempfile.TemporaryDirectory(), patch("src.setup.Path") as mock_path_class:
                 def path_side_effect(path_str):
                     if path_str == "data":
                         # Mock data directory that doesn't exist yet
@@ -88,7 +83,7 @@ class TestMainCommand:
                         mock_questions_file = Mock()
                         mock_questions_file.exists.return_value = False
                         return mock_questions_file
-                
+
                 mock_path_class.side_effect = path_side_effect
 
                 # Mock click.confirm to return True (create sample)
@@ -199,8 +194,7 @@ class TestMainCommand:
         mock_db = Mock()
         mock_db_class.return_value = mock_db
 
-        with patch("src.setup._create_config_file"):
-            with patch("src.setup.Path") as mock_path_class:
+        with patch("src.setup._create_config_file"), patch("src.setup.Path") as mock_path_class:
                 mock_path_class.return_value = Mock(exists=Mock(return_value=False))
 
                 with patch("src.setup.click.confirm", return_value=False):
@@ -340,8 +334,7 @@ class TestCreateConfigFile:
             with open(config_file, "w") as f:
                 json.dump(original_config, f)
 
-            with patch("src.setup.Path", return_value=config_file):
-                with patch("src.setup.console.print") as mock_print:
+            with patch("src.setup.Path", return_value=config_file), patch("src.setup.console.print") as mock_print:
                     _create_config_file()
 
             # Verify original content unchanged
@@ -394,7 +387,6 @@ class TestIntegrationScenarios:
 
                 # Mock Path for data directory and config
                 with patch("src.setup.Path") as mock_path_class:
-
                     def path_side_effect(path_str):
                         if path_str == "data":
                             return Path(temp_dir) / "data"

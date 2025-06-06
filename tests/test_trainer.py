@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import pytest
 from click.testing import CliRunner
 
 from src.trainer import (
@@ -50,7 +48,7 @@ class TestMainCommand:
 
     @patch("src.trainer.DatabaseManager")
     @patch("src.trainer.Path")
-    def test_missing_questions_file(self, mock_path, mock_db):
+    def test_missing_questions_file(self, mock_path, _mock_db):
         """Test behavior when questions file is missing."""
         # Mock questions file not existing
         mock_questions_file = Mock()
@@ -66,7 +64,7 @@ class TestMainCommand:
     @patch("src.trainer.DatabaseManager")
     @patch("src.trainer.Path")
     @patch("src.trainer._start_trainer")
-    def test_normal_startup(self, mock_start_trainer, mock_path, mock_db):
+    def test_normal_startup(self, mock_start_trainer, mock_path, _mock_db):
         """Test normal startup flow."""
         # Mock questions file existing
         mock_questions_file = Mock()
@@ -80,7 +78,7 @@ class TestMainCommand:
 
     @patch("src.trainer.DatabaseManager")
     @patch("src.trainer._handle_reset")
-    def test_reset_flag(self, mock_handle_reset, mock_db):
+    def test_reset_flag(self, mock_handle_reset, _mock_db):
         """Test --reset flag."""
         result = self.runner.invoke(main, ["--reset"])
 
@@ -89,7 +87,7 @@ class TestMainCommand:
 
     @patch("src.trainer.DatabaseManager")
     @patch("src.trainer._display_stats")
-    def test_stats_flag(self, mock_display_stats, mock_db):
+    def test_stats_flag(self, mock_display_stats, _mock_db):
         """Test --stats flag."""
         result = self.runner.invoke(main, ["--stats"])
 
@@ -98,7 +96,7 @@ class TestMainCommand:
 
     @patch("src.trainer.DatabaseManager")
     @patch("src.trainer._export_stats")
-    def test_export_stats_flag(self, mock_export_stats, mock_db):
+    def test_export_stats_flag(self, mock_export_stats, _mock_db):
         """Test --export-stats flag."""
         result = self.runner.invoke(main, ["--export-stats"])
 
@@ -183,7 +181,7 @@ class TestExportStats:
     """Test the export stats function."""
 
     @patch("src.trainer.console.print")
-    def test_export_stats(self, mock_print):
+    def test_export_stats(self, _mock_print):
         """Test exporting statistics to file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Setup mocks
