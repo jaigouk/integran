@@ -107,7 +107,7 @@ integrate --export-stats
 Upon starting, you'll see:
 ```
 ╔════════════════════════════════════════╗
-║           IntegRate - Exam Trainer     ║
+║       IntegRate - Exam Trainer         ║
 ╚════════════════════════════════════════╝
 
 1. 📚 Practice Mode (Random)
