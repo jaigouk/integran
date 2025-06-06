@@ -1,5 +1,5 @@
 [project]
-name = "integrate"
+name = "integran"
 version = "0.1.0"
 description = "Interactive terminal-based trainer for the German Integration Exam"
 authors = [{name = "Jaigouk Kim", email = "ping@jaigouk.kim"}]
@@ -55,12 +55,12 @@ all = [
 ]
 
 [project.scripts]
-integrate = "src.trainer:main"
-integrate-setup = "src.setup:main"
+integran = "src.trainer:main"
+integran-setup = "src.setup:main"
 
 [project.urls]
-Homepage = "https://github.com/jaigouk/integrate"
-Repository = "https://github.com/jaigouk/integrate"
+Homepage = "https://github.com/jaigouk/integran"
+Repository = "https://github.com/jaigouk/integran"
 
 [build-system]
 requires = ["setuptools>=61.0"]

@@ -169,7 +169,8 @@ class DatabaseManager:
             List of questions due for review.
         """
         with self.get_session() as session:
-            now = datetime.utcnow()
+            # Use naive datetime for comparison since SQLite stores naive datetimes
+            now = datetime.now()
             return (
                 session.query(Question)
                 .join(LearningData)
@@ -252,9 +253,10 @@ class DatabaseManager:
             learning.interval = 1
             learning.easiness_factor = max(1.3, learning.easiness_factor - 0.2)
 
-        # Update review dates
-        learning.last_reviewed = datetime.now(UTC)
-        learning.next_review = datetime.now(UTC) + timedelta(days=learning.interval)
+        # Update review dates (use naive datetime for SQLite compatibility)
+        now_utc = datetime.now(UTC)
+        learning.last_reviewed = now_utc.replace(tzinfo=None)
+        learning.next_review = (now_utc + timedelta(days=learning.interval)).replace(tzinfo=None)
 
     def create_session(self, mode: str) -> int:
         """Create a new practice session.
@@ -287,7 +289,7 @@ class DatabaseManager:
             if not practice_session:
                 raise ValueError(f"Session {session_id} not found")
 
-            practice_session.ended_at = datetime.utcnow()
+            practice_session.ended_at = datetime.now(UTC).replace(tzinfo=None)
 
             # Calculate statistics
             attempts = (
@@ -343,8 +345,8 @@ class DatabaseManager:
                 total_time_spent=0.0,
                 current_streak=0,
                 longest_streak=0,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+                updated_at=datetime.now(UTC).replace(tzinfo=None),
             )
             session.add(progress)
 
@@ -354,10 +356,11 @@ class DatabaseManager:
 
         # Update streaks
         last_practice = progress.last_practice
-        progress.last_practice = datetime.utcnow()
+        progress.last_practice = datetime.now(UTC).replace(tzinfo=None)
 
         if last_practice:
-            days_since = (datetime.utcnow() - last_practice).days
+            now_naive = datetime.now(UTC).replace(tzinfo=None)
+            days_since = (now_naive - last_practice).days
             if days_since <= 1:
                 progress.current_streak += 1
             else:
@@ -366,7 +369,7 @@ class DatabaseManager:
             progress.current_streak = 1
 
         progress.longest_streak = max(progress.longest_streak, progress.current_streak)
-        progress.updated_at = datetime.utcnow()
+        progress.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     def get_learning_stats(self) -> LearningStats:
         """Get overall learning statistics.
@@ -378,7 +381,8 @@ class DatabaseManager:
             stats = LearningStats()
 
             # Count questions by learning status
-            now = datetime.utcnow()
+            # Use naive datetime for comparison since SQLite stores naive datetimes
+            now = datetime.now()
             learning_data = session.query(LearningData).all()
 
             for ld in learning_data:

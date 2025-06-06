@@ -19,13 +19,13 @@ help:
 # Create conda environment
 env-create:
 	@echo "Creating conda environment..."
-	conda create -n integrate python=3.12 -y
-	@echo "Environment created. Activate with: conda activate integrate"
+	conda create -n integran python=3.12 -y
+	@echo "Environment created. Activate with: conda activate integran"
 
 # Show activation command
 env-activate:
 	@echo "To activate the environment, run:"
-	@echo "conda activate integrate"
+	@echo "conda activate integran"
 
 # Install dependencies with uv
 install:
@@ -88,8 +88,8 @@ clean:
 # Build production Docker image
 docker-build:
 	@echo "Building production Docker image..."
-	docker build -t integrate:latest .
-	@echo "Image built successfully: integrate:latest"
+	docker build -t integran:latest .
+	@echo "Image built successfully: integran:latest"
 
 # Run tests in Docker container (for CI)
 docker-test:
@@ -110,10 +110,10 @@ docker-test:
 
 # Run the Docker container
 docker-run:
-	@echo "Running IntegRate in Docker..."
-	docker run -it --rm -v "$(PWD)/data":/app/data integrate:latest
+	@echo "Running Integran in Docker..."
+	docker run -it --rm -v "$(PWD)/data":/app/data integran:latest
 
 # Test the built Docker image
 docker-test-image:
 	@echo "Testing the built Docker image..."
-	docker run --rm integrate:latest integrate --help
+	docker run --rm integran:latest integran --help

@@ -89,7 +89,7 @@ class Question(Base):
     correct = Column(String(500), nullable=False)
     category = Column(String(100), nullable=False)
     difficulty = Column(String(20), nullable=False, default=Difficulty.MEDIUM.value)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     # Relationships
     attempts = relationship("QuestionAttempt", back_populates="question")
@@ -109,7 +109,7 @@ class QuestionAttempt(Base):
     status = Column(String(20), nullable=False)
     user_answer = Column(String(500))
     time_taken = Column(Float)  # seconds
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     # Relationships
     question = relationship("Question", back_populates="attempts")
@@ -123,7 +123,7 @@ class PracticeSession(Base):
 
     id = Column(Integer, primary_key=True)
     mode = Column(String(20), nullable=False)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
     ended_at = Column(DateTime)
     total_questions = Column(Integer, default=0)
     correct_answers = Column(Integer, default=0)
@@ -144,7 +144,7 @@ class LearningData(Base):
     repetitions = Column(Integer, default=0)
     easiness_factor = Column(Float, default=2.5)  # SM-2 algorithm
     interval = Column(Integer, default=1)  # days
-    next_review = Column(DateTime, default=lambda: datetime.now(UTC))
+    next_review = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
     last_reviewed = Column(DateTime)
 
     # Relationships
@@ -165,8 +165,8 @@ class UserProgress(Base):
     current_streak = Column(Integer, default=0)
     longest_streak = Column(Integer, default=0)
     last_practice = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), onupdate=lambda: datetime.now(UTC).replace(tzinfo=None))
 
 
 class CategoryProgress(Base):

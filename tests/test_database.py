@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -247,7 +247,12 @@ class TestDatabaseManager:
             assert learning.repetitions == 1
             assert learning.interval == 1
             assert learning.last_reviewed is not None
-            assert learning.next_review > datetime.utcnow()
+            # Compare with a naive datetime since SQLite may store as naive
+            now_naive = datetime.now()
+            if learning.next_review.tzinfo is None:
+                assert learning.next_review > now_naive
+            else:
+                assert learning.next_review > datetime.now(UTC)
 
     def test_get_questions_for_review(
         self, db_manager: DatabaseManager, sample_questions: list[dict], tmp_path: Path
@@ -267,7 +272,8 @@ class TestDatabaseManager:
         with db_manager.get_session() as session:
             learning = session.query(LearningData).filter_by(question_id=1).first()
             if learning:
-                learning.next_review = datetime.utcnow() + timedelta(days=7)
+                # Use naive datetime since SQLite stores naive datetimes
+                learning.next_review = datetime.now() + timedelta(days=7)
                 session.commit()
 
         # Now only 2 questions should be due

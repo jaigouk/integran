@@ -1,4 +1,4 @@
-# IntegRate
+# Integran
 
 Interactive trainer for the German Integration Exam (Leben in Deutschland Test)
 
@@ -44,14 +44,14 @@ The "Leben in Deutschland" test consists of 310 questions covering German societ
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/integrate.git
-cd integrate
+git clone https://github.com/yourusername/integran.git
+cd integran
 ```
 
 2. Create and activate conda environment:
 ```bash
-conda create -n integrate python=3.12 -y
-conda activate integrate
+conda create -n integran python=3.12 -y
+conda activate integran
 ```
 
 3. Install uv (if not already installed):
@@ -68,13 +68,13 @@ uv pip install -e ".[dev]"
 ```bash
 # Quick setup with make
 make env-create
-conda activate integrate
+conda activate integran
 make install
 ```
 
 5. Run the setup script to initialize the database:
 ```bash
-integrate-setup
+integran-setup
 ```
 
 ## 🎮 Usage
@@ -83,23 +83,23 @@ integrate-setup
 
 Start the trainer:
 ```bash
-integrate
+integran
 ```
 
 ### Command Line Options
 
 ```bash
 # Start in a specific mode
-integrate --mode random
+integran --mode random
 
 # Review only failed questions
-integrate --review
+integran --review
 
 # Practice specific category
-integrate --category "Grundrechte"
+integran --category "Grundrechte"
 
 # Export progress report
-integrate --export-stats
+integran --export-stats
 ```
 
 ### Interactive Menu
@@ -107,7 +107,7 @@ integrate --export-stats
 Upon starting, you'll see:
 ```
 ╔════════════════════════════════════════╗
-║       IntegRate - Exam Trainer         ║
+║        Integran - Exam Trainer         ║
 ╚════════════════════════════════════════╝
 
 1. 📚 Practice Mode (Random)
@@ -166,7 +166,7 @@ Edit `data/config.json` to customize:
 
 View your progress with:
 ```bash
-integrate --stats
+integran --stats
 ```
 
 This shows:
