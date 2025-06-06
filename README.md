@@ -152,6 +152,8 @@ The app uses SQLite to track your progress:
 
 ## 🔧 Configuration
 
+### Basic Configuration
+
 Edit `data/config.json` to customize:
 ```json
 {
@@ -161,6 +163,70 @@ Edit `data/config.json` to customize:
   "color_mode": "auto"
 }
 ```
+
+### Environment Variables (Optional)
+
+These environment variables are **ONLY needed for developers** who want to extract questions from the PDF using AI. **End users don't need these** as the app comes with pre-extracted question data.
+
+#### Question Extraction (Developer Only)
+
+The application supports **two authentication methods** for Google Gemini AI:
+
+##### Method 1: Vertex AI with Service Account (Recommended)
+```bash
+# Required variables
+export USE_VERTEX_AI=true                           # Enable Vertex AI authentication (default)
+export GCP_PROJECT_ID="your-gcp-project"           # Google Cloud Project ID
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"  # Service account JSON file
+export GCP_REGION="us-central1"                    # Google Cloud region (optional)
+export GEMINI_MODEL="gemini-2.5-pro-preview-06-05" # Model version (optional)
+```
+
+##### Method 2: API Key (Legacy)
+```bash
+# Required variables  
+export USE_VERTEX_AI=false                         # Disable Vertex AI, use API key instead
+export GEMINI_API_KEY="your-gemini-api-key"        # Google AI API key
+export GCP_PROJECT_ID="your-gcp-project"           # Google Cloud Project ID
+export GCP_REGION="us-central1"                    # Google Cloud region (optional)
+export GEMINI_MODEL="gemini-2.5-pro-preview-06-05" # Model version (optional)
+```
+
+##### Required vs Optional Variables:
+
+**Always Required:**
+- `GCP_PROJECT_ID` - Your Google Cloud Project ID
+
+**Required for Vertex AI (Method 1):**
+- `GOOGLE_APPLICATION_CREDENTIALS` - Path to service account JSON file
+- `USE_VERTEX_AI=true` (or omit, as this is the default)
+
+**Required for API Key (Method 2):**
+- `GEMINI_API_KEY` - Google AI Studio API key
+- `USE_VERTEX_AI=false`
+
+**Optional (have sensible defaults):**
+- `GCP_REGION` - Defaults to "us-central1"
+- `GEMINI_MODEL` - Defaults to "gemini-2.5-pro-preview-06-05"
+
+⚠️ **Important Notes:**
+- **Cost Warning**: Using the Gemini API will incur charges on your Google Cloud account
+- **Not Required**: The app works perfectly without these variables using pre-extracted data
+- **For Developers Only**: Only needed if you want to re-extract questions from the PDF
+- **One-Time Use**: Question extraction is typically done once during development
+- **Vertex AI Recommended**: More secure and scalable than API keys
+
+#### When You Need These Variables:
+- ✅ You're a developer modifying the question extraction process
+- ✅ You want to re-extract questions from a new PDF version
+- ✅ You're contributing to the project's question database
+
+#### When You DON'T Need These Variables:
+- ❌ You're just using the app to study for the exam
+- ❌ You're running the trainer for practice sessions
+- ❌ You're a regular end user
+
+The application automatically uses pre-extracted question data from `data/questions.json` and will never call external APIs during normal usage.
 
 ## 📈 Progress Tracking
 

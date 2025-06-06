@@ -36,26 +36,31 @@ class TestMainCommand:
     @patch("src.setup.DatabaseManager")
     @patch("src.setup.console.print")
     @patch("src.setup._create_config_file")
-    def test_basic_setup_success(self, mock_create_config, mock_print, mock_db_class):
+    @patch("src.setup.ensure_questions_available")
+    def test_basic_setup_success(
+        self, mock_ensure_questions, mock_create_config, mock_print, mock_db_class
+    ):
         """Test basic setup without questions file."""
         mock_db = Mock()
+        mock_db.load_questions.return_value = 3
         mock_db_class.return_value = mock_db
 
-        with tempfile.TemporaryDirectory(), patch("src.setup.Path") as mock_path_class:
-                mock_questions_file = Mock()
-                mock_questions_file.exists.return_value = False
-                mock_path_class.return_value = mock_questions_file
+        # Mock successful questions finding
+        questions_path = Path("data/questions.json")
+        mock_ensure_questions.return_value = questions_path
 
-                # Mock click.confirm to return False (don't create sample)
-                with patch("src.setup.click.confirm", return_value=False):
-                    result = self.runner.invoke(main, [])
+        result = self.runner.invoke(main, [])
 
         assert result.exit_code == 0
         mock_db_class.assert_called_once()
         mock_create_config.assert_called_once()
+        mock_ensure_questions.assert_called_once()
+        mock_db.load_questions.assert_called_once_with(questions_path)
 
         # Verify success messages
-        print_calls = [call[0][0] if call[0] else str(call) for call in mock_print.call_args_list]
+        print_calls = [
+            call[0][0] if call[0] else str(call) for call in mock_print.call_args_list
+        ]
         setup_text = " ".join(print_calls)
         assert "Setup completed successfully" in setup_text
 
@@ -63,39 +68,51 @@ class TestMainCommand:
     @patch("src.setup.console.print")
     @patch("src.setup._create_config_file")
     @patch("src.setup._create_sample_questions")
+    @patch("src.setup.ensure_questions_available")
     def test_setup_with_sample_questions(
-        self, mock_create_sample, _mock_create_config, mock_print, mock_db_class
+        self,
+        mock_ensure_questions,
+        mock_create_sample,
+        _mock_create_config,
+        mock_print,
+        mock_db_class,
     ):
         """Test setup with sample questions creation."""
         mock_db = Mock()
         mock_db.load_questions.return_value = 3
         mock_db_class.return_value = mock_db
 
+        # Mock ensure_questions_available to raise FileNotFoundError
+        mock_ensure_questions.side_effect = FileNotFoundError("No questions data found")
+
         with tempfile.TemporaryDirectory(), patch("src.setup.Path") as mock_path_class:
-                def path_side_effect(path_str):
-                    if path_str == "data":
-                        # Mock data directory that doesn't exist yet
-                        mock_data_dir = Mock()
-                        mock_data_dir.exists.return_value = False
-                        return mock_data_dir
-                    else:
-                        # Mock questions file that doesn't exist
-                        mock_questions_file = Mock()
-                        mock_questions_file.exists.return_value = False
-                        return mock_questions_file
 
-                mock_path_class.side_effect = path_side_effect
+            def path_side_effect(path_str):
+                if path_str == "data":
+                    # Mock data directory that doesn't exist yet
+                    mock_data_dir = Mock()
+                    mock_data_dir.exists.return_value = False
+                    return mock_data_dir
+                else:
+                    # Mock questions file that doesn't exist
+                    mock_questions_file = Mock()
+                    mock_questions_file.exists.return_value = False
+                    return mock_questions_file
 
-                # Mock click.confirm to return True (create sample)
-                with patch("src.setup.click.confirm", return_value=True):
-                    result = self.runner.invoke(main, [])
+            mock_path_class.side_effect = path_side_effect
+
+            # Mock click.confirm to return True (create sample)
+            with patch("src.setup.click.confirm", return_value=True):
+                result = self.runner.invoke(main, [])
 
         assert result.exit_code == 0
         mock_create_sample.assert_called_once()
         mock_db.load_questions.assert_called_once()
 
         # Verify sample creation messages
-        print_calls = [call[0][0] if call[0] else str(call) for call in mock_print.call_args_list]
+        print_calls = [
+            call[0][0] if call[0] else str(call) for call in mock_print.call_args_list
+        ]
         setup_text = " ".join(print_calls)
         assert "Sample questions created" in setup_text
         assert "Successfully loaded 3 questions" in setup_text
@@ -132,11 +149,18 @@ class TestMainCommand:
 
     @patch("src.setup.DatabaseManager")
     @patch("src.setup.click.confirm")
-    def test_setup_existing_database_cancel(self, mock_confirm, mock_db_class):
+    @patch("src.setup.ensure_questions_available")
+    def test_setup_existing_database_cancel(
+        self, mock_ensure_questions, mock_confirm, mock_db_class
+    ):
         """Test setup when database exists and user cancels."""
         mock_confirm.return_value = False
         mock_db = Mock()
         mock_db_class.return_value = mock_db
+
+        # Mock successful questions finding
+        questions_path = Path("data/questions.json")
+        mock_ensure_questions.return_value = questions_path
 
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create fake database file
@@ -157,13 +181,19 @@ class TestMainCommand:
     @patch("src.setup.DatabaseManager")
     @patch("src.setup.click.confirm")
     @patch("src.setup._create_config_file")
+    @patch("src.setup.ensure_questions_available")
     def test_setup_existing_database_continue(
-        self, mock_create_config, mock_confirm, mock_db_class
+        self, mock_ensure_questions, mock_create_config, mock_confirm, mock_db_class
     ):
         """Test setup when database exists and user continues."""
         mock_confirm.return_value = True
         mock_db = Mock()
+        mock_db.load_questions.return_value = 3
         mock_db_class.return_value = mock_db
+
+        # Mock successful questions finding
+        questions_path = Path("data/questions.json")
+        mock_ensure_questions.return_value = questions_path
 
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create fake database file
@@ -172,33 +202,34 @@ class TestMainCommand:
             (data_dir / "trainer.db").touch()
 
             with patch("src.setup.Path") as mock_path_class:
-                mock_path_class.side_effect = lambda x: (
-                    Path(temp_dir) / x
-                    if x == "data"
-                    else Mock(
-                        exists=Mock(return_value=False)
-                    )  # questions.json doesn't exist
+                mock_path_class.side_effect = (
+                    lambda x: Path(temp_dir) / x if x == "data" else Mock()
                 )
 
-                with patch(
-                    "src.setup.click.confirm", side_effect=[True, False]
-                ):  # Continue setup, don't create sample
-                    result = self.runner.invoke(main, [])
+                result = self.runner.invoke(main, [])
 
         assert result.exit_code == 0
         mock_create_config.assert_called_once()
+        mock_db.load_questions.assert_called_once_with(questions_path)
 
     @patch("src.setup.DatabaseManager")
-    def test_setup_force_flag(self, mock_db_class):
+    @patch("src.setup.ensure_questions_available")
+    def test_setup_force_flag(self, mock_ensure_questions, mock_db_class):
         """Test setup with --force flag."""
         mock_db = Mock()
         mock_db_class.return_value = mock_db
 
-        with patch("src.setup._create_config_file"), patch("src.setup.Path") as mock_path_class:
-                mock_path_class.return_value = Mock(exists=Mock(return_value=False))
+        # Mock ensure_questions_available to return a questions file path
+        mock_ensure_questions.return_value = Path("data/questions.json")
 
-                with patch("src.setup.click.confirm", return_value=False):
-                    result = self.runner.invoke(main, ["--force"])
+        with (
+            patch("src.setup._create_config_file"),
+            patch("src.setup.Path") as mock_path_class,
+        ):
+            mock_path_class.return_value = Mock(exists=Mock(return_value=False))
+
+            with patch("src.setup.click.confirm", return_value=False):
+                result = self.runner.invoke(main, ["--force"])
 
         assert result.exit_code == 0
         # With --force, should not prompt user about existing database
@@ -334,8 +365,11 @@ class TestCreateConfigFile:
             with open(config_file, "w") as f:
                 json.dump(original_config, f)
 
-            with patch("src.setup.Path", return_value=config_file), patch("src.setup.console.print") as mock_print:
-                    _create_config_file()
+            with (
+                patch("src.setup.Path", return_value=config_file),
+                patch("src.setup.console.print") as mock_print,
+            ):
+                _create_config_file()
 
             # Verify original content unchanged
             with open(config_file) as f:
@@ -387,6 +421,7 @@ class TestIntegrationScenarios:
 
                 # Mock Path for data directory and config
                 with patch("src.setup.Path") as mock_path_class:
+
                     def path_side_effect(path_str):
                         if path_str == "data":
                             return Path(temp_dir) / "data"

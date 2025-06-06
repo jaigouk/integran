@@ -256,7 +256,9 @@ class DatabaseManager:
         # Update review dates (use naive datetime for SQLite compatibility)
         now_utc = datetime.now(UTC)
         learning.last_reviewed = now_utc.replace(tzinfo=None)
-        learning.next_review = (now_utc + timedelta(days=learning.interval)).replace(tzinfo=None)
+        learning.next_review = (now_utc + timedelta(days=learning.interval)).replace(
+            tzinfo=None
+        )
 
     def create_session(self, mode: str) -> int:
         """Create a new practice session.

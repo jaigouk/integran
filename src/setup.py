@@ -10,6 +10,7 @@ import click
 from rich.console import Console
 
 from src.core.database import DatabaseManager
+from src.utils.pdf_extractor import ensure_questions_available
 
 console = Console()
 
@@ -43,7 +44,28 @@ def main(force: bool, questions_file: Path | None) -> None:
 
         # Determine questions file path
         if questions_file is None:
-            questions_file = Path("data/questions.json")
+            try:
+                console.print("[blue]🔍 Checking for questions data...[/blue]")
+                questions_file = ensure_questions_available()
+                console.print(
+                    f"[green]✅ Questions available at: {questions_file}[/green]"
+                )
+            except FileNotFoundError as e:
+                console.print("[yellow]⚠️  No questions data found.[/yellow]")
+                console.print(str(e))
+
+                if click.confirm("Do you want to create a sample questions file?"):
+                    questions_file = Path("data/questions.json")
+                    _create_sample_questions(questions_file)
+                    console.print(
+                        f"[green]✅ Sample questions created at {questions_file}[/green]"
+                    )
+                else:
+                    console.print(
+                        "[yellow]Setup completed without questions. "
+                        "Add questions data and run setup again.[/yellow]"
+                    )
+                    return
 
         # Check if setup already completed
         data_dir = Path("data")
@@ -61,36 +83,14 @@ def main(force: bool, questions_file: Path | None) -> None:
         # Create data directory
         data_dir.mkdir(exist_ok=True)
 
-        # Load questions if file exists
-        if questions_file.exists():
-            console.print(f"[blue]📚 Loading questions from {questions_file}...[/blue]")
-            try:
-                count = db_manager.load_questions(questions_file)
-                console.print(
-                    f"[green]✅ Successfully loaded {count} questions![/green]"
-                )
-            except Exception as e:
-                console.print(f"[red]❌ Error loading questions: {e}[/red]")
-                sys.exit(1)
-        else:
-            console.print("[yellow]⚠️  Questions file not found.[/yellow]")
-            console.print(f"[yellow]Expected location: {questions_file}[/yellow]")
-
-            if click.confirm("Do you want to create a sample questions file?"):
-                _create_sample_questions(questions_file)
-                console.print(
-                    f"[green]✅ Sample questions created at {questions_file}[/green]"
-                )
-                console.print("[blue]📚 Loading sample questions...[/blue]")
-                count = db_manager.load_questions(questions_file)
-                console.print(
-                    f"[green]✅ Successfully loaded {count} questions![/green]"
-                )
-            else:
-                console.print(
-                    "[yellow]Setup completed without questions. "
-                    "Add questions.json and run setup again.[/yellow]"
-                )
+        # Load questions
+        console.print(f"[blue]📚 Loading questions from {questions_file}...[/blue]")
+        try:
+            count = db_manager.load_questions(questions_file)
+            console.print(f"[green]✅ Successfully loaded {count} questions![/green]")
+        except Exception as e:
+            console.print(f"[red]❌ Error loading questions: {e}[/red]")
+            sys.exit(1)
 
         # Create config file if it doesn't exist
         _create_config_file()

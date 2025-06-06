@@ -292,7 +292,9 @@ class TestReviewMode:
 
         mock_db.get_questions_for_review.assert_called_once()
         # Should print about starting session with question count
-        print_calls = [call[0][0] if call[0] else str(call) for call in mock_print.call_args_list]
+        print_calls = [
+            call[0][0] if call[0] else str(call) for call in mock_print.call_args_list
+        ]
         assert any("3 questions" in call for call in print_calls)
 
 
@@ -323,7 +325,9 @@ class TestCategoryMode:
 
         mock_db.get_questions_by_category.assert_called_once_with("test_category")
         # Should print about starting practice with question count
-        print_calls = [call[0][0] if call[0] else str(call) for call in mock_print.call_args_list]
+        print_calls = [
+            call[0][0] if call[0] else str(call) for call in mock_print.call_args_list
+        ]
         assert any("2 questions from test_category" in call for call in print_calls)
 
 
@@ -339,7 +343,9 @@ class TestInteractiveMenu:
 
         # Should have multiple print calls for menu options
         assert mock_print.call_count >= 8
-        print_calls = [call[0][0] if call[0] else str(call) for call in mock_print.call_args_list]
+        print_calls = [
+            call[0][0] if call[0] else str(call) for call in mock_print.call_args_list
+        ]
 
         # Verify menu items are displayed
         menu_text = " ".join(print_calls)
