@@ -1,0 +1,46 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build and Test
+        run: |
+          # Try Docker first
+          if command -v docker &> /dev/null; then
+            echo "Building Docker image..."
+            make docker-build
+            
+            echo "Testing Docker image..."
+            make docker-test-image
+            
+            echo "Running tests in Docker..."
+            make docker-test
+          # Fallback to local Python
+          elif command -v python3 &> /dev/null; then
+            echo "Using local Python environment..."
+            python3 -m venv ci-env
+            . ci-env/bin/activate
+            
+            # Install uv in the virtual environment
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.cargo/bin:$PATH"
+            
+            # Install dependencies and run checks
+            make install
+            make lint
+            make typecheck
+            make test
+            make coverage
+          else
+            echo "ERROR: Neither Docker nor Python3 found!"
+            exit 1
+          fi
