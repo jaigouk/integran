@@ -14,6 +14,9 @@ jobs:
       
       - name: Build and Test
         run: |
+          # Use test environment configuration
+          export ENV_FILE=.env.test
+          
           # Try Docker first
           if command -v docker &> /dev/null; then
             echo "Building Docker image..."

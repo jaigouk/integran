@@ -96,6 +96,8 @@ docker-test:
 	@echo "Running tests in Docker container..."
 	docker run --rm -v "$(PWD)":/app -w /app python:3.12-slim sh -c "\
 		apt-get update && apt-get install -y curl && \
+		echo 'Setting up test environment...' && \
+		if [ -f .env.test ]; then cp .env.test .env; fi && \
 		echo 'Installing uv...' && \
 		curl -LsSf https://astral.sh/uv/install.sh | sh && \
 		export PATH=\"/root/.local/bin:\$$PATH\" && \
