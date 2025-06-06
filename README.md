@@ -1,8 +1,8 @@
 # Integran
 
-Interactive trainer for the German Integration Exam (Leben in Deutschland Test)
+A terminal-based training application for the German Integration Exam (Leben in Deutschland Test). Built with spaced repetition and intelligent progress tracking to maximize learning efficiency.
 
-A terminal-based interactive application designed to help people prepare for the German Integration Exam (Leben in Deutschland Test). This app uses spaced repetition and intelligent tracking to maximize learning efficiency.
+*Future versions will include mobile and desktop applications.*
 
 ## 🎯 Purpose
 
