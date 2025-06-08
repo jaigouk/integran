@@ -108,7 +108,14 @@ class TestGeminiPDFExtractor:
 
     @patch("src.utils.pdf_extractor.genai")
     @patch("src.utils.pdf_extractor.GENAI_AVAILABLE", True)
-    @patch.dict("os.environ", {"GEMINI_API_KEY": "test-key", "USE_VERTEX_AI": "false", "GCP_PROJECT_ID": "test-project"})
+    @patch.dict(
+        "os.environ",
+        {
+            "GEMINI_API_KEY": "test-key",
+            "USE_VERTEX_AI": "false",
+            "GCP_PROJECT_ID": "test-project",
+        },
+    )
     def test_extract_questions_pdf_not_found(self, _mock_genai):
         """Test extraction fails when PDF doesn't exist."""
         extractor = GeminiPDFExtractor()
@@ -122,8 +129,22 @@ class TestGeminiPDFExtractor:
     @patch("src.utils.pdf_extractor.fitz")
     @patch("src.utils.pdf_extractor.genai")
     @patch("src.utils.pdf_extractor.GENAI_AVAILABLE", True)
-    @patch.dict("os.environ", {"GEMINI_API_KEY": "test-key", "USE_VERTEX_AI": "false", "GCP_PROJECT_ID": "test-project"})
-    def test_extract_questions_success(self, _mock_genai, mock_fitz, mock_extract_images, mock_extract_batch, mock_sleep):
+    @patch.dict(
+        "os.environ",
+        {
+            "GEMINI_API_KEY": "test-key",
+            "USE_VERTEX_AI": "false",
+            "GCP_PROJECT_ID": "test-project",
+        },
+    )
+    def test_extract_questions_success(
+        self,
+        _mock_genai,
+        mock_fitz,
+        mock_extract_images,
+        mock_extract_batch,
+        mock_sleep,
+    ):
         """Test successful question extraction."""
         # Mock the document (smaller for faster test)
         mock_doc = MagicMock()
@@ -174,7 +195,14 @@ class TestGeminiPDFExtractor:
 
     @patch("src.utils.pdf_extractor.genai")
     @patch("src.utils.pdf_extractor.GENAI_AVAILABLE", True)
-    @patch.dict("os.environ", {"GEMINI_API_KEY": "test-key", "USE_VERTEX_AI": "false", "GCP_PROJECT_ID": "test-project"})
+    @patch.dict(
+        "os.environ",
+        {
+            "GEMINI_API_KEY": "test-key",
+            "USE_VERTEX_AI": "false",
+            "GCP_PROJECT_ID": "test-project",
+        },
+    )
     def test_save_questions_to_csv(self, _mock_genai):
         """Test saving questions to CSV."""
         extractor = GeminiPDFExtractor()
@@ -213,7 +241,14 @@ class TestGeminiPDFExtractor:
 
     @patch("src.utils.pdf_extractor.genai")
     @patch("src.utils.pdf_extractor.GENAI_AVAILABLE", True)
-    @patch.dict("os.environ", {"GEMINI_API_KEY": "test-key", "USE_VERTEX_AI": "false", "GCP_PROJECT_ID": "test-project"})
+    @patch.dict(
+        "os.environ",
+        {
+            "GEMINI_API_KEY": "test-key",
+            "USE_VERTEX_AI": "false",
+            "GCP_PROJECT_ID": "test-project",
+        },
+    )
     def test_convert_csv_to_json(self, _mock_genai):
         """Test converting CSV to JSON."""
         extractor = GeminiPDFExtractor()

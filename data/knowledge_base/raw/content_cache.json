@@ -1,0 +1,39 @@
+{
+  "cached_at": "2025-06-08T18:01:44.741915",
+  "content": {
+    "web_pages": [],
+    "pdfs": [],
+    "structured_data": [
+      {
+        "source": "german_states",
+        "type": "structured_data",
+        "title": "German Federal States Information",
+        "content": "\n        Die 16 Bundesländer Deutschlands:\n        \n        1. Baden-Württemberg - Hauptstadt: Stuttgart\n        2. Bayern (Freistaat) - Hauptstadt: München\n        3. Berlin - Stadtstaat\n        4. Brandenburg - Hauptstadt: Potsdam\n        5. Bremen (Freie Hansestadt) - Stadtstaat\n        6. Hamburg (Freie und Hansestadt) - Stadtstaat\n        7. Hessen - Hauptstadt: Wiesbaden\n        8. Mecklenburg-Vorpommern - Hauptstadt: Schwerin\n        9. Niedersachsen - Hauptstadt: Hannover\n        10. Nordrhein-Westfalen - Hauptstadt: Düsseldorf\n        11. Rheinland-Pfalz - Hauptstadt: Mainz\n        12. Saarland - Hauptstadt: Saarbrücken\n        13. Sachsen (Freistaat) - Hauptstadt: Dresden\n        14. Sachsen-Anhalt - Hauptstadt: Magdeburg\n        15. Schleswig-Holstein - Hauptstadt: Kiel\n        16. Thüringen (Freistaat) - Hauptstadt: Erfurt\n        \n        Stadtstaaten: Berlin, Bremen, Hamburg\n        Flächenstaaten: Alle anderen 13 Bundesländer\n        ",
+        "metadata": {
+          "category": "geography"
+        },
+        "fetched_at": "2025-06-08T18:01:44.741875"
+      },
+      {
+        "source": "german_history",
+        "type": "structured_data",
+        "title": "Important Dates in German History",
+        "content": "\n        Wichtige Daten der deutschen Geschichte:\n        \n        1933-1945: Zeit des Nationalsozialismus\n        - 30. Januar 1933: Hitler wird Reichskanzler\n        - 9. November 1938: Reichspogromnacht\n        - 1. September 1939: Beginn des Zweiten Weltkriegs\n        - 8. Mai 1945: Ende des Zweiten Weltkriegs in Europa\n        \n        1949: Gründung der Bundesrepublik Deutschland und der DDR\n        - 23. Mai 1949: Verkündung des Grundgesetzes\n        - 7. Oktober 1949: Gründung der DDR\n        \n        1961-1989: Berliner Mauer\n        - 13. August 1961: Bau der Berliner Mauer\n        - 9. November 1989: Fall der Berliner Mauer\n        \n        1990: Deutsche Wiedervereinigung\n        - 3. Oktober 1990: Tag der Deutschen Einheit\n        ",
+        "metadata": {
+          "category": "history"
+        },
+        "fetched_at": "2025-06-08T18:01:44.741889"
+      },
+      {
+        "source": "german_politics",
+        "type": "structured_data",
+        "title": "German Political System",
+        "content": "\n        Das politische System Deutschlands:\n        \n        Staatsform: Parlamentarische Demokratie, Bundesrepublik\n        \n        Verfassungsorgane:\n        1. Bundestag - Parlament, vom Volk gewählt\n        2. Bundesrat - Vertretung der Länder\n        3. Bundesregierung - Exekutive, geführt vom Bundeskanzler\n        4. Bundespräsident - Staatsoberhaupt\n        5. Bundesverfassungsgericht - Höchstes Gericht\n        \n        Gewaltenteilung:\n        - Legislative (Gesetzgebung): Bundestag und Bundesrat\n        - Exekutive (Ausführung): Bundesregierung\n        - Judikative (Rechtsprechung): Gerichte\n        \n        Wahlsystem:\n        - Wahlrecht ab 18 Jahren\n        - Allgemein, unmittelbar, frei, gleich und geheim\n        - 5%-Hürde für Parteien\n        ",
+        "metadata": {
+          "category": "politics"
+        },
+        "fetched_at": "2025-06-08T18:01:44.741896"
+      }
+    ]
+  }
+}

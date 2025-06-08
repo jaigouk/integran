@@ -1,0 +1,447 @@
+{
+  "completed_batches": [
+    {
+      "timestamp": "2025-06-08T16:02:41.937956+00:00",
+      "count": 10,
+      "question_ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "timestamp": "2025-06-08T16:09:02.443392+00:00",
+      "count": 10,
+      "question_ids": [
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ]
+    },
+    {
+      "timestamp": "2025-06-08T16:10:59.706902+00:00",
+      "count": 10,
+      "question_ids": [
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30
+      ]
+    }
+  ],
+  "explanations": {
+    "1": {
+      "question_id": 1,
+      "question_text": "In Deutschland dürfen Menschen offen etwas gegen die Regierung sagen, weil …",
+      "correct_answer": "hier Meinungsfreiheit gilt.",
+      "explanation": "In Deutschland ist die Meinungsfreiheit ein sehr wichtiges Grundrecht, das in Artikel 5 des Grundgesetzes festgeschrieben ist. Dieses Recht erlaubt es allen Menschen, ihre Meinung frei zu äußern, auch wenn es Kritik an der Regierung ist. Eine offene Debatte und Kritik sind entscheidend für eine funktionierende Demokratie, da sie zur Kontrolle der Macht beitragen und den politischen Diskurs fördern.",
+      "why_others_wrong": {
+        "hier Religionsfreiheit gilt.": "Die Religionsfreiheit (Artikel 4 GG) schützt den Glauben und die religiöse Praxis, aber nicht die politische Meinungsäußerung.",
+        "die Menschen Steuern zahlen.": "Steuern zu zahlen ist eine gesetzliche Pflicht. Das Recht, die Regierung zu kritisieren, hat man aber unabhängig davon, ob man Steuern zahlt oder nicht.",
+        "die Menschen das Wahlrecht haben.": "Das Wahlrecht ermöglicht die Teilnahme an Wahlen. Die Meinungsfreiheit ist ein separates Recht, das man jederzeit ausüben kann, nicht nur am Wahltag."
+      },
+      "key_concept": "Meinungsfreiheit (Artikel 5 Grundgesetz)",
+      "mnemonic": "Meine Meinung ist frei – ich sage, was ich denke, auch über die Politik dabei."
+    },
+    "2": {
+      "question_id": 2,
+      "question_text": "In Deutschland können Eltern bis zum 14. Lebensjahr ihres Kindes entscheiden, ob es in der Schule am …",
+      "correct_answer": "Religionsunterricht teilnimmt.",
+      "explanation": "Das Recht der Eltern, über die religiöse Erziehung ihrer Kinder zu bestimmen, ist Teil der Glaubensfreiheit. Das \"Gesetz über die religiöse Kindererziehung\" regelt dies genau: Bis zum 12. Lebensjahr entscheiden die Eltern allein. Zwischen 12 und 14 Jahren kann das Kind widersprechen. Ab dem 14. Geburtstag ist das Kind \"religionsmündig\" und entscheidet komplett selbst. Die Frage zielt auf den allgemeinen Zeitraum ab, in dem Eltern die primäre Entscheidungsgewalt haben.",
+      "why_others_wrong": {
+        "Geschichtsunterricht teilnimmt.": "Geschichte ist in Deutschland ein Pflichtfach und für die Allgemeinbildung wichtig. Eine Teilnahme ist obligatorisch.",
+        "Politikunterricht teilnimmt.": "Politikunterricht (auch Sozialkunde oder Gemeinschaftskunde genannt) ist ebenfalls ein Pflichtfach, um demokratische Grundwerte zu vermitteln.",
+        "Sprachunterricht teilnimmt.": "Der Deutschunterricht ist zentral und verpflichtend. Auch Fremdsprachen sind in der Regel Teil des obligatorischen Lehrplans."
+      },
+      "key_concept": "Religionsmündigkeit und elterliches Erziehungsrecht",
+      "mnemonic": "Religion ist Privatsache, daher entscheiden bis 14 die Eltern, danach das Kind für sich."
+    },
+    "3": {
+      "question_id": 3,
+      "question_text": "Deutschland ist ein Rechtsstaat. Was ist damit gemeint?",
+      "correct_answer": "Alle Einwohnerinnen/Einwohner und der Staat müssen sich an die Gesetze halten.",
+      "explanation": "Das Prinzip des Rechtsstaates (Artikel 20 Grundgesetz) ist eine der wichtigsten Grundlagen Deutschlands. Es bedeutet, dass niemand über dem Gesetz steht – weder die Bürgerinnen und Bürger noch der Staat selbst mit seinen Behörden, der Polizei oder der Regierung. Alle staatlichen Handlungen müssen auf Gesetzen basieren. Dies schützt die Menschen vor willkürlichen Entscheidungen des Staates.",
+      "why_others_wrong": {
+        "Der Staat muss sich nicht an die Gesetze halten.": "Das ist das genaue Gegenteil eines Rechtsstaates. Es beschreibt eine Diktatur oder Willkürherrschaft.",
+        "Nur Deutsche müssen die Gesetze befolgen.": "Die Gesetze in Deutschland gelten für alle Menschen, die sich im Land aufhalten, unabhängig von ihrer Staatsangehörigkeit.",
+        "Die Gerichte machen die Gesetze.": "Das ist falsch. In Deutschland herrscht Gewaltenteilung: Das Parlament (Legislative) macht die Gesetze, die Gerichte (Judikative) wenden sie an und legen sie aus."
+      },
+      "key_concept": "Rechtsstaatsprinzip",
+      "mnemonic": "Im Rechtsstaat gilt für alle das gleiche Recht – für den Bürger und auch für den Staat, ganz schlicht."
+    },
+    "4": {
+      "question_id": 4,
+      "question_text": "Welches Recht gehört zu den Grundrechten in Deutschland?",
+      "correct_answer": "Meinungsfreiheit",
+      "explanation": "Die Grundrechte sind die wichtigsten Rechte, die Bürgerinnen und Bürger gegenüber dem Staat haben. Sie sind im Grundgesetz verankert. Die Meinungsfreiheit (Artikel 5 GG) ist eines dieser zentralen Grundrechte und erlaubt es jedem, seine Meinung frei zu äußern, solange man nicht die Rechte anderer verletzt.",
+      "why_others_wrong": {
+        "Waffenbesitz": "Der Besitz von Waffen ist in Deutschland kein Grundrecht, sondern wird durch das Waffengesetz streng geregelt und erfordert eine spezielle Erlaubnis.",
+        "Faustrecht": "Das \"Recht des Stärkeren\" ist das Gegenteil eines Rechtsstaates, in dem Konflikte durch Gesetze und Gerichte gelöst werden.",
+        "Selbstjustiz": "Es ist verboten, das Recht in die eigene Hand zu nehmen. Nur der Staat hat das Gewaltmonopol, das durch Polizei und Gerichte ausgeübt wird."
+      },
+      "key_concept": "Grundrechte im Grundgesetz",
+      "mnemonic": null
+    },
+    "5": {
+      "question_id": 5,
+      "question_text": "Wahlen in Deutschland sind frei. Was bedeutet das?",
+      "correct_answer": "Die Wählerin/der Wähler darf bei der Wahl weder beeinflusst noch zu einer bestimmten Stimmabgabe gezwungen werden und keine Nachteile durch die Wahl haben.",
+      "explanation": "Das Wahlprinzip \"frei\" bedeutet, dass jede wahlberechtigte Person ihre Entscheidung ohne Druck, Zwang oder Angst vor Bestrafung treffen kann. Niemand darf einem Wähler vorschreiben, wen er wählen soll, oder ihn für seine Wahlentscheidung benachteiligen. Dies sichert, dass das Wahlergebnis den wahren Willen der Bevölkerung widerspiegelt.",
+      "why_others_wrong": {
+        "Man darf Geld annehmen, wenn man dafür eine bestimmte Kandidatin/einen bestimmten Kandidaten wählt.": "Das ist Wählerbestechung und eine Straftat. Es widerspricht dem Prinzip der freien Wahl.",
+        "Nur Personen, die noch nie im Gefängnis waren, dürfen wählen.": "Das ist falsch. Ein Gefängnisaufenthalt führt nicht automatisch zum Verlust des Wahlrechts. Nur in seltenen Fällen kann ein Gericht das Wahlrecht aberkennen.",
+        "Alle wahlberechtigten Personen müssen wählen.": "In Deutschland gibt es ein Wahlrecht, aber keine Wahlpflicht. Jeder darf frei entscheiden, ob er wählen geht oder nicht."
+      },
+      "key_concept": "Wahlgrundsätze: Freie Wahl",
+      "mnemonic": "Freie Wahl heißt: Meine Stimme gehört mir, ohne Zwang und ohne Gier."
+    },
+    "6": {
+      "question_id": 6,
+      "question_text": "Wie heißt die deutsche Verfassung?",
+      "correct_answer": "Grundgesetz",
+      "explanation": "Die Verfassung der Bundesrepublik Deutschland heißt \"Grundgesetz\". Es wurde 1949 vom Parlamentarischen Rat ausgearbeitet und verkündet. Es enthält die grundlegenden staatlichen Regeln, die Grundrechte der Bürgerinnen und Bürger und die Struktur des politischen Systems in Deutschland.",
+      "why_others_wrong": {
+        "Volksgesetz": "Diesen Begriff gibt es im deutschen Rechtssystem nicht als Bezeichnung für die Verfassung.",
+        "Bundesgesetz": "Ein Bundesgesetz ist ein normales Gesetz, das für ganz Deutschland gilt. Das Grundgesetz steht aber als Verfassung über allen anderen Gesetzen.",
+        "Deutsches Gesetz": "Dies ist ein zu allgemeiner Begriff. Der offizielle und korrekte Name der Verfassung ist \"Grundgesetz\"."
+      },
+      "key_concept": "Grundgesetz als Verfassung Deutschlands",
+      "mnemonic": "Das Fundament und die Grundlage für Deutschland ist das Grundgesetz."
+    },
+    "7": {
+      "question_id": 7,
+      "question_text": "Welches Recht gehört zu den Grundrechten, die nach der deutschen Verfassung garantiert werden? Das Recht auf …",
+      "correct_answer": "Glaubens- und Gewissensfreiheit",
+      "explanation": "Die Glaubens- und Gewissensfreiheit ist ein zentrales Grundrecht, das in Artikel 4 des Grundgesetzes garantiert wird. Es besagt, dass jeder Mensch frei ist, seine Religion oder Weltanschauung zu wählen, auszuüben oder auch keiner Religion anzugehören. Der Staat darf niemanden wegen seines Glaubens benachteiligen.",
+      "why_others_wrong": {
+        "Unterhaltung": "Es gibt kein Grundrecht auf Unterhaltung. Dies fällt unter die allgemeine Handlungsfreiheit, ist aber kein eigenständiges, einklagbares Grundrecht.",
+        "Arbeit": "Es gibt kein Grundrecht auf einen Arbeitsplatz. Artikel 12 GG garantiert die Berufsfreiheit, also das Recht, seinen Beruf frei zu wählen, aber nicht das Recht, eine Arbeitsstelle vom Staat zu bekommen.",
+        "Wohnung": "Es gibt kein Grundrecht auf eine Wohnung. Artikel 13 GG schützt die \"Unverletzlichkeit der Wohnung\", was bedeutet, dass niemand ohne richterlichen Beschluss Ihre Wohnung durchsuchen darf. Der Staat hat aber das soziale Ziel, für angemessenen Wohnraum zu sorgen."
+      },
+      "key_concept": "Glaubens- und Gewissensfreiheit (Artikel 4 Grundgesetz)",
+      "mnemonic": null
+    },
+    "8": {
+      "question_id": 8,
+      "question_text": "Was steht nicht im Grundgesetz von Deutschland?",
+      "correct_answer": "Alle sollen gleich viel Geld haben.",
+      "explanation": "Das Grundgesetz legt fest, dass Deutschland ein Sozialstaat ist. Das bedeutet, der Staat versucht, soziale Ungerechtigkeiten auszugleichen (z.B. durch Sozialhilfe). Es gibt aber keine Regel, die vorschreibt, dass alle Menschen den gleichen Besitz oder das gleiche Einkommen haben müssen (Gleichheit des Ergebnisses). Garantiert wird die Gleichheit vor dem Gesetz.",
+      "why_others_wrong": {
+        "Die Würde des Menschen ist unantastbar.": "Dies ist der erste und wichtigste Satz des Grundgesetzes (Artikel 1). Er ist die Grundlage aller anderen Grundrechte.",
+        "Jeder Mensch darf seine Meinung sagen.": "Dies ist die Meinungsfreiheit, die in Artikel 5 des Grundgesetzes garantiert wird.",
+        "Alle sind vor dem Gesetz gleich.": "Dies ist der Gleichheitsgrundsatz, der in Artikel 3 des Grundgesetzes festgeschrieben ist."
+      },
+      "key_concept": "Sozialstaatsprinzip vs. Kommunismus",
+      "mnemonic": "Gleiche Rechte, ja. Gleiches Geld, nein. Das steht im Grundgesetz nicht drin."
+    },
+    "9": {
+      "question_id": 9,
+      "question_text": "Welches Grundrecht gilt in Deutschland nur für Ausländerinnen/Ausländer? Das Grundrecht auf …",
+      "correct_answer": "Asyl",
+      "explanation": "Das Recht auf Asyl (Artikel 16a Grundgesetz) ist ein besonderes Schutzrecht. Es gilt für Menschen, die in ihrem Heimatland politisch verfolgt werden und deshalb in Deutschland Schutz suchen. Ein deutscher Staatsbürger kann in Deutschland kein Asyl beantragen, da er hier bereits alle Bürgerrechte genießt und nicht vom eigenen Staat verfolgt wird im Sinne des Asylrechts.",
+      "why_others_wrong": {
+        "Schutz der Familie": "Der Schutz von Ehe und Familie (Artikel 6 GG) gilt für alle Menschen in Deutschland, egal welche Staatsangehörigkeit sie haben.",
+        "Menschenwürde": "Die Menschenwürde (Artikel 1 GG) ist ein universelles Menschenrecht und gilt für absolut jeden Menschen.",
+        "Meinungsfreiheit": "Die Meinungsfreiheit (Artikel 5 GG) ist ebenfalls ein Menschenrecht, das jeder in Deutschland genießen kann."
+      },
+      "key_concept": "Asylrecht (Artikel 16a GG) als Schutzrecht für politisch Verfolgte",
+      "mnemonic": "Asyl ist für Ausländer, die Schutz suchen. Deutsche Bürger brauchen das im eigenen Land nicht."
+    },
+    "10": {
+      "question_id": 10,
+      "question_text": "Was ist mit dem deutschen Grundgesetz vereinbar?",
+      "correct_answer": "die Geldstrafe",
+      "explanation": "Eine Geldstrafe ist eine im deutschen Rechtssystem vorgesehene und zulässige Strafe für Gesetzesverstöße. Sie greift in das Eigentum ein, was unter gesetzlichem Vorbehalt zulässig ist, verletzt aber nicht die Menschenwürde oder das Recht auf körperliche Unversehrtheit und ist daher mit dem Grundgesetz vereinbar.",
+      "why_others_wrong": {
+        "die Prügelstrafe": "Körperliche Strafen sind verboten, da sie gegen die Menschenwürde (Artikel 1 GG) und das Recht auf körperliche Unversehrtheit (Artikel 2 GG) verstoßen.",
+        "die Folter": "Folter ist unter allen Umständen und ausnahmslos verboten. Sie ist ein schwerwiegender Verstoß gegen die Menschenwürde.",
+        "die Todesstrafe": "Die Todesstrafe ist in Deutschland durch Artikel 102 des Grundgesetzes explizit abgeschafft."
+      },
+      "key_concept": "Verbot von grausamen Strafen und Abschaffung der Todesstrafe",
+      "mnemonic": "Keine Schläge, keine Qual, kein Tod – das ist im Grundgesetz das oberste Gebot. Nur Geldstrafen sind erlaubt."
+    },
+    "11": {
+      "question_id": 11,
+      "question_text": "Wie wird die Verfassung der Bundesrepublik Deutschland genannt?",
+      "correct_answer": "Grundgesetz",
+      "explanation": "Die Verfassung der Bundesrepublik Deutschland heißt „Grundgesetz“. Sie wurde 1949 ursprünglich als Provisorium für Westdeutschland geschaffen. Der Name sollte den vorläufigen Charakter betonen, bis eine Verfassung für ein wiedervereinigtes Deutschland beschlossen werden könnte. Nach der Wiedervereinigung 1990 wurde das Grundgesetz zur dauerhaften Verfassung für ganz Deutschland.",
+      "why_others_wrong": {
+        "Bundesverfassung": "Obwohl es die Verfassung des Bundes ist, ist dies nicht der offizielle Name. Der korrekte Begriff ist Grundgesetz.",
+        "Gesetzbuch": "Ein Gesetzbuch (z.B. das Bürgerliche Gesetzbuch) ist eine Sammlung von Gesetzen zu einem bestimmten Thema, aber nicht die übergeordnete Verfassung des Staates.",
+        "Verfassungsvertrag": "Dies ist kein offizieller Name für ein deutsches Rechtsdokument. Das Grundgesetz ist ein Gesetz, kein Vertrag in diesem Sinne."
+      },
+      "key_concept": "Der offizielle Name der deutschen Verfassung ist Grundgesetz (GG).",
+      "mnemonic": "Das Grundgesetz ist die Grundlage für alle anderen Gesetze in Deutschland."
+    },
+    "12": {
+      "question_id": 12,
+      "question_text": "Eine Partei im Deutschen Bundestag will die Pressefreiheit abschaffen. Ist das möglich?",
+      "correct_answer": "Nein, denn die Pressefreiheit ist ein Grundrecht. Sie kann nicht abgeschafft werden.",
+      "explanation": "Die Pressefreiheit ist ein Grundrecht, das in Artikel 5 des Grundgesetzes verankert ist. Bestimmte Kernprinzipien des Grundgesetzes, darunter die Menschenwürde (Art. 1) und die grundlegenden demokratischen und rechtsstaatlichen Prinzipien (Art. 20), sind durch die sogenannte „Ewigkeitsklausel“ (Art. 79 Abs. 3 GG) geschützt. Diese Klausel verbietet Änderungen, die diese fundamentalen Werte antasten. Die Abschaffung eines so wichtigen Grundrechts wie der Pressefreiheit ist daher unmöglich.",
+      "why_others_wrong": {
+        "Ja, wenn mehr als die Hälfte der Abgeordneten im Bundestag dafür sind.": "Eine einfache Mehrheit reicht nicht aus, um die Verfassung zu ändern, und schon gar nicht, um ein Kern-Grundrecht abzuschaffen.",
+        "Ja, aber dazu müssen zwei Drittel der Abgeordneten im Bundestag dafür sein.": "Eine Zwei-Drittel-Mehrheit ist zwar für Verfassungsänderungen nötig, aber die Ewigkeitsklausel schützt die wichtigsten Grundrechte vor jeglicher Abschaffung.",
+        "Nein, denn nur der Bundesrat kann die Pressefreiheit abschaffen.": "Kein staatliches Organ, weder Bundestag noch Bundesrat, hat die Macht, die durch die Ewigkeitsklausel geschützten Grundrechte abzuschaffen."
+      },
+      "key_concept": "Wichtige Grundrechte wie die Pressefreiheit sind durch die „Ewigkeitsklausel“ geschützt und können nicht abgeschafft werden.",
+      "mnemonic": "Manche Rechte sind „ewig“ und können niemals weggenommen werden, egal wer regiert."
+    },
+    "13": {
+      "question_id": 13,
+      "question_text": "Im Parlament steht der Begriff \"Opposition\" für …",
+      "correct_answer": "alle Abgeordneten, die nicht zu der Regierungspartei/den Regierungsparteien gehören.",
+      "explanation": "In einer Demokratie bilden eine oder mehrere Parteien die Regierung (die Regierungskoalition). Alle anderen Parteien, die im Parlament vertreten sind, aber nicht an der Regierung beteiligt sind, bilden die Opposition. Ihre Aufgabe ist es, die Regierung zu kontrollieren, ihre Arbeit zu kritisieren und eigene politische Alternativen aufzuzeigen.",
+      "why_others_wrong": {
+        "die regierenden Parteien.": "Das ist das genaue Gegenteil. Die regierenden Parteien bilden die Regierung, nicht die Opposition.",
+        "die Fraktion mit den meisten Abgeordneten.": "Die stärkste Fraktion bildet oft die Regierung. Wenn nicht, ist sie zwar die größte Oppositionspartei, aber der Begriff „Opposition“ umfasst alle nicht-regierenden Parteien.",
+        "alle Parteien, die bei der letzten Wahl die 5%-Hürde erreichen konnten.": "Dies beschreibt alle Parteien im Parlament, also Regierung und Opposition zusammen."
+      },
+      "key_concept": "Die Opposition im Parlament sind alle Parteien, die nicht die Regierung stellen.",
+      "mnemonic": "Opposition kommt von „opponere“ (lateinisch für „entgegensetzen“). Die Opposition setzt der Regierung ihre Kontrolle und ihre Ideen entgegen."
+    },
+    "14": {
+      "question_id": 14,
+      "question_text": "Meinungsfreiheit in Deutschland heißt, dass ich …",
+      "correct_answer": "meine Meinung im Internet äußern kann.",
+      "explanation": "Die Meinungsfreiheit (Artikel 5 Grundgesetz) schützt das Recht jedes Menschen, seine Meinung frei zu äußern. Das gilt für alle Medien, also auch für das Internet, soziale Netzwerke oder Blogs. Diese Freiheit hat jedoch Grenzen: Sie darf nicht die Rechte anderer verletzen oder gegen andere Gesetze verstoßen.",
+      "why_others_wrong": {
+        "Passanten auf der Straße beschimpfen darf.": "Das ist nicht von der Meinungsfreiheit gedeckt. Beleidigungen sind strafbar und verletzen die Ehre anderer Menschen.",
+        "Nazi-, Hamas- oder Islamischer Staat-Symbole öffentlich tragen darf.": "Das ist streng verboten. Das Verwenden von Kennzeichen verfassungswidriger oder terroristischer Organisationen ist in Deutschland eine Straftat.",
+        "meine Meinung nur dann äußern darf, solange ich der Regierung nicht widerspreche.": "Das Gegenteil ist der Fall. Die Kritik an der Regierung ist ein wesentlicher und geschützter Teil der Meinungsfreiheit in einer Demokratie."
+      },
+      "key_concept": "Meinungsfreiheit erlaubt die Äußerung von Meinungen (auch kritischen), findet ihre Grenzen aber im Schutz der Rechte anderer und in bestehenden Gesetzen.",
+      "mnemonic": "Deine Freiheit endet dort, wo die Freiheit des anderen beginnt. Meinungsfreiheit ist kein Freibrief für Beleidigung oder Hass."
+    },
+    "15": {
+      "question_id": 15,
+      "question_text": "Was verbietet das deutsche Grundgesetz?",
+      "correct_answer": "Zwangsarbeit",
+      "explanation": "Artikel 12 des Grundgesetzes verbietet Zwangsarbeit ausdrücklich. Niemand darf gezwungen werden, eine bestimmte Arbeit zu leisten. Dies ist ein wichtiger Schutz der persönlichen Freiheit. Ausnahmen gibt es nur in sehr eng begrenzten Fällen, zum Beispiel bei einer gerichtlich angeordneten Freiheitsstrafe.",
+      "why_others_wrong": {
+        "Militärdienst": "Das Grundgesetz verbietet den Militärdienst nicht, sondern schafft die rechtliche Grundlage dafür. Die Wehrpflicht ist zwar ausgesetzt, kann aber per Gesetz wieder eingeführt werden.",
+        "freie Berufswahl": "Das Grundgesetz verbietet die freie Berufswahl nicht, sondern garantiert sie in Artikel 12.",
+        "Arbeit im Ausland": "Das Grundgesetz verbietet die Arbeit im Ausland nicht. Deutsche Staatsbürger haben das Recht, im Ausland zu arbeiten."
+      },
+      "key_concept": "Das Grundgesetz schützt die persönliche Freiheit und verbietet daher Zwangsarbeit (Artikel 12 GG).",
+      "mnemonic": null
+    },
+    "16": {
+      "question_id": 16,
+      "question_text": "Wann ist die Meinungsfreiheit in Deutschland eingeschränkt?",
+      "correct_answer": "bei der öffentlichen Verbreitung falscher Behauptungen über einzelne Personen",
+      "explanation": "Die Meinungsfreiheit ist kein grenzenloses Recht. Eine wichtige Grenze ist der Schutz der persönlichen Ehre anderer Menschen. Wenn man wissentlich falsche Tatsachen über eine Person verbreitet, um deren Ansehen zu schaden, ist das Verleumdung oder üble Nachrede und somit strafbar. Hier schützt das Gesetz den Einzelnen vor falschen Anschuldigungen.",
+      "why_others_wrong": {
+        "bei Meinungsäußerungen über die Bundesregierung": "Kritik an der Regierung ist ein zentrales Element der Demokratie und wird durch die Meinungsfreiheit ausdrücklich geschützt.",
+        "bei Diskussionen über Religionen": "Diskussionen über Religionen sind erlaubt. Die Grenze ist erst erreicht, wenn man zum Hass aufstachelt (Volksverhetzung) oder Religionsgemeinschaften grob beschimpft.",
+        "bei Kritik am Staat": "Kritik am Staat und seinen Institutionen ist ein wichtiges demokratisches Recht und durch die Meinungsfreiheit geschützt."
+      },
+      "key_concept": "Die Meinungsfreiheit wird eingeschränkt, wenn sie die Rechte anderer verletzt, z.B. durch Beleidigung, Verleumdung oder Volksverhetzung.",
+      "mnemonic": "Meine Meinung ist frei, aber Lügen, die anderen schaden, sind verboten."
+    },
+    "17": {
+      "question_id": 17,
+      "question_text": "Die deutschen Gesetze verbieten …",
+      "correct_answer": "Ungleichbehandlung der Bürgerinnen und Bürger durch den Staat.",
+      "explanation": "Das Grundgesetz verbietet in Artikel 3 die Ungleichbehandlung durch den Staat. Dieser Artikel enthält den Gleichheitssatz („Alle Menschen sind vor dem Gesetz gleich“) und ein Diskriminierungsverbot. Der Staat darf niemanden wegen seines Geschlechts, seiner Abstammung, seiner Herkunft, seines Glaubens oder seiner politischen Anschauungen benachteiligen oder bevorzugen.",
+      "why_others_wrong": {
+        "Meinungsfreiheit der Einwohnerinnen und Einwohner.": "Die Gesetze garantieren die Meinungsfreiheit (Art. 5 GG), sie verbieten sie nicht.",
+        "Petitionen der Bürgerinnen und Bürger.": "Das Recht, Bitten oder Beschwerden an Behörden zu richten (Petitionen), ist gesetzlich garantiert (Art. 17 GG).",
+        "Versammlungsfreiheit der Einwohnerinnen und Einwohner.": "Die Gesetze garantieren das Recht, sich friedlich zu versammeln (Art. 8 GG), sie verbieten es nicht."
+      },
+      "key_concept": "Ein zentrales Prinzip der deutschen Gesetze ist das Verbot der Ungleichbehandlung und Diskriminierung durch den Staat (Gleichheitssatz, Art. 3 GG).",
+      "mnemonic": "Vor dem Gesetz sind alle gleich – egal wer sie sind, woher sie kommen oder woran sie glauben."
+    },
+    "18": {
+      "question_id": 18,
+      "question_text": "Welches Grundrecht ist in Artikel 1 des Grundgesetzes der Bundesrepublik Deutschland garantiert?",
+      "correct_answer": "die Unantastbarkeit der Menschenwürde",
+      "explanation": "Artikel 1 des Grundgesetzes ist der wichtigste Artikel und steht ganz am Anfang. Sein erster Satz lautet: „Die Würde des Menschen ist unantastbar.“ Das bedeutet, dass jeder Mensch einen angeborenen Wert hat, der vom Staat und allen Menschen geachtet werden muss. Dieses Prinzip ist die Grundlage aller anderen Grundrechte.",
+      "why_others_wrong": {
+        "das Recht auf Leben": "Das Recht auf Leben und körperliche Unversehrtheit ist ebenfalls ein sehr wichtiges Grundrecht, es steht aber in Artikel 2 des Grundgesetzes.",
+        "Religionsfreiheit": "Die Freiheit des Glaubens, des Gewissens und die Freiheit des religiösen und weltanschaulichen Bekenntnisses sind in Artikel 4 des Grundgesetzes garantiert.",
+        "Meinungsfreiheit": "Das Recht, seine Meinung frei zu äußern, ist in Artikel 5 des Grundgesetzes garantiert."
+      },
+      "key_concept": "Artikel 1 des Grundgesetzes schützt die Menschenwürde als höchsten Wert der Verfassung.",
+      "mnemonic": "Die Nummer 1 im Grundgesetz ist das Wichtigste: die Würde des Menschen."
+    },
+    "19": {
+      "question_id": 19,
+      "question_text": "Was versteht man unter dem Recht der \"Freizügigkeit\" in Deutschland?",
+      "correct_answer": "Man darf sich seinen Wohnort selbst aussuchen.",
+      "explanation": "Das Recht auf Freizügigkeit ist in Artikel 11 des Grundgesetzes geregelt. Es bedeutet, dass alle Deutschen das Recht haben, sich im gesamten Bundesgebiet frei zu bewegen und ihren Wohn- und Aufenthaltsort frei zu wählen. Man kann also von Hamburg nach München ziehen, ohne dafür eine Erlaubnis zu benötigen.",
+      "why_others_wrong": {
+        "Man kann seinen Beruf wechseln.": "Das ist die Berufsfreiheit, die in Artikel 12 des Grundgesetzes geregelt ist.",
+        "Man darf sich für eine andere Religion entscheiden.": "Das ist die Glaubens- und Religionsfreiheit, die in Artikel 4 des Grundgesetzes steht.",
+        "Man darf sich in der Öffentlichkeit nur leicht bekleidet bewegen.": "Dies ist eine falsche Interpretation des Wortes „freizügig“. Im rechtlichen Sinne hat Freizügigkeit nichts mit Kleidung zu tun, sondern nur mit der Bewegungs- und Wohnsitzfreiheit."
+      },
+      "key_concept": "Freizügigkeit (Art. 11 GG) ist das Recht, seinen Wohn- und Aufenthaltsort innerhalb Deutschlands frei zu wählen.",
+      "mnemonic": "Freizügigkeit bedeutet, man kann frei umziehen."
+    },
+    "20": {
+      "question_id": 20,
+      "question_text": "Eine Partei in Deutschland verfolgt das Ziel, eine Diktatur zu errichten. Sie ist dann …",
+      "correct_answer": "verfassungswidrig.",
+      "explanation": "Das Grundgesetz legt fest, dass Deutschland eine Demokratie ist (Artikel 20 GG). Eine Partei, die diese demokratische Grundordnung abschaffen und eine Diktatur errichten will, handelt gegen die Verfassung. Sie ist daher „verfassungswidrig“. Solche Parteien können vom Bundesverfassungsgericht verboten werden, weil sie die Existenz des freiheitlichen demokratischen Staates bedrohen.",
+      "why_others_wrong": {
+        "tolerant.": "Eine Partei, die eine Diktatur will, ist das Gegenteil von tolerant, da sie keine anderen Meinungen oder Parteien zulassen würde.",
+        "rechtsstaatlich orientiert.": "Eine Diktatur ist das Gegenteil eines Rechtsstaates. In einem Rechtsstaat herrscht das Gesetz und schützt die Bürger, in einer Diktatur herrscht Willkür.",
+        "gesetzestreu.": "Eine solche Partei ist nicht gesetzestreu, da ihr oberstes Ziel der Bruch des höchsten Gesetzes, der Verfassung, ist."
+      },
+      "key_concept": "Parteien, die die demokratische Grundordnung beseitigen wollen, sind verfassungswidrig.",
+      "mnemonic": "Wer gegen die Verfassung ist, ist verfassungswidrig. Das Wort selbst verrät die Antwort."
+    },
+    "21": {
+      "question_id": 21,
+      "question_text": "Welches ist das Wappen der Bundesrepublik Deutschland?",
+      "correct_answer": "Bild 1",
+      "explanation": "Das Wappen der Bundesrepublik Deutschland zeigt den Bundesadler. Es ist ein schwarzer Adler mit roten Krallen und einem roten Schnabel auf einem goldgelben Hintergrund. Dieses Symbol hat eine lange Tradition und steht für die Souveränität und Stärke des deutschen Staates. Achten Sie auf die Kombination: goldener Grund, schwarzer Adler, rote Details.",
+      "why_others_wrong": {
+        "Bild 2": "Dieses Bild zeigt wahrscheinlich ein anderes Wappen, z.B. das eines Bundeslandes oder eines anderen Staates, mit anderen Farben oder Symbolen.",
+        "Bild 3": "Dieses Bild zeigt wahrscheinlich ein anderes Wappen, z.B. das eines Bundeslandes oder eines другого Staates, mit anderen Farben oder Symbolen.",
+        "Bild 4": "Dieses Bild zeigt wahrscheinlich ein anderes Wappen, z.B. das eines Bundeslandes oder eines anderen Staates, mit anderen Farben oder Symbolen."
+      },
+      "key_concept": "Erkennung des Bundeswappens (Bundesadler)",
+      "mnemonic": "Gold, Schwarz, Rot – wie die deutsche Flagge, nur anders angeordnet. Der Adler ist das Tier des Bundes."
+    },
+    "22": {
+      "question_id": 22,
+      "question_text": "Was für eine Staatsform hat Deutschland?",
+      "correct_answer": "Republik",
+      "explanation": "Deutschland ist eine Republik. Das bedeutet, das Staatsoberhaupt (der Bundespräsident) wird gewählt und erbt sein Amt nicht. Der Name 'Bundesrepublik Deutschland' sagt es schon. In einer Republik geht die Macht vom Volk aus (Volkssouveränität).",
+      "why_others_wrong": {
+        "Monarchie": "Eine Monarchie hat einen König oder eine Königin als Staatsoberhaupt (z.B. Großbritannien). Deutschland hat seit 1918 keinen Monarchen mehr.",
+        "Diktatur": "Eine Diktatur ist eine Herrschaft ohne freie Wahlen und ohne Gewaltenteilung. Deutschland ist eine Demokratie, das genaue Gegenteil.",
+        "Fürstentum": "Ein Fürstentum ist eine Form der Monarchie, die von einem Fürsten regiert wird (z.B. Monaco). Das trifft auf Deutschland nicht zu."
+      },
+      "key_concept": "Staatsform Deutschlands ist eine Republik",
+      "mnemonic": "Im Namen 'Bundesrepublik Deutschland' steckt die Antwort schon drin: Republik."
+    },
+    "23": {
+      "question_id": 23,
+      "question_text": "In Deutschland sind die meisten Erwerbstätigen …",
+      "correct_answer": "bei einer Firma oder Behörde beschäftigt.",
+      "explanation": "Die überwiegende Mehrheit der arbeitenden Menschen in Deutschland sind Arbeitnehmer, also Angestellte oder Arbeiter. Sie haben einen Arbeitsvertrag mit einem privaten Unternehmen (Firma) oder einer öffentlichen Einrichtung (Behörde) und erhalten dafür ein Gehalt oder einen Lohn. Dies ist die typische Form der Erwerbstätigkeit in Deutschland.",
+      "why_others_wrong": {
+        "in kleinen Familienunternehmen beschäftigt.": "Obwohl Familienunternehmen wichtig für die Wirtschaft sind, beschäftigen sie nicht die Mehrheit aller Erwerbstätigen.",
+        "ehrenamtlich für ein Bundesland tätig.": "Ehrenamtliche Arbeit ist unbezahlt und freiwillig. Erwerbstätigkeit bedeutet, dass man für seinen Lebensunterhalt arbeitet.",
+        "selbstständig mit einer eigenen Firma tätig.": "Die Zahl der Selbstständigen ist deutlich geringer als die der angestellten Arbeitnehmer."
+      },
+      "key_concept": "Struktur des deutschen Arbeitsmarktes",
+      "mnemonic": "Die meisten Menschen sind 'Arbeitnehmer' – sie nehmen Arbeit bei einer Firma oder Behörde an."
+    },
+    "24": {
+      "question_id": 24,
+      "question_text": "Wie viele Bundesländer hat die Bundesrepublik Deutschland?",
+      "correct_answer": "16",
+      "explanation": "Die Bundesrepublik Deutschland ist ein Bundesstaat, der aus 16 einzelnen Bundesländern besteht. Diese Zahl wurde nach der deutschen Wiedervereinigung 1990 erreicht, als die fünf neuen Länder der ehemaligen DDR der Bundesrepublik beitraten.",
+      "why_others_wrong": {
+        "14": "Diese Anzahl ist falsch. Es waren früher weniger, aber heute sind es 16.",
+        "15": "Diese Anzahl ist falsch. Es sind 16.",
+        "17": "Diese Anzahl ist falsch. Es sind 16."
+      },
+      "key_concept": "Föderalismus: Deutschland besteht aus 16 Bundesländern.",
+      "mnemonic": "Eine einfache Zahl zum Merken: Deutschland hat 16 Bundesländer."
+    },
+    "25": {
+      "question_id": 25,
+      "question_text": "Was ist kein Bundesland der Bundesrepublik Deutschland?",
+      "correct_answer": "Elsass-Lothringen",
+      "explanation": "Elsass-Lothringen ist eine Region, die heute zu Frankreich gehört. Sie hat eine wechselvolle Geschichte und war zeitweise Teil des Deutschen Reiches, ist aber heute kein deutsches Bundesland. Die anderen drei genannten sind allesamt Bundesländer.",
+      "why_others_wrong": {
+        "Nordrhein-Westfalen": "Dies ist das bevölkerungsreichste Bundesland im Westen Deutschlands.",
+        "Mecklenburg-Vorpommern": "Dies ist ein Bundesland im Nordosten Deutschlands, das nach der Wiedervereinigung 1990 gebildet wurde.",
+        "Sachsen-Anhalt": "Dies ist ein Bundesland in der Mitte Deutschlands, ebenfalls eines der 'neuen' Bundesländer."
+      },
+      "key_concept": "Kenntnis der 16 deutschen Bundesländer",
+      "mnemonic": "Elsass-Lothringen klingt zwar deutsch, liegt aber heute in Frankreich."
+    },
+    "26": {
+      "question_id": 26,
+      "question_text": "Deutschland ist …",
+      "correct_answer": "ein demokratischer und sozialer Bundesstaat.",
+      "explanation": "Diese Beschreibung fasst die wichtigsten Staatsprinzipien Deutschlands zusammen, die in Artikel 20 des Grundgesetzes festgelegt sind. 'Demokratisch' bedeutet, die Macht geht vom Volk aus. 'Sozial' bedeutet, der Staat sorgt für soziale Sicherheit und Gerechtigkeit. 'Bundesstaat' bedeutet, Deutschland besteht aus 16 Bundesländern.",
+      "why_others_wrong": {
+        "eine kommunistische Republik.": "Deutschland hat eine Marktwirtschaft und ein Mehrparteiensystem, keine kommunistische Planwirtschaft.",
+        "eine kapitalistische und soziale Monarchie.": "Deutschland ist keine Monarchie (sondern eine Republik) und der Begriff 'kapitalistisch' ist nicht die offizielle Verfassungsbezeichnung.",
+        "ein sozialer und sozialistischer Bundesstaat.": "Deutschland ist nicht sozialistisch. Im Sozialismus gehören die Produktionsmittel dem Staat, in Deutschland überwiegend Privatpersonen und Unternehmen."
+      },
+      "key_concept": "Staatsprinzipien im Grundgesetz (Art. 20 GG)",
+      "mnemonic": "Merke dir die drei Säulen aus dem Grundgesetz: Demokratie, Sozialstaat, Bundesstaat."
+    },
+    "27": {
+      "question_id": 27,
+      "question_text": "Deutschland ist …",
+      "correct_answer": "ein Bundesstaat.",
+      "explanation": "Deutschland ist ein Bundesstaat (Föderation). Das bedeutet, die staatliche Macht ist zwischen dem Bund (der Zentralregierung) und den 16 Bundesländern aufgeteilt. Die Länder haben eigene Parlamente, Regierungen und Zuständigkeiten, z.B. in der Bildungspolitik. Dieses Prinzip nennt man Föderalismus.",
+      "why_others_wrong": {
+        "ein sozialistischer Staat.": "Falsch, Deutschland hat eine soziale Marktwirtschaft, keinen Sozialismus.",
+        "eine Diktatur.": "Falsch, Deutschland ist eine stabile Demokratie.",
+        "eine Monarchie.": "Falsch, Deutschland ist eine Republik ohne König oder Königin."
+      },
+      "key_concept": "Föderalismus als Grundprinzip Deutschlands",
+      "mnemonic": "Ein 'Bund' von 16 Ländern bildet den 'Bundesstaat'."
+    },
+    "28": {
+      "question_id": 28,
+      "question_text": "Wer wählt in Deutschland die Abgeordneten zum Bundestag?",
+      "correct_answer": "das wahlberechtigte Volk",
+      "explanation": "In einer Demokratie geht alle Staatsgewalt vom Volk aus. Das Volk übt diese Gewalt durch Wahlen aus. Alle deutschen Staatsbürger, die mindestens 18 Jahre alt sind, dürfen die Abgeordneten des Bundestages (des deutschen Parlaments) wählen. Sie sind das 'wahlberechtigte Volk'.",
+      "why_others_wrong": {
+        "das Militär": "In einer Demokratie untersteht das Militär der zivilen Kontrolle und hat kein Wahlrecht als Institution.",
+        "die Wirtschaft": "Unternehmen oder Wirtschaftsverbände haben kein Wahlrecht. Nur einzelne Bürgerinnen und Bürger dürfen wählen.",
+        "die Verwaltung": "Die Verwaltung (Behörden) ist Teil der ausführenden Gewalt (Exekutive) und wählt nicht das Parlament (Legislative)."
+      },
+      "key_concept": "Demokratieprinzip und Volkssouveränität",
+      "mnemonic": "Demokratie heißt 'Herrschaft des Volkes'. Also wählt das Volk."
+    },
+    "29": {
+      "question_id": 29,
+      "question_text": "Welches Tier ist das Wappentier der Bundesrepublik Deutschland?",
+      "correct_answer": "Adler",
+      "explanation": "Das Wappentier Deutschlands ist der Adler, auch Bundesadler genannt. Er ist ein traditionelles deutsches Herrschaftssymbol, das für Stärke, Souveränität und Freiheit steht. Man findet ihn auf offiziellen Dokumenten, Münzen und an Regierungsgebäuden.",
+      "why_others_wrong": {
+        "Löwe": "Der Löwe ist das Wappentier einiger Bundesländer, z.B. von Bayern oder Hessen, aber nicht des Bundes.",
+        "Bär": "Der Bär ist das Wappentier von Berlin.",
+        "Pferd": "Das Pferd (Sachsenross) ist das Wappentier von Niedersachsen."
+      },
+      "key_concept": "Wappentier Deutschlands ist der Bundesadler.",
+      "mnemonic": "Der Adler fliegt über dem ganzen Bund, der Bär tanzt nur in Berlin und der Löwe brüllt in Bayern."
+    },
+    "30": {
+      "question_id": 30,
+      "question_text": "Was ist kein Merkmal unserer Demokratie?",
+      "correct_answer": "Pressezensur",
+      "explanation": "Pressezensur bedeutet, dass der Staat kontrolliert und vorschreibt, was in den Medien veröffentlicht werden darf. Dies ist ein typisches Merkmal einer Diktatur. In der deutschen Demokratie ist die Zensur durch das Grundgesetz (Artikel 5) ausdrücklich verboten. Presse- und Meinungsfreiheit sind wesentliche Säulen der Demokratie.",
+      "why_others_wrong": {
+        "regelmäßige Wahlen": "Dies ist ein Kernmerkmal der Demokratie. Das Volk kann seine Vertreter regelmäßig wählen und auch abwählen.",
+        "Meinungsfreiheit": "Dies ist ein Grundrecht in einer Demokratie. Jeder darf seine Meinung frei äußern, solange er nicht die Rechte anderer verletzt.",
+        "verschiedene Parteien": "Der Wettbewerb verschiedener Parteien mit unterschiedlichen Programmen (Parteienpluralismus) ist entscheidend für eine funktionierende Demokratie."
+      },
+      "key_concept": "Grundrechte und Merkmale der Demokratie (vs. Diktatur)",
+      "mnemonic": "Zensur ist Kontrolle und Verbot. Demokratie ist Freiheit. Daher passt Pressezensur nicht zur Demokratie."
+    }
+  },
+  "state": "in_progress",
+  "started_at": "2025-06-08T16:01:46.599501+00:00",
+  "total_questions": 460
+}

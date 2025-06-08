@@ -312,7 +312,7 @@ class GeminiPDFExtractor:
                                 question["image_mapping"] = "option_images"
                                 question["is_image_question"] = True
                                 logger.info(
-                                    f"Multi-question page: Assigned images {start_idx}-{end_idx-1} to question {question_id}"
+                                    f"Multi-question page: Assigned images {start_idx}-{end_idx - 1} to question {question_id}"
                                 )
                     else:
                         # Single question on page - assign all available images
