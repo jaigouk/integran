@@ -23,12 +23,36 @@ Questions are stored in `questions.json`:
 
 ## 🗄️ Database Schema
 
-The app uses SQLite to track progress:
+The app uses SQLite to track progress with enhanced models:
 
-- **failures**: Tracks incorrectly answered questions
-- **sessions**: Records practice session data
-- **progress**: Monitors overall improvement
-- **categories**: Stores category-specific performance
+### Core Tables
+- **Question**: Stores questions with enhanced metadata (images, state-specific, etc.)
+- **QuestionExplanation**: AI-generated explanations for each question ✨ **NEW**
+- **QuestionAttempt**: Individual question attempt tracking
+- **PracticeSession**: Practice session data
+- **LearningData**: Spaced repetition learning data per question
+- **UserProgress**: Overall user progress tracking
+- **CategoryProgress**: Category-specific performance
+
+### Enhanced Question Model
+Questions now support:
+- **Image-based questions**: With image paths and mapping
+- **State-specific questions**: For federal state tests
+- **Enhanced metadata**: Page numbers, question types
+- **AI-generated explanations**: Linked via QuestionExplanation table
+
+### QuestionExplanation Model ✨ **NEW**
+```python
+class QuestionExplanation(Base):
+    question_id: int           # Link to question
+    explanation: str           # Why the correct answer is right
+    why_others_wrong: str      # JSON: Why other options are wrong
+    key_concept: str           # Main concept to remember
+    mnemonic: str             # Memory aid (optional)
+    context_sources: str       # JSON: RAG sources used
+    enhanced_with_rag: bool    # Whether RAG was used
+    generated_at: datetime     # When explanation was created
+```
 
 ## 🤖 PDF Question Extraction
 
@@ -109,6 +133,151 @@ integran-extract-questions
 integran-setup
 ```
 
+## 🧠 Knowledge Base & RAG System ✨ **NEW**
+
+The application includes a sophisticated Retrieval-Augmented Generation (RAG) system for enhanced explanations using official German government sources.
+
+### Architecture Overview
+
+The RAG system consists of four main components:
+
+```
+src/knowledge_base/
+├── content_fetcher.py    # Downloads content from official sources
+├── rag_engine.py         # Main RAG orchestration and question answering
+├── text_splitter.py      # Intelligent document chunking
+└── vector_store.py       # ChromaDB vector database operations
+```
+
+### Content Sources
+
+The system automatically fetches content from:
+- **BAMF Official Documents**: Integration course materials
+- **Federal Government Resources**: Constitutional and legal documents
+- **Historical Context**: German history and political system
+- **Legal Framework**: Grundgesetz (German Constitution) articles
+
+### Knowledge Base Management
+
+#### Building the Knowledge Base
+
+```bash
+# Build knowledge base from official sources
+integran-build-kb build
+
+# Force refresh content even if cache exists
+integran-build-kb build --force-refresh
+
+# Check knowledge base statistics
+integran-build-kb stats
+
+# Search the knowledge base
+integran-build-kb search "Grundgesetz"
+
+# Test RAG with a query
+integran-build-kb test "Was ist Meinungsfreiheit?"
+
+# Clear knowledge base
+integran-build-kb clear
+```
+
+#### Configuration Options
+
+```bash
+# Custom vector store directory
+integran-build-kb build --vector-store-dir /custom/path
+
+# Custom collection name
+integran-build-kb build --collection-name my_collection
+
+# Custom chunking parameters
+integran-build-kb build --chunk-size 1500 --chunk-overlap 300
+```
+
+### Data Storage
+
+The knowledge base uses ChromaDB for vector storage:
+- **Location**: `data/vector_store/`
+- **Collection**: `german_integration_kb`
+- **Embeddings**: `sentence-transformers/all-MiniLM-L6-v2`
+- **Content Cache**: `data/knowledge_base/raw/`
+
+## 🎓 AI Explanation Generation ✨ **NEW**
+
+The system generates comprehensive explanations for all exam questions using Google's Gemini AI, optionally enhanced with RAG.
+
+### Explanation Generation Process
+
+#### Basic Explanation Generation
+
+```bash
+# Generate explanations for all 460 questions
+integran-generate-explanations
+
+# Use specific batch size (default: 10)
+integran-generate-explanations --batch-size 15
+
+# Start fresh (ignore existing checkpoint)
+integran-generate-explanations --no-resume
+
+# Enable verbose logging
+integran-generate-explanations --verbose
+```
+
+#### RAG-Enhanced Explanations
+
+```bash
+# Generate explanations with RAG enhancement
+integran-generate-explanations --use-rag
+
+# Combined example: RAG with custom batch size
+integran-generate-explanations --use-rag --batch-size 5 --verbose
+```
+
+### Explanation Structure
+
+Each generated explanation includes:
+
+```json
+{
+  "question_id": 1,
+  "question_text": "In Deutschland dürfen Menschen offen etwas gegen die Regierung sagen, weil …",
+  "correct_answer": "hier Meinungsfreiheit gilt.",
+  "explanation": "Detailed explanation of why this answer is correct...",
+  "why_others_wrong": {
+    "incorrect_option_1": "Why this option is wrong...",
+    "incorrect_option_2": "Why this option is wrong..."
+  },
+  "key_concept": "Meinungsfreiheit (Artikel 5 Grundgesetz)",
+  "mnemonic": "Memory aid to remember the concept",
+  "context_sources": ["source1", "source2"],  // When using RAG
+  "enhanced_with_rag": true                    // RAG enhancement flag
+}
+```
+
+### Checkpoint System
+
+The explanation generation includes robust checkpoint support:
+
+- **Resume Capability**: Automatically resumes from last successful batch
+- **Progress Tracking**: Saves progress in `data/explanations_checkpoint.json`
+- **Error Handling**: Continues with next batch if one fails
+- **Cost Optimization**: Never re-generates existing explanations
+
+### Cost and Performance
+
+- **Total Questions**: 460 explanations
+- **Estimated Cost**: $10-20 USD for complete generation
+- **Time**: ~1-2 hours for all questions
+- **API Calls**: ~50-100 requests (depending on batch size)
+- **Rate Limiting**: Built-in throttling to respect API limits
+
+### Output Files
+
+- **Final Output**: `data/explanations.json` (used by the application)
+- **Checkpoint**: `data/explanations_checkpoint.json` (for resume capability)
+- **Progress Tracking**: Detailed batch completion logs
+
 ## 🔧 Development Setup
 
 ### Prerequisites
@@ -175,19 +344,137 @@ The project uses several tools for code quality:
 5. Commit and push
 6. Create a pull request
 
+### Complete Developer Workflow ✨ **NEW**
+
+For developers working on the AI-enhanced question system:
+
+#### 1. Initial Setup
+```bash
+# Clone and setup environment
+git clone https://github.com/yourusername/integran.git
+cd integran
+make env-create
+conda activate integran
+make install
+
+# Setup environment variables (if working with AI features)
+cp .env.example .env
+# Edit .env with your Google Cloud credentials
+```
+
+#### 2. Building Knowledge Base
+```bash
+# Build the knowledge base (one-time setup)
+integran-build-kb build
+
+# Verify knowledge base is working
+integran-build-kb stats
+integran-build-kb search "Grundgesetz"
+```
+
+#### 3. Working with Explanations
+```bash
+# Generate explanations for all questions (if needed)
+integran-generate-explanations --batch-size 10
+
+# Generate explanations with RAG enhancement
+integran-generate-explanations --use-rag --batch-size 5
+
+# Check progress during generation
+tail -f data/explanations_checkpoint.json
+```
+
+#### 4. Development Cycle
+```bash
+# Make your changes
+# ...
+
+# Run full test suite
+make check-all
+
+# Or individually:
+make lint        # Linting
+make typecheck   # Type checking  
+make test        # Tests
+make coverage    # Coverage report
+```
+
+#### 5. Quality Assurance
+```bash
+# Before committing, ensure:
+pytest --cov=src --cov-report=term-missing  # 80%+ coverage required
+ruff check . --fix && ruff format .         # Code quality
+mypy src/                                    # Type checking
+```
+
+### Working with the RAG System
+
+#### Dependencies
+The RAG system requires additional packages:
+```bash
+# Core RAG dependencies (included in main install)
+chromadb>=0.4.22
+sentence-transformers>=2.2.2
+pypdf>=4.0.0
+beautifulsoup4>=4.12.0
+
+# Optional: Enhanced web scraping
+firecrawl-py>=0.0.16
+```
+
+#### Testing RAG Components
+```bash
+# Test individual components
+pytest tests/unit/knowledge_base/ -v
+
+# Test specific RAG functionality
+pytest tests/unit/knowledge_base/test_rag_engine.py -v
+
+# Integration tests
+pytest tests/integration/ -v
+```
+
 ### Project Structure
 
 ```
 src/
 ├── core/
-│   ├── database.py     # Database operations
-│   ├── models.py       # SQLAlchemy models
-│   └── settings.py     # Configuration management
+│   ├── database.py          # Database operations
+│   ├── models.py            # SQLAlchemy models (enhanced with QuestionExplanation)
+│   └── settings.py          # Configuration management
+├── cli/                     # ✨ NEW: CLI commands
+│   ├── build_knowledge_base.py  # Knowledge base management CLI
+│   └── generate_explanations.py # Explanation generation CLI
+├── knowledge_base/          # ✨ NEW: RAG system
+│   ├── content_fetcher.py   # Downloads content from official sources
+│   ├── rag_engine.py        # Main RAG orchestration
+│   ├── text_splitter.py     # Intelligent document chunking
+│   └── vector_store.py      # ChromaDB vector operations
+├── ui/
+│   └── __init__.py          # Terminal UI components (future)
 ├── utils/
-│   └── pdf_extractor.py # PDF extraction utility
-├── trainer.py          # Main application
-├── extract_questions.py # PDF extraction CLI
-└── setup.py           # Database setup CLI
+│   ├── explanation_generator.py  # ✨ NEW: AI explanation generation
+│   ├── gemini_client.py          # ✨ NEW: Google Gemini AI client
+│   └── pdf_extractor.py          # PDF extraction utility
+├── trainer.py              # Main application
+├── extract_questions.py    # PDF extraction CLI
+└── setup.py                # Database setup CLI
+```
+
+### Data Directory Structure
+
+```
+data/
+├── questions.json                 # Final question data for app
+├── questions.csv                  # Extracted questions from PDF
+├── explanations.json              # ✨ NEW: AI-generated explanations (460 total)
+├── explanations_checkpoint.json   # ✨ NEW: Generation progress tracking
+├── extraction_checkpoint.json     # PDF extraction progress
+├── images/                        # Extracted question images
+├── knowledge_base/                # ✨ NEW: RAG content cache
+│   └── raw/                       # Downloaded content
+├── vector_store/                  # ✨ NEW: ChromaDB vector storage
+└── gesamtfragenkatalog-lebenindeutschland.pdf
 ```
 
 ## 📝 Contributing

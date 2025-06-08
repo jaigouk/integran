@@ -131,6 +131,9 @@ class Question(Base):
     learning_data = relationship(
         "LearningData", back_populates="question", uselist=False
     )
+    explanation = relationship(
+        "QuestionExplanation", back_populates="question", uselist=False
+    )
 
 
 class QuestionAttempt(Base):
@@ -230,6 +233,33 @@ class CategoryProgress(Base):
     last_practiced = Column(DateTime)
 
     __table_args__ = (UniqueConstraint("category"),)
+
+
+class QuestionExplanation(Base):
+    """AI-generated explanations for questions."""
+
+    __tablename__ = "question_explanations"
+
+    id = Column(Integer, primary_key=True)
+    question_id = Column(
+        Integer, ForeignKey("questions.id"), unique=True, nullable=False
+    )
+    explanation = Column(Text, nullable=False)
+    why_others_wrong = Column(Text, nullable=True)  # JSON serialized dict
+    key_concept = Column(Text, nullable=True)
+    mnemonic = Column(Text, nullable=True)
+    context_sources = Column(Text, nullable=True)  # JSON serialized list
+    enhanced_with_rag = Column(
+        Integer, nullable=False, default=0
+    )  # SQLite boolean as int
+    generated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+
+    # Relationships
+    question = relationship("Question", back_populates="explanation")
+
+    __table_args__ = (UniqueConstraint("question_id"),)
 
 
 # Dataclasses for business logic
