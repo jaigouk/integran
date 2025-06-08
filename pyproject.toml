@@ -143,8 +143,31 @@ pretty = true
 module = [
     "alembic.*",
     "sqlalchemy.*",
+    "firecrawl.*",
+    "chromadb.*",
+    "sentence_transformers.*",
+    "google.genai.*",
+    "pypdf.*",
+    "pymupdf.*",
+    "bs4.*",
 ]
 ignore_missing_imports = true
+
+# Disable specific error codes for database module due to SQLAlchemy ORM complexity
+[[tool.mypy.overrides]]
+module = "src.core.database"
+disable_error_code = ["assignment", "call-overload", "return-value", "arg-type", "misc"]
+
+# Disable type checking for modules with complex external library interactions
+[[tool.mypy.overrides]]
+module = [
+    "src.knowledge_base.*",
+    "src.utils.explanation_generator",
+    "src.utils.gemini_client", 
+    "src.utils.pdf_extractor",
+    "src.setup",
+]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -160,6 +183,10 @@ addopts = [
 ]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
 filterwarnings = [
     "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
     "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",

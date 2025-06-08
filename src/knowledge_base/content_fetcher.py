@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import requests
 from bs4 import BeautifulSoup
@@ -26,7 +27,7 @@ try:
     PYPDF_AVAILABLE = True
 except ImportError:
     PYPDF_AVAILABLE = False
-    PdfReader = None
+    PdfReader = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -67,13 +68,19 @@ class ContentFetcher:
             "integration_handbook": "https://www.bamf.de/SharedDocs/Anlagen/DE/Integration/Integrationskurse/Kurstraeger/Konzeptleitfaden/curriculum-integrationskurs.pdf",
         }
 
-    def fetch_all_content(self, force_refresh: bool = False) -> dict[str, list[dict]]:
+    def fetch_all_content(
+        self, force_refresh: bool = False
+    ) -> dict[str, list[dict[str, Any]]]:
         """Fetch content from all sources."""
         console.print(
             "[bold cyan]Fetching content from official sources...[/bold cyan]"
         )
 
-        all_content = {"web_pages": [], "pdfs": [], "structured_data": []}
+        all_content: dict[str, list[dict[str, Any]]] = {
+            "web_pages": [],
+            "pdfs": [],
+            "structured_data": [],
+        }
 
         # Check if we have recent cache
         if not force_refresh and self._has_recent_cache():
@@ -110,7 +117,7 @@ class ContentFetcher:
 
         return all_content
 
-    def _fetch_web_content(self, name: str, url: str) -> dict | None:
+    def _fetch_web_content(self, name: str, url: str) -> dict[str, Any] | None:
         """Fetch content from a web page."""
         try:
             if self.firecrawl:
@@ -173,9 +180,10 @@ class ContentFetcher:
 
         except Exception as e:
             logger.error(f"Error fetching {name} from {url}: {e}")
-            return None
 
-    def _fetch_pdf_content(self, name: str, url: str) -> dict | None:
+        return None
+
+    def _fetch_pdf_content(self, name: str, url: str) -> dict[str, Any] | None:
         """Fetch and extract content from PDF."""
         if not PYPDF_AVAILABLE:
             logger.warning("pypdf not available, skipping PDF content")
@@ -219,7 +227,7 @@ class ContentFetcher:
             logger.error(f"Error fetching PDF {name} from {url}: {e}")
             return None
 
-    def _fetch_structured_data(self) -> list[dict]:
+    def _fetch_structured_data(self) -> list[dict[str, Any]]:
         """Fetch structured data like German states, important dates, etc."""
         structured_data = []
 
@@ -349,13 +357,13 @@ class ContentFetcher:
         except Exception:
             return False
 
-    def _load_cached_content(self) -> dict[str, list[dict]]:
+    def _load_cached_content(self) -> dict[str, list[dict[str, Any]]]:
         """Load content from cache."""
         cache_file = self.cache_dir / "content_cache.json"
         with open(cache_file, encoding="utf-8") as f:
-            return json.load(f)["content"]
+            return json.load(f)["content"]  # type: ignore[no-any-return]
 
-    def _save_cache(self, content: dict[str, list[dict]]) -> None:
+    def _save_cache(self, content: dict[str, list[dict[str, Any]]]) -> None:
         """Save content to cache."""
         cache_file = self.cache_dir / "content_cache.json"
         cache_data = {"cached_at": datetime.now().isoformat(), "content": content}

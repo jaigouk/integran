@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 from sqlalchemy import (
     Column,
     DateTime,
@@ -86,7 +86,7 @@ class QuestionData(BaseModel):
 
     @field_validator("correct")
     @classmethod
-    def correct_in_options(cls, v: str, info) -> str:
+    def correct_in_options(cls, v: str, info: ValidationInfo) -> str:
         """Ensure correct answer is in options."""
         if (
             hasattr(info, "data")

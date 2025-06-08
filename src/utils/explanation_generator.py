@@ -28,8 +28,8 @@ try:
     GENAI_AVAILABLE = True
 except ImportError:
     GENAI_AVAILABLE = False
-    genai = None
-    types = None
+    genai = None  # type: ignore[assignment]
+    types = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +239,7 @@ Deutsche Staatssymbole:
                     logger.info(
                         f"Loaded {len(data['questions'])} questions from checkpoint"
                     )
-                    return data["questions"]
+                    return data["questions"]  # type: ignore[no-any-return]
 
         # Fall back to questions.json if it exists
         json_path = Path("data/questions.json")
@@ -247,18 +247,18 @@ Deutsche Staatssymbole:
             with open(json_path) as f:
                 questions = json.load(f)
                 logger.info(f"Loaded {len(questions)} questions from JSON")
-                return questions
+                return questions  # type: ignore[no-any-return]
 
         raise FileNotFoundError(
             "No questions data found. Please ensure either "
             "data/extraction_checkpoint.json or data/questions.json exists."
         )
 
-    def load_explanation_checkpoint(self, checkpoint_file: Path) -> dict:
+    def load_explanation_checkpoint(self, checkpoint_file: Path) -> dict[str, Any]:
         """Load existing checkpoint or create new one."""
         if checkpoint_file.exists():
             with open(checkpoint_file) as f:
-                return json.load(f)
+                return json.load(f)  # type: ignore[no-any-return]
 
         return {
             "completed_batches": [],
@@ -268,19 +268,23 @@ Deutsche Staatssymbole:
             "total_questions": 0,
         }
 
-    def save_explanation_checkpoint(self, checkpoint_file: Path, checkpoint_data: dict):
+    def save_explanation_checkpoint(
+        self, checkpoint_file: Path, checkpoint_data: dict[str, Any]
+    ) -> None:
         """Save checkpoint to disk."""
         checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
         with open(checkpoint_file, "w") as f:
             json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
 
-    def should_skip_question(self, checkpoint_data: dict, question_id: int) -> bool:
+    def should_skip_question(
+        self, checkpoint_data: dict[str, Any], question_id: int
+    ) -> bool:
         """Check if question already has an explanation."""
         return str(question_id) in checkpoint_data.get("explanations", {})
 
     def add_explanations_to_checkpoint(
-        self, checkpoint_data: dict, explanations: list[dict[str, Any]]
-    ):
+        self, checkpoint_data: dict[str, Any], explanations: list[dict[str, Any]]
+    ) -> None:
         """Add generated explanations to checkpoint."""
         for exp in explanations:
             question_id = exp["question_id"]
@@ -475,7 +479,7 @@ KONTEXTWISSEN EINBEZIEHEN:
 
                 response = self.client.models.generate_content(
                     model=self.model_id,
-                    contents=contents,
+                    contents=contents,  # type: ignore[arg-type]
                     config=generate_config,
                 )
                 break
@@ -495,7 +499,7 @@ KONTEXTWISSEN EINBEZIEHEN:
                     raise
 
         # Parse response
-        response_text = response.text.strip()
+        response_text = response.text.strip() if response.text else ""
 
         # Remove markdown if present
         if response_text.startswith("```json"):
@@ -620,7 +624,7 @@ KONTEXTWISSEN EINBEZIEHEN:
             )
             return False, generated_count
 
-    def save_final_explanations(self, explanations: dict[str, dict]):
+    def save_final_explanations(self, explanations: dict[str, dict[str, Any]]) -> None:
         """Save final explanations to JSON file."""
         output_file = Path("data/explanations.json")
 

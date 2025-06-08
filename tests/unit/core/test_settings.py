@@ -14,29 +14,41 @@ class TestSettings:
 
     def test_default_settings(self):
         """Test default settings values."""
-        settings = Settings()
 
-        # Gemini API defaults
-        assert settings.gcp_region in [
-            "us-central1",
-            "europe-west3",
-        ]  # Allow both defaults
-        assert settings.gemini_model == "gemini-2.5-pro-preview-06-05"
-        assert settings.use_vertex_ai is True
+        # Create a Settings class that ignores environment files
+        class PureDefaultSettings(Settings):
+            model_config = {
+                "env_prefix": "",
+                "case_sensitive": False,
+                "env_file": None,  # Disable env file loading
+                "env_file_encoding": "utf-8",
+            }
 
-        # Application defaults
-        assert settings.max_daily_questions == 50
-        assert settings.show_explanations is True
-        assert settings.color_mode == "auto"
-        assert settings.spaced_repetition is True
-        assert settings.log_level == "INFO"
+        # Clear environment to test true defaults
+        with patch.dict(os.environ, {}, clear=True):
+            settings = PureDefaultSettings()
 
-        # RAG defaults
-        assert settings.vector_store_dir == "data/vector_store"
-        assert settings.vector_collection_name == "german_integration_kb"
-        assert settings.embedding_model == "sentence-transformers/all-MiniLM-L6-v2"
-        assert settings.chunk_size == 1000
-        assert settings.chunk_overlap == 200
+            # Gemini API defaults
+            assert settings.gcp_region in [
+                "us-central1",
+                "europe-west3",
+            ]  # Allow both defaults
+            assert settings.gemini_model == "gemini-2.5-pro-preview-06-05"
+            assert settings.use_vertex_ai is True
+
+            # Application defaults
+            assert settings.max_daily_questions == 50
+            assert settings.show_explanations is True
+            assert settings.color_mode == "auto"
+            assert settings.spaced_repetition is True
+            assert settings.log_level == "INFO"
+
+            # RAG defaults
+            assert settings.vector_store_dir == "data/vector_store"
+            assert settings.vector_collection_name == "german_integration_kb"
+            assert settings.embedding_model == "sentence-transformers/all-MiniLM-L6-v2"
+            assert settings.chunk_size == 1000
+            assert settings.chunk_overlap == 200
 
     def test_environment_override(self):
         """Test that environment variables override defaults."""

@@ -24,7 +24,7 @@ console = Console()
 
 
 @click.group()
-def cli():
+def cli() -> None:
     """German Integration Exam Knowledge Base Management."""
     pass
 
@@ -59,7 +59,7 @@ def build(
     collection_name: str | None,
     chunk_size: int | None,
     chunk_overlap: int | None,
-):
+) -> None:
     """Build the knowledge base from official sources."""
     try:
         console.print(
@@ -122,7 +122,7 @@ def build(
     "--collection-name",
     help="Name of the vector store collection (default from settings)",
 )
-def stats(vector_store_dir: str | None, collection_name: str | None):
+def stats(vector_store_dir: str | None, collection_name: str | None) -> None:
     """Show knowledge base statistics."""
     try:
         rag_engine = RAGEngine(
@@ -164,7 +164,7 @@ def stats(vector_store_dir: str | None, collection_name: str | None):
 )
 def search(
     query: str, k: int, vector_store_dir: str | None, collection_name: str | None
-):
+) -> None:
     """Search the knowledge base."""
     try:
         rag_engine = RAGEngine(
@@ -199,7 +199,7 @@ def search(
     "--collection-name",
     help="Name of the vector store collection (default from settings)",
 )
-def test(query: str, vector_store_dir: str | None, collection_name: str | None):
+def test(query: str, vector_store_dir: str | None, collection_name: str | None) -> None:
     """Test RAG with a query."""
     try:
         rag_engine = RAGEngine(
@@ -235,7 +235,7 @@ def test(query: str, vector_store_dir: str | None, collection_name: str | None):
     help="Name of the vector store collection (default from settings)",
 )
 @click.confirmation_option(prompt="Are you sure you want to clear the knowledge base?")
-def clear(vector_store_dir: str | None, collection_name: str | None):
+def clear(vector_store_dir: str | None, collection_name: str | None) -> None:
     """Clear the knowledge base."""
     try:
         rag_engine = RAGEngine(
@@ -255,7 +255,7 @@ def clear(vector_store_dir: str | None, collection_name: str | None):
         sys.exit(1)
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     cli()
 

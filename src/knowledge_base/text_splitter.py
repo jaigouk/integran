@@ -1,7 +1,7 @@
 """Simple text splitter implementation without external dependencies."""
 
 import re
-from typing import Any
+from typing import Any, Union
 
 
 class TextSplitter:
@@ -37,7 +37,7 @@ class TextSplitter:
 
                 # Add additional metadata if provided
                 if metadatas and i < len(metadatas):
-                    doc["metadata"].update(metadatas[i])
+                    doc["metadata"].update(metadatas[i])  # type: ignore[attr-defined]
 
                 documents.append(doc)
 
@@ -363,8 +363,10 @@ def create_text_splitter(
     splitter_type: str = "recursive",
     chunk_size: int = 1000,
     chunk_overlap: int = 200,
-    **kwargs,
-) -> TextSplitter:
+    **kwargs: Any,
+) -> Union[
+    "RecursiveCharacterTextSplitter", "SentenceTextSplitter", "ParagraphTextSplitter"
+]:
     """Factory function to create text splitters."""
     if splitter_type == "recursive":
         return RecursiveCharacterTextSplitter(
