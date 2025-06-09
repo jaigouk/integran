@@ -8,6 +8,14 @@ from rich.progress import track
 
 from src.core.settings import get_settings
 from src.knowledge_base.content_fetcher import ContentFetcher
+
+try:
+    from src.knowledge_base.firecrawl_fetcher import FirecrawlContentFetcher
+
+    FIRECRAWL_AVAILABLE = True
+except ImportError:
+    FIRECRAWL_AVAILABLE = False
+    FirecrawlContentFetcher = None
 from src.knowledge_base.text_splitter import create_text_splitter
 from src.knowledge_base.vector_store import VectorStore
 from src.utils.gemini_client import GeminiClient
@@ -37,6 +45,18 @@ class RAGEngine:
 
         # Initialize components
         self.content_fetcher = ContentFetcher()
+
+        # Initialize Firecrawl fetcher if available
+        self.firecrawl_fetcher = None
+        if FIRECRAWL_AVAILABLE:
+            try:
+                self.firecrawl_fetcher = FirecrawlContentFetcher()
+                logger.info(
+                    "Firecrawl fetcher initialized for enhanced content extraction"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize Firecrawl fetcher: {e}")
+
         self.text_splitter = create_text_splitter(
             splitter_type="recursive",
             chunk_size=chunk_size,
@@ -392,3 +412,95 @@ Gib eine klare Erklärung auf Deutsch."""
                 "answer": f"Fehler: {e}",
                 "context_used": False,
             }
+
+    def generate_explanation_with_firecrawl(
+        self,
+        question: str,
+        correct_answer: str,
+        options: dict[str, str],
+        category: str = "",
+    ) -> dict[str, Any]:
+        """Generate explanation using enhanced Firecrawl context."""
+        if not self.firecrawl_fetcher:
+            logger.warning("Firecrawl fetcher not available, falling back to basic RAG")
+            return self.generate_explanation_with_rag(
+                question, correct_answer, options, category
+            )
+
+        try:
+            # Build search query
+            search_query = f"{question} {correct_answer} {category}"
+
+            # Get enhanced context from Firecrawl
+            firecrawl_context = self.firecrawl_fetcher.get_enhanced_context(
+                search_query, max_results=3
+            )
+
+            # Combine with regular RAG context
+            rag_context = self.search_knowledge_base(query=search_query, k=3)
+
+            # Build comprehensive context
+            context_parts = []
+            sources = []
+
+            # Add Firecrawl structured extracts
+            for extract in firecrawl_context:
+                extracted_data = extract.get("extracted_data", {})
+                source = extract.get("source", "")
+
+                # Format the structured data
+                if isinstance(extracted_data, dict):
+                    content = f"[Strukturierte Quelle: {source}]\n"
+                    content += f"Titel: {extracted_data.get('title', '')}\n"
+                    content += f"Zusammenfassung: {extracted_data.get('summary', '')}\n"
+
+                    key_points = extracted_data.get("key_points", [])
+                    if key_points:
+                        content += f"Wichtige Punkte: {'; '.join(key_points)}\n"
+
+                    context_parts.append(content)
+                    sources.append(f"firecrawl_{source}")
+
+            # Add regular RAG context
+            for doc in rag_context:
+                content = (
+                    f"[Quelle: {doc['metadata'].get('source', '')}]\n{doc['content']}"
+                )
+                context_parts.append(content)
+                sources.append(doc["metadata"].get("source", ""))
+
+            context = "\n\n".join(context_parts)
+
+            # Generate enhanced explanation
+            prompt = f"""Du bist ein erfahrener Lehrer für den deutschen Einbürgerungstest.
+Verwende den folgenden Kontext aus offiziellen Quellen, um eine präzise Erklärung zu erstellen.
+
+KONTEXT AUS OFFIZIELLEN QUELLEN:
+{context}
+
+FRAGE: {question}
+ANTWORTOPTIONEN: {"; ".join([f"{k}: {v}" for k, v in options.items()])}
+RICHTIGE ANTWORT: {correct_answer}
+
+Erkläre klar und präzise, warum die richtige Antwort korrekt ist. Nutze die offiziellen Informationen aus dem Kontext."""
+
+            explanation = self.gemini_client.generate_text(
+                prompt=prompt,
+                max_output_tokens=1024,
+                temperature=0.3,
+            )
+
+            return {
+                "explanation": explanation,
+                "key_concepts": [],  # Could extract these from Firecrawl data
+                "context_sources": sources,
+                "context_used": len(context_parts) > 0,
+                "enhanced_with_firecrawl": True,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to generate Firecrawl-enhanced explanation: {e}")
+            # Fallback to regular RAG
+            return self.generate_explanation_with_rag(
+                question, correct_answer, options, category
+            )

@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.cli.build_knowledge_base import main as build_kb_main
-from src.cli.generate_explanations import main as gen_exp_main
+from src.cli.backup_data import main as backup_main
+from src.cli.build_dataset import build_dataset_cli
 
 
 class TestCLIIntegration:
@@ -23,49 +23,51 @@ class TestCLIIntegration:
         self.temp_dir = tempfile.mkdtemp()
         self.test_dir = Path(self.temp_dir)
 
-    @patch("src.cli.build_knowledge_base.has_rag_config")
-    def test_build_kb_help_command_integration(self, mock_has_rag_config, capsys):
+    @patch("src.core.settings.has_gemini_config")
+    def test_build_dataset_help_command_integration(
+        self, mock_has_gemini_config, capsys
+    ):
         """Test that help command displays proper help text."""
-        mock_has_rag_config.return_value = True
+        mock_has_gemini_config.return_value = True
 
         with (
-            patch.object(sys, "argv", ["build-knowledge-base", "--help"]),
+            patch.object(sys, "argv", ["build-dataset", "--help"]),
             pytest.raises(SystemExit) as exc_info,
         ):
-            build_kb_main()
+            build_dataset_cli()
 
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
 
         # Verify help contains expected information
-        assert "German Integration Exam Knowledge Base Management" in captured.out
-        assert "build" in captured.out
-        assert "stats" in captured.out
-        assert "search" in captured.out
-        assert "clear" in captured.out
+        assert "Build multilingual dataset" in captured.out
+        assert "--force-rebuild" in captured.out
+        assert "--status" in captured.out
+        assert "--verbose" in captured.out
 
-    @patch("src.utils.explanation_generator.GENAI_AVAILABLE", False)
-    def test_generate_explanations_missing_deps_integration(self, caplog):
-        """Test that missing dependencies are properly reported."""
+    def test_backup_data_help_command_integration(self, capsys):
+        """Test that backup data help command works."""
         with (
-            patch.object(sys, "argv", ["generate-explanations"]),
+            patch.object(sys, "argv", ["backup-data", "--help"]),
             pytest.raises(SystemExit) as exc_info,
         ):
-            gen_exp_main()
+            backup_main()
 
-        assert exc_info.value.code == 1
-        # Check that the error was logged
-        assert "google-genai package not available" in caplog.text
+        assert exc_info.value.code == 0
+        captured = capsys.readouterr()
+
+        # Verify help contains expected information
+        assert "Backup and restore question data" in captured.out
 
     def test_cli_commands_available(self):
         """Test that CLI commands can be imported and are callable."""
         # This tests that the CLI modules are properly structured
-        assert callable(build_kb_main)
-        assert callable(gen_exp_main)
+        assert callable(build_dataset_cli)
+        assert callable(backup_main)
 
         # Test that the functions have proper docstrings
-        assert build_kb_main.__doc__ is not None
-        assert gen_exp_main.__doc__ is not None
+        assert build_dataset_cli.__doc__ is not None
+        assert backup_main.__doc__ is not None
 
 
 class TestEndToEndWorkflow:

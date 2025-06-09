@@ -27,8 +27,14 @@ console = Console()
     default=None,
     help="Path to questions JSON file",
 )
+@click.option(
+    "--language",
+    type=click.Choice(["en", "de", "tr", "uk", "ar"]),
+    default="en",
+    help="Preferred language for explanations",
+)
 @click.version_option(version="0.1.0", prog_name="integran-setup")
-def main(force: bool, questions_file: Path | None) -> None:
+def main(force: bool, questions_file: Path | None, language: str) -> None:
     """Initialize Integran database and load questions.
 
     This command sets up the database schema and loads the German Integration
@@ -94,6 +100,13 @@ def main(force: bool, questions_file: Path | None) -> None:
 
         # Create config file if it doesn't exist
         _create_config_file()
+
+        # Initialize user settings with defaults
+        _initialize_user_settings(db_manager)
+
+        # Set preferred language
+        db_manager.set_user_setting("preferred_language", language)
+        console.print(f"[green]✅ Preferred language set to: {language}[/green]")
 
         console.print()
         console.print("[bold green]🎉 Setup completed successfully![/bold green]")
@@ -184,6 +197,22 @@ def _create_config_file() -> None:
         json.dump(default_config, f, indent=2)
 
     console.print(f"[green]✅ Configuration file created at {config_file}[/green]")
+
+
+def _initialize_user_settings(db_manager: DatabaseManager) -> None:
+    """Initialize default user settings in the database."""
+    default_settings = {
+        "preferred_language": "en",
+        "show_explanations": True,
+        "multilingual_mode": True,
+        "image_descriptions": True,
+    }
+
+    for key, value in default_settings.items():
+        # Only set if not already exists
+        existing = db_manager.get_user_setting(key)
+        if existing is None:
+            db_manager.set_user_setting(key, value)
 
 
 if __name__ == "__main__":

@@ -27,13 +27,14 @@ from src.core.models import (
     QuestionData,
     SessionStats,
     UserProgress,
+    UserSettings,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseManager:
-    """Manages database connections and operations."""
+    """Manages database connections and operations for Phase 1.8 multilingual support."""
 
     def __init__(self, db_path: str | Path = "data/trainer.db") -> None:
         """Initialize database manager.
@@ -85,7 +86,7 @@ class DatabaseManager:
             session.close()
 
     def load_questions(self, questions_file: str | Path) -> int:
-        """Load questions from JSON file into database.
+        """Load questions from JSON file into database (Phase 1.8 format).
 
         Args:
             questions_file: Path to questions JSON file.
@@ -104,21 +105,55 @@ class DatabaseManager:
             # Clear existing questions if any
             session.query(Question).delete()
 
-            # Load new questions
+            # Load new questions with Phase 1.8 multilingual format
             for item in data:
-                question_data = QuestionData(**item)
-                question = Question(
-                    id=question_data.id,
-                    question=question_data.question,
-                    options=json.dumps(question_data.options),
-                    correct=question_data.correct,
-                    category=question_data.category,
-                    difficulty=question_data.difficulty.value,
-                )
+                # Handle both legacy and new format
+                if "answers" in item:  # New Phase 1.8 format
+                    question = Question(
+                        id=item["id"],
+                        question=item["question"],
+                        options=json.dumps(item["options"]),
+                        correct=item["correct"],
+                        category=item["category"],
+                        difficulty=item.get("difficulty", "medium"),
+                        question_type=item.get("question_type", "general"),
+                        state=item.get("state"),
+                        page_number=item.get("page_number"),
+                        is_image_question=1 if item.get("images") else 0,
+                        images_data=json.dumps(item.get("images", [])),
+                        multilingual_answers=json.dumps(item.get("answers", {})),
+                        rag_sources=json.dumps(item.get("rag_sources", [])),
+                    )
+                else:  # Legacy format
+                    question_data = QuestionData(**item)
+                    question = Question(
+                        id=question_data.id,
+                        question=question_data.question,
+                        options=json.dumps(question_data.options),
+                        correct=question_data.correct,
+                        category=question_data.category,
+                        difficulty=question_data.difficulty.value,
+                        question_type=question_data.question_type,
+                        state=question_data.state,
+                        page_number=question_data.page_number,
+                        is_image_question=1 if question_data.is_image_question else 0,
+                        # Convert legacy image_paths to new format if needed
+                        images_data=json.dumps(
+                            [
+                                {"path": path, "description": "", "context": ""}
+                                for path in question_data.image_paths
+                            ]
+                        )
+                        if question_data.image_paths
+                        else None,
+                        image_paths=json.dumps(question_data.image_paths),
+                        image_mapping=question_data.image_mapping,
+                    )
+
                 session.add(question)
 
                 # Initialize learning data
-                learning = LearningData(question_id=question_data.id)
+                learning = LearningData(question_id=item["id"])
                 session.add(learning)
 
             # Update category progress
@@ -411,6 +446,22 @@ class DatabaseManager:
             if progress:
                 stats.study_streak = progress.current_streak
 
+            # Phase 1.8: Count image questions completed
+            completed_image_attempts = (
+                session.query(QuestionAttempt)
+                .join(Question)
+                .filter(
+                    Question.is_image_question == 1,
+                    QuestionAttempt.status == AnswerStatus.CORRECT.value,
+                )
+                .count()
+            )
+            stats.image_questions_completed = completed_image_attempts
+
+            # Get preferred language from settings
+            preferred_lang = self.get_user_setting("preferred_language")
+            stats.preferred_language = preferred_lang if preferred_lang else "en"
+
             return stats
 
     def reset_progress(self) -> None:
@@ -438,3 +489,121 @@ class DatabaseManager:
 
             session.commit()
             logger.info("Progress reset successfully")
+
+    def get_user_setting(self, key: str, default: Any = None) -> Any:
+        """Get a user setting value.
+
+        Args:
+            key: Setting key.
+            default: Default value if setting not found.
+
+        Returns:
+            Setting value or default.
+        """
+        with self.get_session() as session:
+            setting = session.query(UserSettings).filter_by(setting_key=key).first()
+            if setting:
+                try:
+                    return json.loads(setting.setting_value)
+                except json.JSONDecodeError:
+                    return setting.setting_value
+            return default
+
+    def set_user_setting(self, key: str, value: Any) -> None:
+        """Set a user setting value.
+
+        Args:
+            key: Setting key.
+            value: Setting value.
+        """
+        with self.get_session() as session:
+            setting = session.query(UserSettings).filter_by(setting_key=key).first()
+
+            if setting:
+                setting.setting_value = json.dumps(value)
+                setting.updated_at = datetime.now(UTC).replace(tzinfo=None)
+            else:
+                setting = UserSettings(setting_key=key, setting_value=json.dumps(value))
+                session.add(setting)
+
+            session.commit()
+
+    def get_question_with_multilingual_answers(
+        self, question_id: int, language: str = "en"
+    ) -> dict[str, Any] | None:
+        """Get a question with its multilingual answers.
+
+        Args:
+            question_id: Question ID.
+            language: Preferred language for answers.
+
+        Returns:
+            Question data with answers in specified language, or None if not found.
+        """
+        with self.get_session() as session:
+            question = session.query(Question).filter_by(id=question_id).first()
+            if not question:
+                return None
+
+            # Parse JSON data
+            options = json.loads(question.options)
+            images = json.loads(question.images_data) if question.images_data else []
+            multilingual_answers = (
+                json.loads(question.multilingual_answers)
+                if question.multilingual_answers
+                else {}
+            )
+            rag_sources = (
+                json.loads(question.rag_sources) if question.rag_sources else []
+            )
+
+            # Get answers for specified language (fallback to English)
+            answers = multilingual_answers.get(
+                language, multilingual_answers.get("en", {})
+            )
+
+            return {
+                "id": question.id,
+                "question": question.question,
+                "options": options,
+                "correct": question.correct,
+                "category": question.category,
+                "difficulty": question.difficulty,
+                "has_images": bool(question.is_image_question),
+                "images": images,
+                "answers": answers,
+                "available_languages": list(multilingual_answers.keys()),
+                "rag_sources": rag_sources,
+            }
+
+    def migrate_to_phase_18_schema(self) -> None:
+        """Migrate database schema to Phase 1.8 format.
+
+        This adds the new columns for multilingual support.
+        """
+        with self.get_session() as session:
+            try:
+                # Add new columns if they don't exist
+                session.execute("ALTER TABLE questions ADD COLUMN images_data TEXT")
+            except Exception:
+                pass  # Column already exists
+
+            try:
+                session.execute(
+                    "ALTER TABLE questions ADD COLUMN multilingual_answers TEXT"
+                )
+            except Exception:
+                pass  # Column already exists
+
+            try:
+                session.execute("ALTER TABLE questions ADD COLUMN rag_sources TEXT")
+            except Exception:
+                pass  # Column already exists
+
+            try:
+                session.execute("ALTER TABLE questions ADD COLUMN updated_at DATETIME")
+            except Exception:
+                pass  # Column already exists
+
+            session.commit()
+            logger.info("Phase 1.8 schema migration completed")

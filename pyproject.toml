@@ -73,8 +73,8 @@ all = [
 integran = "src.trainer:main"
 integran-setup = "src.setup:main"
 integran-extract-questions = "src.extract_questions:main"
-integran-generate-explanations = "src.cli.generate_explanations:main"
-integran-build-kb = "src.cli.build_knowledge_base:main"
+integran-backup-data = "src.cli.backup_data:main"
+integran-build-dataset = "src.cli.build_dataset:build_dataset_cli"
 
 [project.urls]
 Homepage = "https://github.com/jaigouk/integran"
@@ -162,9 +162,12 @@ disable_error_code = ["assignment", "call-overload", "return-value", "arg-type",
 [[tool.mypy.overrides]]
 module = [
     "src.knowledge_base.*",
-    "src.utils.explanation_generator",
     "src.utils.gemini_client", 
     "src.utils.pdf_extractor",
+    "src.core.image_processor",
+    "src.core.answer_engine",
+    "src.core.data_builder",
+    "src.cli.build_dataset",
     "src.setup",
 ]
 ignore_errors = true

@@ -76,12 +76,31 @@ class QuestionData(BaseModel):
     is_image_question: bool = Field(
         False, description="Whether question includes images"
     )
+
+    # New Phase 1.8 format: Image descriptions with AI vision
+    images: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="List of image objects with path, description, and context",
+    )
+
+    # New Phase 1.8 format: Multilingual answers
+    answers: dict[str, dict[str, str]] = Field(
+        default_factory=dict,
+        description="Multilingual answers: {lang: {explanation, why_others_wrong, key_concept, mnemonic}}",
+    )
+
+    # RAG sources for enhanced explanations
+    rag_sources: list[str] = Field(
+        default_factory=list, description="Sources used from RAG system"
+    )
+
+    # Legacy fields (deprecated but kept for compatibility)
     image_paths: list[str] = Field(
         default_factory=list,
-        description="List of image paths for multi-image questions (in order)",
+        description="DEPRECATED: Use images field instead",
     )
     image_mapping: str | None = Field(
-        None, description="How images map to options: 'single' or 'option_images'"
+        None, description="DEPRECATED: Use images field instead"
     )
 
     @field_validator("correct")
@@ -99,7 +118,7 @@ class QuestionData(BaseModel):
 
 # SQLAlchemy models for database
 class Question(Base):
-    """Question database model."""
+    """Question database model with Phase 1.8 multilingual support."""
 
     __tablename__ = "questions"
 
@@ -109,6 +128,7 @@ class Question(Base):
     correct = Column(String(500), nullable=False)
     category = Column(String(100), nullable=False)
     difficulty = Column(String(20), nullable=False, default=Difficulty.MEDIUM.value)
+
     # Enhanced fields for image support and state questions
     question_type = Column(String(20), nullable=False, default="general")
     state = Column(
@@ -120,10 +140,27 @@ class Question(Base):
     is_image_question = Column(
         Integer, nullable=False, default=0
     )  # SQLite boolean as int
-    image_paths = Column(Text, nullable=True)  # JSON serialized list of image paths
-    image_mapping = Column(String(50), nullable=True)  # 'single' or 'option_images'
+
+    # New Phase 1.8 fields: AI-described images
+    images_data = Column(Text, nullable=True)  # JSON serialized list of image objects
+
+    # New Phase 1.8 fields: Multilingual answers
+    multilingual_answers = Column(
+        Text, nullable=True
+    )  # JSON serialized multilingual data
+    rag_sources = Column(Text, nullable=True)  # JSON serialized list of sources
+
+    # Legacy fields (deprecated but kept for migration compatibility)
+    image_paths = Column(Text, nullable=True)  # DEPRECATED: Use images_data
+    image_mapping = Column(String(50), nullable=True)  # DEPRECATED: Use images_data
+
     created_at = Column(
         DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
 
     # Relationships
@@ -131,9 +168,7 @@ class Question(Base):
     learning_data = relationship(
         "LearningData", back_populates="question", uselist=False
     )
-    explanation = relationship(
-        "QuestionExplanation", back_populates="question", uselist=False
-    )
+    # NOTE: QuestionExplanation is deprecated in favor of multilingual_answers
 
 
 class QuestionAttempt(Base):
@@ -236,7 +271,11 @@ class CategoryProgress(Base):
 
 
 class QuestionExplanation(Base):
-    """AI-generated explanations for questions."""
+    """DEPRECATED: AI-generated explanations for questions.
+
+    NOTE: This table is kept for migration compatibility.
+    New multilingual explanations are stored in Question.multilingual_answers.
+    """
 
     __tablename__ = "question_explanations"
 
@@ -256,13 +295,49 @@ class QuestionExplanation(Base):
         DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
     )
 
-    # Relationships
-    question = relationship("Question", back_populates="explanation")
-
     __table_args__ = (UniqueConstraint("question_id"),)
 
 
+class UserSettings(Base):
+    """User settings and preferences."""
+
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True)
+    setting_key = Column(String(100), unique=True, nullable=False)
+    setting_value = Column(Text, nullable=False)  # JSON serialized value
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
+
+    __table_args__ = (UniqueConstraint("setting_key"),)
+
+
 # Dataclasses for business logic
+@dataclass
+class ImageInfo:
+    """Information about a question image."""
+
+    path: str
+    description: str
+    context: str
+
+
+@dataclass
+class MultilingualAnswerData:
+    """Multilingual answer data for a question."""
+
+    explanation: str
+    why_others_wrong: dict[str, str]  # {option: reason}
+    key_concept: str
+    mnemonic: str | None = None
+
+
 @dataclass
 class QuestionResult:
     """Result of a question attempt."""
@@ -273,6 +348,8 @@ class QuestionResult:
     correct_answer: str = ""
     time_taken: float = 0.0
     category: str = ""
+    has_images: bool = False
+    selected_language: str = "en"
 
 
 @dataclass
@@ -299,3 +376,7 @@ class LearningStats:
     overdue_count: int = 0
     average_easiness: float = 2.5
     study_streak: int = 0
+    # New stats for Phase 1.8
+    image_questions_completed: int = 0
+    multilingual_explanations_viewed: int = 0
+    preferred_language: str = "en"

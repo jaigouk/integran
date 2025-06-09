@@ -1,4 +1,4 @@
-"""Main entry point for the Integran German Integration Exam trainer."""
+"""Main entry point for the Integran German Integration Exam trainer (Phase 1.8)."""
 
 from __future__ import annotations
 

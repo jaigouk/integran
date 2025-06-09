@@ -1,17 +1,20 @@
 # Integran
 
-A terminal-based training application for the German Integration Exam (Leben in Deutschland Test). Built with spaced repetition and intelligent progress tracking to maximize learning efficiency.
+A comprehensive, terminal-based training application for the German Integration Exam (Leben in Deutschland Test). Features multilingual support, AI-powered explanations, and intelligent learning techniques to maximize exam success.
 
 *Future versions will include mobile and desktop applications.*
 
 ## 🎯 Purpose
 
-The "Leben in Deutschland" test consists of 310 questions covering German society, laws, culture, and history. This trainer helps you master all questions through:
+The "Leben in Deutschland" test consists of 460 questions (300 general + 160 state-specific) covering German society, laws, culture, and history. This trainer helps you master all questions through:
 
-- Interactive practice sessions
-- Smart failure tracking
-- Spaced repetition learning
-- Progress monitoring
+- **Multilingual Support**: Explanations in 5 languages (English, German, Turkish, Ukrainian, Arabic)
+- **Image Question Support**: Visual questions with detailed image descriptions
+- **AI-Powered Explanations**: Comprehensive explanations enhanced with official sources
+- **Interactive Practice Sessions**: Multiple learning modes
+- **Smart Failure Tracking**: Adaptive learning system
+- **Spaced Repetition Learning**: Optimize retention
+- **Progress Monitoring**: Track your improvement
 
 ## 🎮 Usage
 
@@ -62,20 +65,33 @@ integran --export-stats
 
 ## 🚀 Features
 
-### 1. **Multiple Practice Modes**
+### 1. **Multilingual Learning Experience**
+- **5 Language Support**: English (primary), German, Turkish, Ukrainian, Arabic
+- **Cultural Context**: Explanations adapted for different backgrounds
+- **Language Selection**: Choose your preferred explanation language
+
+### 2. **Advanced Question Types**
+- **Text Questions**: Traditional multiple-choice questions
+- **Image Questions**: Visual questions with detailed image descriptions
+- **State-Specific Questions**: Federal state questions for regional exams
+- **AI-Enhanced Descriptions**: Automatic image analysis and context
+
+### 3. **Multiple Practice Modes**
 - **Random Practice**: Questions shuffled for varied learning
 - **Sequential Practice**: Work through questions in order
 - **Targeted Practice**: Jump to specific question numbers
 - **Category Practice**: Focus on specific topics (e.g., Grundrechte, Geschichte)
 
-### 2. **Intelligent Learning System**
+### 4. **Intelligent Learning System**
 - **Failure Tracking**: Automatically saves incorrectly answered questions
 - **Spaced Repetition**: Review difficult questions more frequently
 - **Performance Analytics**: Track your progress over time
 - **Category Insights**: Identify weak areas for focused study
 
-### 3. **Enhanced Terminal UI**
+### 5. **Enhanced Terminal UI**
 - Color-coded feedback (✅ correct / ❌ incorrect)
+- **Image Display**: Shows relevant images for visual questions
+- **Multilingual Explanations**: Switch between explanation languages
 - Clear navigation menus
 - Progress indicators
 - Unicode support for German characters
@@ -98,7 +114,8 @@ This shows:
 
 - Conda (Anaconda or Miniconda)
 - Terminal with UTF-8 support
-- 50MB free disk space
+- 100MB free disk space (includes images and multilingual data)
+- **Optional**: Firecrawl API key for enhanced content (developers only)
 
 ## 🛠️ Installation
 
@@ -137,6 +154,20 @@ make install
 integran-setup
 ```
 
+### 🔧 Optional: Enhanced Content (Developers Only)
+
+For developers who want to regenerate the dataset with enhanced content:
+
+```bash
+# Optional: Firecrawl API key for enhanced RAG content
+export FIRECRAWL_API_KEY="your-firecrawl-api-key"
+
+# Build enhanced multilingual dataset
+integran-build-dataset --verbose
+```
+
+**Note**: Regular users don't need API keys - the app comes with pre-built multilingual data.
+
 ## 🔧 Configuration
 
 ### Basic Configuration
@@ -147,26 +178,68 @@ Edit `data/config.json` to customize:
   "repetition_interval": 3,
   "max_daily_questions": 50,
   "show_explanations": true,
+  "show_images": true,
+  "explanation_language": "en",
   "color_mode": "auto"
 }
+```
+
+### Language Settings
+
+Available explanation languages:
+- `"en"` - English (default)
+- `"de"` - German (Deutsch)
+- `"tr"` - Turkish (Türkçe)
+- `"uk"` - Ukrainian (Українська)
+- `"ar"` - Arabic (العربية)
+
+### Developer Configuration
+
+For developers working with the dataset building:
+
+```bash
+# Environment variables for enhanced features
+export FIRECRAWL_API_KEY="your-key"           # Optional: Enhanced RAG content
+export GEMINI_API_KEY="your-key"              # Required: For dataset building
+export GCP_PROJECT_ID="your-project"          # Required: For AI processing
 ```
 
 ## 🙏 Acknowledgments
 
 - Questions sourced from the official BAMF exam catalog
+- Enhanced with content from official German government sources
+- AI-powered explanations using Google Gemini
+- Multilingual translations for diverse communities
 - Inspired by Anki's spaced repetition algorithm
 - Built with love for the integration community
 
 ## 👩‍💻 For Developers
 
-If you're contributing to this project or want to modify the question extraction process, see our comprehensive [Developer Guide](docs/developer-guide.md).
+If you're contributing to this project or want to modify the dataset building process, see our comprehensive [Developer Guide](docs/developer-guide.md).
 
 The developer guide covers:
 - 📊 Data structure and database schema
-- 🤖 PDF question extraction setup
+- 🏗️ Complete dataset building with `integran-build-dataset`
+- 🤖 PDF question extraction and AI processing
+- 🌍 Multilingual explanation generation
+- 🖼️ Image processing and description system
+- 🧠 RAG system with official German sources
 - 🔧 Development environment setup
 - 🧪 Testing and code quality
 - 📝 Contributing guidelines
+
+### Quick Developer Commands
+
+```bash
+# Check dataset build status
+integran-build-dataset --status
+
+# Build complete multilingual dataset
+integran-build-dataset --verbose
+
+# Backup existing data
+integran-backup-data backup
+```
 
 ## 📝 License
 

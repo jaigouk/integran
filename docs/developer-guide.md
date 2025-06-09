@@ -2,56 +2,110 @@
 
 This guide is for developers and contributors working on the Integran project. Regular users don't need this information.
 
-## 📊 Data Structure
+## 🎯 Phase 1.8 Architecture Overview
 
-Questions are stored in `questions.json`:
+As of 2025-01-09, Integran has undergone a complete architecture refactor (Phase 1.8-1.9.4) to address critical image mapping issues and introduce multilingual support. The new system is built around three core components:
+
+1. **ImageProcessor** - AI vision for accurate image-to-question mapping
+2. **AnswerEngine** - Multilingual answer generation (5 languages)
+3. **DataBuilder** - Unified pipeline orchestrating the entire workflow
+
+## 📊 Enhanced Data Structure
+
+Questions are now stored in `questions.json` with the new Phase 1.8 multilingual format:
+
 ```json
 {
-  "id": 1,
-  "question": "In Deutschland dürfen Menschen offen etwas gegen die Regierung sagen, weil …",
-  "options": [
-    "hier Religionsfreiheit gilt.",
-    "die Menschen Steuern zahlen.",
-    "die Menschen das Wahlrecht haben.",
-    "hier Meinungsfreiheit gilt."
+  "id": 21,
+  "question": "Welches ist das Wappen der Bundesrepublik Deutschland?",
+  "options": ["Bild 1", "Bild 2", "Bild 3", "Bild 4"],
+  "correct": "Bild 1",
+  "category": "Symbols",
+  "difficulty": "easy",
+  "images": [
+    {
+      "path": "images/page_9_img_2.png",
+      "description": "German federal eagle on yellow background with red claws and beak",
+      "context": "Official coat of arms of Germany since 1950"
+    }
   ],
-  "correct": "hier Meinungsfreiheit gilt.",
-  "category": "Grundrechte",
-  "difficulty": "medium"
+  "answers": {
+    "en": {
+      "explanation": "The German federal eagle is the official coat of arms of Germany...",
+      "why_others_wrong": {
+        "B": "This shows a different coat of arms...",
+        "C": "This is not the federal eagle...",
+        "D": "This image shows a state symbol..."
+      },
+      "key_concept": "German federal symbols and constitutional emblems",
+      "mnemonic": "Eagle = Germany (like USA has eagle too)"
+    },
+    "de": {
+      "explanation": "Der Bundesadler ist das offizielle Wappen Deutschlands...",
+      "why_others_wrong": {
+        "B": "Das zeigt ein anderes Wappen...",
+        "C": "Das ist nicht der Bundesadler...",
+        "D": "Dieses Bild zeigt ein Landeswappen..."
+      },
+      "key_concept": "Deutsche Staatssymbole und Verfassungsembleme",
+      "mnemonic": "Adler = Deutschland"
+    },
+    "tr": { "explanation": "...", "why_others_wrong": {...}, "key_concept": "...", "mnemonic": "..." },
+    "uk": { "explanation": "...", "why_others_wrong": {...}, "key_concept": "...", "mnemonic": "..." },
+    "ar": { "explanation": "...", "why_others_wrong": {...}, "key_concept": "...", "mnemonic": "..." }
+  },
+  "rag_sources": ["grundgesetz.de", "bundesregierung.de"]
 }
 ```
 
-## 🗄️ Database Schema
+## 🗄️ Database Schema (Phase 1.8)
 
-The app uses SQLite to track progress with enhanced models:
+The app uses SQLite to track progress with enhanced models supporting multilingual content:
 
 ### Core Tables
-- **Question**: Stores questions with enhanced metadata (images, state-specific, etc.)
-- **QuestionExplanation**: AI-generated explanations for each question ✨ **NEW**
+- **Question**: Enhanced with Phase 1.8 multilingual support
 - **QuestionAttempt**: Individual question attempt tracking
 - **PracticeSession**: Practice session data
 - **LearningData**: Spaced repetition learning data per question
 - **UserProgress**: Overall user progress tracking
 - **CategoryProgress**: Category-specific performance
+- **UserSettings**: User preferences including language selection
+- **QuestionExplanation**: ⚠️ **DEPRECATED** (kept for migration compatibility)
 
-### Enhanced Question Model
-Questions now support:
-- **Image-based questions**: With image paths and mapping
-- **State-specific questions**: For federal state tests
-- **Enhanced metadata**: Page numbers, question types
-- **AI-generated explanations**: Linked via QuestionExplanation table
-
-### QuestionExplanation Model ✨ **NEW**
+### Enhanced Question Model (Phase 1.8)
 ```python
-class QuestionExplanation(Base):
-    question_id: int           # Link to question
-    explanation: str           # Why the correct answer is right
-    why_others_wrong: str      # JSON: Why other options are wrong
-    key_concept: str           # Main concept to remember
-    mnemonic: str             # Memory aid (optional)
-    context_sources: str       # JSON: RAG sources used
-    enhanced_with_rag: bool    # Whether RAG was used
-    generated_at: datetime     # When explanation was created
+class Question(Base):
+    # Basic fields
+    id: int
+    question: str
+    options: str              # JSON serialized list
+    correct: str
+    category: str
+    difficulty: str
+    
+    # Enhanced fields
+    question_type: str        # "general" or "state_specific"
+    state: str               # Federal state for state-specific questions
+    page_number: int         # PDF page number
+    is_image_question: int   # Boolean flag
+    
+    # Phase 1.8 NEW: Multilingual support
+    images_data: str         # JSON serialized list of image objects
+    multilingual_answers: str # JSON serialized multilingual data
+    rag_sources: str         # JSON serialized list of sources
+    
+    # Legacy fields (deprecated but kept for migration)
+    image_paths: str         # DEPRECATED: Use images_data
+    image_mapping: str       # DEPRECATED: Use images_data
+```
+
+### User Settings Model (Phase 1.8)
+```python
+class UserSettings(Base):
+    setting_key: str         # e.g., "preferred_language"
+    setting_value: str       # JSON serialized value
+    created_at: datetime
+    updated_at: datetime
 ```
 
 ## 🤖 PDF Question Extraction
@@ -123,15 +177,145 @@ export GEMINI_MODEL="gemini-2.5-pro-preview-06-05" # Model version (optional)
 
 The application automatically uses pre-extracted question data from `data/questions.json` and will never call external APIs during normal usage.
 
-### Developer Commands
+### Developer Commands (Phase 1.8)
 
 ```bash
-# Extract questions from PDF (requires environment variables above)
-integran-extract-questions
+# PRIMARY COMMAND: Build complete multilingual dataset
+integran-build-dataset
 
-# Database setup (already covered in installation)
-integran-setup
+# Database setup with language preference
+integran-setup --language en
+
+# Backup and restore data
+integran-backup-data backup
+integran-backup-data restore --suffix 20250609_124243
+
+# LEGACY (for PDF extraction only - developers only):
+integran-extract-questions
 ```
+
+## 🏗️ Unified Data Pipeline (Phase 1.8)
+
+The new architecture provides a **single unified command** that replaces all previous scattered utilities:
+
+### Primary Command: integran-build-dataset
+
+```bash
+# Build complete multilingual dataset (replaces all old commands)
+integran-build-dataset
+```
+
+This **single command** orchestrates the entire pipeline:
+
+1. **Load Source Data**: Reads from `data/extraction_checkpoint.json` (460 questions)
+2. **AI Image Processing**: Uses Gemini Vision to describe all images with context
+3. **Image-Question Mapping**: Creates accurate mappings (fixes previous 25/42 broken mappings)
+4. **Multilingual Generation**: Generates answers in 5 languages (EN, DE, TR, UK, AR)
+5. **RAG Enhancement**: Enriches with official German government sources
+6. **Final Output**: Saves to `data/questions.json` ready for the application
+
+### Why This Replaces Old Commands
+
+**❌ Old Broken Workflow (Phase 1.7 and earlier):**
+```bash
+integran-extract-questions     # Extract from PDF
+integran-generate-explanations # Generate explanations  
+integran-build-kb             # Build knowledge base
+# Manual CSV to JSON conversion
+# Manual image mapping fixes
+# Multiple checkpoint files
+# Inconsistent data formats
+```
+
+**✅ New Unified Workflow (Phase 1.8+):**
+```bash
+integran-build-dataset         # Does everything above + fixes issues
+```
+
+### Advanced Options
+
+```bash
+# Force rebuild everything from scratch
+integran-build-dataset --force-rebuild
+
+# Disable RAG enhancement for faster processing
+integran-build-dataset --no-rag
+
+# Skip multilingual generation (testing only)
+integran-build-dataset --no-multilingual
+
+# Use larger batch size for faster processing
+integran-build-dataset --batch-size 20
+
+# Check current build status
+integran-build-dataset --status
+
+# Enable verbose logging
+integran-build-dataset --verbose
+```
+
+### Prerequisites
+
+Before running `integran-build-dataset`, ensure:
+
+1. **Extraction completed**: `data/extraction_checkpoint.json` must exist and be completed
+2. **Gemini API configured**: Required for image descriptions and multilingual answers
+3. **Images extracted**: `data/images/` directory contains extracted PDF images
+4. **Optional**: Firecrawl API key for enhanced RAG content fetching
+
+### Output Structure
+
+The generated `data/questions.json` includes:
+
+```json
+{
+  "id": 21,
+  "question": "Welches ist das Wappen der Bundesrepublik Deutschland?",
+  "options": ["Bild 1", "Bild 2", "Bild 3", "Bild 4"],
+  "correct": "Bild 1",
+  "category": "Symbols",
+  "difficulty": "easy",
+  "images": [
+    {
+      "path": "images/page_9_img_2.png",
+      "description": "German federal eagle on yellow background with red claws and beak",
+      "context": "Official coat of arms of Germany since 1950"
+    }
+  ],
+  "answers": {
+    "en": {
+      "explanation": "The German federal eagle is the official coat of arms...",
+      "why_others_wrong": {"B": "This shows...", "C": "This is..."},
+      "key_concept": "German federal symbols",
+      "mnemonic": "Eagle = Germany (like USA)"
+    },
+    "de": {
+      "explanation": "Der Bundesadler ist das offizielle Wappen...",
+      "why_others_wrong": {"B": "Das zeigt...", "C": "Das ist..."},
+      "key_concept": "Deutsche Staatssymbole",
+      "mnemonic": "Adler = Deutschland"
+    },
+    "tr": "...",
+    "uk": "...",
+    "ar": "..."
+  },
+  "rag_sources": ["grundgesetz.de", "bundestag.de"]
+}
+```
+
+### Progress Tracking
+
+The command uses checkpoint system for resumability:
+
+```bash
+# View build progress
+integran-build-dataset --status
+
+# Resume interrupted build
+integran-build-dataset  # Automatically resumes from checkpoint
+```
+
+Progress is saved in `data/dataset_checkpoint.json`.
 
 ## 🧠 Knowledge Base & RAG System ✨ **NEW**
 
@@ -434,47 +618,167 @@ pytest tests/unit/knowledge_base/test_rag_engine.py -v
 pytest tests/integration/ -v
 ```
 
-### Project Structure
+### Current Project Structure (Phase 1.8)
 
 ```
 src/
-├── core/
-│   ├── database.py          # Database operations
-│   ├── models.py            # SQLAlchemy models (enhanced with QuestionExplanation)
-│   └── settings.py          # Configuration management
-├── cli/                     # ✨ NEW: CLI commands
-│   ├── build_knowledge_base.py  # Knowledge base management CLI
-│   └── generate_explanations.py # Explanation generation CLI
-├── knowledge_base/          # ✨ NEW: RAG system
-│   ├── content_fetcher.py   # Downloads content from official sources
-│   ├── rag_engine.py        # Main RAG orchestration
-│   ├── text_splitter.py     # Intelligent document chunking
-│   └── vector_store.py      # ChromaDB vector operations
-├── ui/
-│   └── __init__.py          # Terminal UI components (future)
-├── utils/
-│   ├── explanation_generator.py  # ✨ NEW: AI explanation generation
-│   ├── gemini_client.py          # ✨ NEW: Google Gemini AI client
-│   └── pdf_extractor.py          # PDF extraction utility
-├── trainer.py              # Main application
-├── extract_questions.py    # PDF extraction CLI
-└── setup.py                # Database setup CLI
+├── core/                           # ✨ NEW: Core business logic
+│   ├── __init__.py
+│   ├── models.py                   # Enhanced with Phase 1.8 multilingual support
+│   ├── database.py                 # Enhanced with migration scripts
+│   ├── settings.py                 # Configuration management
+│   ├── image_processor.py          # ✨ NEW: AI vision & question-image mapping
+│   ├── answer_engine.py            # ✨ NEW: Multilingual answer generation
+│   └── data_builder.py             # ✨ NEW: Unified pipeline orchestrator
+├── knowledge_base/                 # Enhanced RAG system
+│   ├── __init__.py
+│   ├── content_fetcher.py
+│   ├── firecrawl_fetcher.py        # ✨ NEW: Official German sources
+│   ├── rag_engine.py               # Enhanced multilingual support
+│   ├── text_splitter.py
+│   └── vector_store.py
+├── cli/                            # Simplified CLI commands
+│   ├── __init__.py
+│   ├── backup_data.py              # Keep (works)
+│   └── build_dataset.py            # ✨ NEW: Main unified command
+├── utils/                          # Only working utilities
+│   ├── __init__.py
+│   ├── pdf_extractor.py            # Keep (works)
+│   ├── gemini_client.py            # Keep (works)
+│   └── explanation_generator.py    # Keep (works with new system)
+├── ui/                             # Future terminal UI
+│   └── __init__.py
+├── trainer.py                      # ✨ UPDATED: Supports new multilingual format
+├── setup.py                        # ✨ UPDATED: Phase 1.8 schema support
+└── extract_questions.py            # Developer tool (rarely used)
 ```
 
-### Data Directory Structure
+### Data Directory Structure (Phase 1.8)
 
 ```
 data/
-├── questions.json                 # Final question data for app
-├── questions.csv                  # Extracted questions from PDF
-├── explanations.json              # ✨ NEW: AI-generated explanations (460 total)
-├── explanations_checkpoint.json   # ✨ NEW: Generation progress tracking
-├── extraction_checkpoint.json     # PDF extraction progress
-├── images/                        # Extracted question images
-├── knowledge_base/                # ✨ NEW: RAG content cache
-│   └── raw/                       # Downloaded content
-├── vector_store/                  # ✨ NEW: ChromaDB vector storage
+├── questions.json                 # ✨ UPDATED: Phase 1.8 multilingual format
+├── extraction_checkpoint.json     # Source of truth (460 questions)
+├── dataset_checkpoint.json        # ✨ NEW: Build progress tracking
+├── images/                        # All extracted question images (42 image questions)
+├── knowledge_base/                # RAG content cache
+│   └── raw/
+│       └── content_cache.json     # Firecrawl cached content
+├── vector_store/                  # ChromaDB vector storage
+│   └── [chroma files]
+├── trainer.db                     # SQLite database (created by setup)
 └── gesamtfragenkatalog-lebenindeutschland.pdf
+
+# REMOVED in Phase 1.8 cleanup:
+# ├── questions.csv              # REMOVED: Replaced by unified format
+# ├── explanations.json          # REMOVED: Integrated into questions.json
+# ├── explanations_checkpoint.json # REMOVED: Replaced by dataset_checkpoint.json
+```
+
+## 🧪 Testing Strategy (Phase 1.8)
+
+The refactored codebase includes comprehensive test coverage (169 tests) with specific focus on the image mapping issues that prompted the refactor.
+
+### Test Structure
+
+```
+tests/
+├── unit/
+│   ├── core/                        # Core component tests
+│   │   ├── test_image_processor.py      # Image processing validation
+│   │   ├── test_answer_engine.py        # Multilingual answer generation
+│   │   ├── test_data_builder.py         # Pipeline orchestration
+│   │   ├── test_image_mapping_validation.py  # ✨ Critical mapping tests
+│   │   ├── test_data_builder_validation.py   # End-to-end validation
+│   │   ├── test_database.py             # Database operations
+│   │   └── test_models.py               # Data models
+│   ├── knowledge_base/              # RAG system tests
+│   │   ├── test_rag_engine.py
+│   │   ├── test_firecrawl_fetcher.py
+│   │   └── test_vector_store.py
+│   └── cli/                        # CLI command tests
+│       └── test_build_dataset.py
+├── integration/                    # End-to-end tests
+│   └── test_cli_integration.py
+└── conftest.py                     # Test configuration
+```
+
+### Critical Validation Tests
+
+The image mapping validation tests specifically target the issues that caused the refactor:
+
+```python
+# tests/unit/core/test_image_mapping_validation.py
+def test_known_image_question_validation():
+    """Test validation against known problematic image questions."""
+    # Tests specific question IDs: 21, 22, 209, 226, 275, etc.
+    # Ensures all 42 image questions are properly detected and mapped
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test categories
+pytest tests/unit/core/                    # Core component tests
+pytest tests/unit/core/test_image_*        # Image mapping tests only
+pytest tests/integration/                  # Integration tests
+
+# Run with coverage (required: 80%+)
+pytest --cov=src --cov-report=term-missing
+
+# Run specific critical tests
+pytest tests/unit/core/test_image_mapping_validation.py -v
+pytest tests/unit/core/test_data_builder_validation.py -v
+```
+
+## 🔧 Updated Development Workflow (Phase 1.8)
+
+### For New Contributors
+
+1. **Clone and Setup**:
+```bash
+git clone https://github.com/yourusername/integran.git
+cd integran
+make env-create
+conda activate integran
+make install
+```
+
+2. **Run Tests** (should all pass):
+```bash
+pytest  # All 169 tests should pass
+```
+
+3. **Try the Application**:
+```bash
+integran-setup --language en  # Setup with English preference
+integran --stats              # View current status
+```
+
+### For Core Development
+
+If you're working on the data pipeline or core components:
+
+1. **Understand the Architecture**:
+   - Review `src/core/data_builder.py` - main orchestrator
+   - Check `src/core/image_processor.py` - image mapping logic
+   - Study `src/core/answer_engine.py` - multilingual generation
+
+2. **Work with Test Data**:
+```bash
+# The tests use mock data, but you can check real data:
+ls data/extraction_checkpoint.json  # Source of truth
+ls data/images/                     # Extracted images
+```
+
+3. **Build Complete Dataset** (requires API keys):
+```bash
+# Only if you have Gemini API configured
+integran-build-dataset --status     # Check current status
+# integran-build-dataset --force-rebuild  # Full rebuild (~$80 cost)
 ```
 
 ## 📝 Contributing
@@ -482,8 +786,9 @@ data/
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes with tests
-4. Ensure all tests pass
-5. Submit a pull request
+4. Ensure all tests pass (169 tests)
+5. Run quality checks: `make check-all`
+6. Submit a pull request
 
 ### Code Standards
 
@@ -506,3 +811,34 @@ data/
 - [Integration Exam Research](./integration_exam_research.md) - Background research
 
 For questions or support, please open an issue on GitHub.
+
+---
+
+## 📋 Phase 1.8 Summary for Developers
+
+### What Changed in the Refactor
+
+**Problem Solved**: Fixed critical image mapping issues where 25/42 image questions had broken image paths.
+
+**Solution**: Complete architecture refactor with three new core components:
+1. **ImageProcessor** - AI vision for accurate image descriptions and mapping
+2. **AnswerEngine** - Multilingual answer generation in 5 languages
+3. **DataBuilder** - Unified pipeline replacing scattered broken utilities
+
+### Key Developer Benefits
+
+✅ **Single Command**: `integran-build-dataset` replaces 5+ broken commands  
+✅ **Comprehensive Tests**: 169 tests including critical image mapping validation  
+✅ **Quality Assurance**: All 42 image questions now properly mapped and described  
+✅ **Multilingual Support**: English, German, Turkish, Ukrainian, Arabic  
+✅ **Enhanced RAG**: Official German government sources via Firecrawl  
+✅ **Future-Ready**: Clean architecture for UI and feature development  
+
+### For Different Developer Types
+
+**End Users**: No changes needed - app works out of the box with pre-extracted data  
+**Contributors**: Focus on tests and quality - all critical mapping issues resolved  
+**Core Developers**: Use `integran-build-dataset` for complete pipeline (requires API keys)  
+**UI Developers**: New multilingual data format ready for display in terminal UI  
+
+**Last Updated**: January 9, 2025 - Phase 1.8-1.9.4 Complete
