@@ -92,7 +92,9 @@ class GeminiClient:
                     config=generate_config,
                 )
 
-                return response.text.strip()
+                response_text = response.text.strip()
+                logger.debug(f"Generated response length: {len(response_text)}")
+                return response_text
 
             except Exception as e:
                 if "overloaded" in str(e).lower() or "unavailable" in str(e).lower():
@@ -153,6 +155,15 @@ class GeminiClient:
                 )
 
                 response_text = response.text.strip()
+                logger.debug(f"JSON response length: {len(response_text)}")
+                
+                # Check for truncated JSON response
+                if response_text and not response_text.endswith('}'):
+                    logger.warning(f"JSON response appears truncated (length: {len(response_text)})")
+                    if attempt < max_retries - 1:
+                        logger.info("Retrying due to truncated JSON response...")
+                        time.sleep(2)
+                        continue
 
                 # Clean up response if needed
                 if response_text.startswith("```json"):

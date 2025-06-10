@@ -107,33 +107,57 @@ class AnswerEngine:
         rag_sources = []
         if use_rag and self.rag_engine:
             try:
-                # Try Firecrawl-enhanced RAG first, fallback to regular RAG
-                if hasattr(self.rag_engine, "generate_explanation_with_firecrawl"):
-                    rag_result = self.rag_engine.generate_explanation_with_firecrawl(
-                        question=question.get("question", ""),
-                        correct_answer=question.get("correct_answer", ""),
-                        options={
-                            "A": question.get("option_a", ""),
-                            "B": question.get("option_b", ""),
-                            "C": question.get("option_c", ""),
-                            "D": question.get("option_d", ""),
-                        },
-                        category=question.get("category", ""),
-                    )
+                # Search for relevant context using multiple queries
+                question_text = question.get("question", "")
+                category = question.get("category", "")
+                
+                # Create targeted search queries
+                search_queries = [
+                    f"{category}: {question_text}",  # Main topic search
+                    question_text,  # Direct question search
+                    category,  # Category-specific information
+                ]
+                
+                # Add option-specific searches for better "why others wrong" explanations
+                options = [
+                    question.get("option_a", ""),
+                    question.get("option_b", ""),
+                    question.get("option_c", ""),
+                    question.get("option_d", ""),
+                ]
+                for opt in options:
+                    if opt and len(opt) > 10:  # Only for substantial options
+                        search_queries.append(opt)
+                
+                # Gather context from all searches
+                all_results = []
+                for query in search_queries[:5]:  # Limit to prevent too many API calls
+                    try:
+                        results = self.rag_engine.search_knowledge_base(query, k=2)
+                        all_results.extend(results)
+                    except Exception as e:
+                        logger.warning(f"RAG search failed for query '{query}': {e}")
+                
+                # Deduplicate and compile context
+                seen_content = set()
+                unique_results = []
+                for result in all_results:
+                    content = result.get("content", "")
+                    if content and content not in seen_content:
+                        seen_content.add(content)
+                        unique_results.append(result)
+                
+                # Build comprehensive context
+                if unique_results:
+                    rag_context = "\n\n".join([
+                        f"Source: {r.get('metadata', {}).get('source', 'Unknown')}\n{r.get('content', '')}"
+                        for r in unique_results[:4]  # Top 4 most relevant
+                    ])
+                    rag_sources = [r.get("metadata", {}).get("source", "") for r in unique_results[:4]]
+                    logger.info(f"Gathered RAG context from {len(unique_results)} sources for Q{question.get('id', 0)}")
                 else:
-                    rag_result = self.rag_engine.generate_explanation_with_rag(
-                        question=question.get("question", ""),
-                        correct_answer=question.get("correct_answer", ""),
-                        options={
-                            "A": question.get("option_a", ""),
-                            "B": question.get("option_b", ""),
-                            "C": question.get("option_c", ""),
-                            "D": question.get("option_d", ""),
-                        },
-                        category=question.get("category", ""),
-                    )
-                rag_context = rag_result.get("explanation", "")
-                rag_sources = rag_result.get("context_sources", [])
+                    logger.warning(f"No RAG context found for Q{question.get('id', 0)}")
+                    
             except Exception as e:
                 logger.warning(f"RAG failed for question {question.get('id')}: {e}")
 
@@ -187,32 +211,42 @@ Category: {category}
 
         # Add RAG context if available
         if rag_context:
-            prompt += f"ADDITIONAL CONTEXT FROM KNOWLEDGE BASE:\n{rag_context}\n\n"
+            prompt += f"""ADDITIONAL CONTEXT FROM KNOWLEDGE BASE:
+{rag_context}
+
+IMPORTANT: Use this context to provide specific, factual explanations. Reference specific laws, dates, facts, or historical events from the context when explaining why options are correct or incorrect.
+
+"""
 
         prompt += """REQUIREMENTS:
 1. Generate explanations in 5 languages: English (primary), German, Turkish, Ukrainian, Arabic
-2. Explain WHY the correct answer is right
-3. Explain WHY each other option is wrong
-4. Provide key concepts to remember
-5. Create helpful mnemonics where appropriate
-6. Use simple, clear language appropriate for exam preparation
-7. Focus on practical understanding, not just memorization
+2. Explain WHY the correct answer is right with specific facts and legal basis
+3. For each WRONG option, explain WHY IT'S WRONG by referencing the specific content of that option
+4. Be SPECIFIC about what makes each option incorrect (not generic statements)
+5. Provide key concepts and legal/historical context
+6. Create helpful mnemonics where appropriate
+7. Use simple, clear language appropriate for exam preparation
+8. Reference specific German laws, articles, dates, or facts when relevant
+
+CRITICAL: For "why_others_wrong", you MUST analyze the actual text of each wrong option and explain what specifically makes it incorrect. Do NOT use generic phrases like "does not align with German law". Instead, explain the specific factual or legal error in each option.
+
+IMPORTANT: Keep explanations concise but specific. Focus on quality over quantity to avoid response truncation.
 
 RESPONSE FORMAT (JSON):
 {
   "explanations": {
-    "en": "Clear explanation in English why this answer is correct...",
-    "de": "Klare Erklärung auf Deutsch warum diese Antwort richtig ist...",
-    "tr": "Bu cevabın neden doğru olduğuna dair Türkçe açıklama...",
-    "uk": "Чітке пояснення українською, чому ця відповідь правильна...",
-    "ar": "شرح واضح باللغة العربية لماذا هذه الإجابة صحيحة..."
+    "en": "Clear explanation in English why this answer is correct, with specific facts...",
+    "de": "Klare Erklärung auf Deutsch warum diese Antwort richtig ist, mit spezifischen Fakten...",
+    "tr": "Bu cevabın neden doğru olduğuna dair Türkçe açıklama, spesifik gerçeklerle...",
+    "uk": "Чітке пояснення українською, чому ця відповідь правильна, зі специфічними фактами...",
+    "ar": "شرح واضح باللغة العربية لماذا هذه الإجابة صحيحة، مع حقائق محددة..."
   },
   "why_others_wrong": {
-    "en": {"B": "This option is wrong because...", "C": "...", "D": "..."},
-    "de": {"B": "Diese Option ist falsch, weil...", "C": "...", "D": "..."},
-    "tr": {"B": "Bu seçenek yanlış çünkü...", "C": "...", "D": "..."},
-    "uk": {"B": "Цей варіант неправильний, тому що...", "C": "...", "D": "..."},
-    "ar": {"B": "هذا الخيار خاطئ لأن...", "C": "...", "D": "..."}
+    "en": {"B": "Option B '[actual option text]' is incorrect because [specific reason]", "C": "Option C '[actual text]' is wrong because [specific factual error]", "D": "..."},
+    "de": {"B": "Option B '[aktueller Optionstext]' ist falsch, weil [spezifischer Grund]", "C": "...", "D": "..."},
+    "tr": {"B": "B seçeneği '[gerçek seçenek metni]' yanlış çünkü [spesifik neden]", "C": "...", "D": "..."},
+    "uk": {"B": "Варіант B '[фактичний текст варіанту]' неправильний, тому що [конкретна причина]", "C": "...", "D": "..."},
+    "ar": {"B": "الخيار B '[النص الفعلي للخيار]' خاطئ لأن [السبب المحدد]", "C": "...", "D": "..."}
   },
   "key_concept": {
     "en": "Main concept to remember",
@@ -240,11 +274,11 @@ Generate the multilingual explanation now:"""
         text_part = types.Part.from_text(text=prompt)
         contents = [types.Content(role="user", parts=[text_part])]
 
-        # Configure generation
+        # Configure generation with higher token limit
         generate_config = types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.3,  # Balanced for accuracy and creativity
-            max_output_tokens=4096,
+            max_output_tokens=8192,  # Increased for multilingual responses
         )
 
         # Make API call with retry logic
@@ -265,7 +299,18 @@ Generate the multilingual explanation now:"""
                     contents=contents,  # type: ignore[arg-type]
                     config=generate_config,
                 )
-                return response.text.strip() if response.text else ""
+                
+                response_text = response.text.strip() if response.text else ""
+                
+                # Check for truncated response (common issue)
+                if response_text and not response_text.endswith('}'):
+                    logger.warning(f"Response appears truncated (length: {len(response_text)})")
+                    logger.warning(f"Response ends with: ...{response_text[-50:]}")
+                    if attempt < max_retries - 1:
+                        logger.info("Retrying due to truncated response...")
+                        continue
+                
+                return response_text
 
             except Exception as e:
                 if "overloaded" in str(e).lower() or "unavailable" in str(e).lower():
@@ -323,7 +368,13 @@ Generate the multilingual explanation now:"""
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse multilingual response: {e}")
-            logger.error(f"Response text: {response_text[:500]}")
+            logger.error(f"Response length: {len(response_text)}")
+            logger.error(f"Response text (first 500 chars): {response_text[:500]}")
+            logger.error(f"Response text (last 100 chars): ...{response_text[-100:]}")
+            
+            # Check if this looks like a truncated JSON
+            if response_text and '{' in response_text and response_text.count('{') > response_text.count('}'):
+                logger.error("Response appears to be truncated JSON (unmatched braces)")
 
             # Create fallback response
             return MultilingualAnswer(
