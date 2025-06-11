@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      
+      - name: Build package
+        run: |
+          uv venv
+          . .venv/bin/activate
+          uv pip install build
+          python -m build
+      
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            ## Changes in this Release
+            
+            > ⚠️ **DEVELOPMENT STATUS WARNING** ⚠️
+            > 
+            > **This project is currently under heavy development and the terminal application is NOT READY for end users yet.**
+            > 
+            > This release contains dataset building tools for developers only.
+            
+            ### What's Included
+            - ✅ Dataset generation and processing tools
+            - ✅ PDF extraction capabilities
+            - ✅ AI-powered question processing
+            - 🚧 Terminal trainer (under development)
+            
+            ### Installation
+            ```bash
+            pip install integran==${{ github.ref_name }}
+            ```
+            
+            See the [README](https://github.com/jaigouk/integran/blob/main/README.md) for detailed installation and usage instructions.
+          draft: true
+          prerelease: true
+      
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/
+          asset_name: integran-dist
+          asset_content_type: application/zip
