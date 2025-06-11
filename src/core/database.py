@@ -1052,3 +1052,15 @@ class DatabaseManager:
                 stats["retention_rate"] = 0.0
 
             return stats
+
+    def get_fsrs_card_by_id(self, card_id: int) -> FSRSCard | None:
+        """Get FSRS card by ID.
+
+        Args:
+            card_id: Card ID
+
+        Returns:
+            FSRS card or None if not found
+        """
+        with self.get_session() as session:
+            return session.query(FSRSCard).filter_by(card_id=card_id).first()

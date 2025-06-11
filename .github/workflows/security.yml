@@ -42,7 +42,7 @@ jobs:
         run: |
           . .venv/bin/activate
           pip install safety
-          safety check
+          safety scan
       
       - name: Upload security scan results
         uses: actions/upload-artifact@v4

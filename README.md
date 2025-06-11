@@ -11,19 +11,57 @@
 >
 > **For Developers**: The dataset building tools (`integran-build-dataset`, `integran-direct-extract`) are working and can be used to generate question datasets from PDF sources.
 
-A comprehensive, terminal-based training application for the German Integration Exam (Leben in Deutschland Test) *currently in development*. Will feature multilingual support, AI-powered explanations, and intelligent learning techniques to maximize exam success.
+A comprehensive, terminal-based training application for the German Integration Exam (Leben in Deutschland Test) *currently in development*. Features an intelligent study system that learns from your performance and schedules review sessions at the optimal time to maximize long-term memory retention and exam success.
 
 ## 🎯 Purpose
 
 The "Leben in Deutschland" test consists of 460 questions (300 general + 160 state-specific) covering German society, laws, culture, and history. This trainer helps you master all questions through:
 
-- **Multilingual Support**: Explanations in 5 languages (English, German, Turkish, Ukrainian, Arabic)
-- **Image Question Support**: Visual questions with detailed image descriptions
-- **AI-Powered Explanations**: Comprehensive explanations for all questions
-- **Interactive Practice Sessions**: Multiple learning modes
-- **Smart Failure Tracking**: Adaptive learning system
-- **Spaced Repetition Learning**: Optimize retention
-- **Progress Monitoring**: Track your improvement
+- **🧠 Smart Learning System**: Uses scientifically-proven spaced repetition to review questions at the perfect time when you're about to forget them
+- **📊 Personalized Scheduling**: The system learns from your performance and adapts to your memory patterns
+- **🌍 Multilingual Support**: Explanations in 5 languages (English, German, Turkish, Ukrainian, Arabic)
+- **🖼️ Image Question Support**: Visual questions with detailed AI-generated descriptions
+- **🤖 AI-Powered Explanations**: Comprehensive explanations for all questions with memory aids
+- **📈 Progress Tracking**: See your learning progress and retention rates in real-time
+- **🎯 Intelligent Review**: Focus more time on difficult questions, less on easy ones
+
+## 🧠 How the Smart Learning System Works
+
+### The Science Behind Spaced Repetition
+
+Most people forget 50% of new information within an hour and 90% within a week. Traditional studying fights this by cramming, but that's inefficient. Our app uses **spaced repetition** - a scientifically-proven method that schedules reviews at the exact moment you're about to forget something.
+
+### What Makes Our System Special
+
+**🤖 FSRS Algorithm**: We use the Free Spaced Repetition Scheduler (FSRS), the most advanced spaced repetition algorithm available. It's 20-30% more efficient than traditional methods.
+
+**🧪 How It Works**:
+1. **Learn New Questions**: Start with any question from the 460-question database
+2. **Rate Your Performance**: After each answer, tell us how difficult it was (Again/Hard/Good/Easy)
+3. **Smart Scheduling**: The system calculates the perfect time to review each question based on:
+   - How well you knew it
+   - How many times you've seen it
+   - Your personal forgetting patterns
+4. **Adaptive Learning**: Questions you struggle with appear more often, easy ones less frequently
+5. **Long-term Retention**: Achieve 90%+ retention rate with minimal study time
+
+### Why This Works Better Than Traditional Study
+
+- **No Wasted Time**: Don't review things you already know well
+- **Perfect Timing**: Review questions just before you forget them
+- **Personalized**: Adapts to YOUR memory, not average students
+- **Proven Results**: Based on decades of memory research
+- **Efficient**: Learn more in less time
+
+### Real-World Example
+
+Instead of reviewing all 460 questions repeatedly:
+- Day 1: Learn 20 new questions
+- Day 2: Review 5 from yesterday + 15 new ones
+- Day 7: Review the questions you're starting to forget
+- Day 30: Quick review of older material to maintain retention
+
+The system handles all the scheduling automatically - you just study what it shows you!
 
 ## 🎮 Usage
 
@@ -102,11 +140,13 @@ integran --export-stats
 - **Targeted Practice**: Jump to specific question numbers
 - **Category Practice**: Focus on specific topics (e.g., Grundrechte, Geschichte)
 
-#### 4. **Intelligent Learning System**
-- **Failure Tracking**: Automatically saves incorrectly answered questions
-- **Spaced Repetition**: Review difficult questions more frequently
-- **Performance Analytics**: Track your progress over time
-- **Category Insights**: Identify weak areas for focused study
+#### 4. **Intelligent Learning System (FSRS-Powered)**
+- **Smart Scheduling**: Questions appear at the perfect time to maximize retention
+- **Difficulty Tracking**: System learns which questions are hard for YOU specifically  
+- **Automatic Review**: No need to manually decide what to study - the system knows
+- **Performance Analytics**: See your retention rate, learning velocity, and progress trends
+- **Leech Detection**: Identifies questions you repeatedly struggle with and provides targeted help
+- **Category Insights**: Discover your weak areas and get personalized study recommendations
 
 #### 5. **Enhanced Terminal UI**
 - Color-coded feedback (✅ correct / ❌ incorrect)
@@ -117,18 +157,27 @@ integran --export-stats
 - Unicode support for German characters
 - Responsive design for various terminal sizes
 
-## 📈 Progress Tracking (Coming Soon)
+## 📈 Progress Tracking & Analytics (Coming Soon)
 
-View your progress with:
-```bash
-integran --stats  # Not yet functional
-```
+The system provides detailed insights into your learning:
 
-This will show:
-- Total questions mastered
-- Success rate by category
-- Learning curve visualization
-- Recommended focus areas
+### Real-Time Metrics
+- **📊 Retention Rate**: Your current memory retention percentage (target: 90%+)
+- **🎯 Questions Mastered**: How many questions you can reliably answer
+- **⚡ Learning Velocity**: How quickly you're progressing through material
+- **📅 Study Streak**: Consecutive days of consistent practice
+
+### Smart Insights
+- **🔥 Weak Areas**: Categories where you need more practice
+- **🏆 Strong Areas**: Topics you've mastered
+- **📈 Learning Curve**: Visual progress over time
+- **🎲 Recommended Daily Reviews**: Personalized study load suggestions
+
+### Advanced Features
+- **🩺 Leech Detection**: Identifies consistently difficult questions
+- **🔄 Review Forecast**: Shows upcoming study sessions
+- **🎚️ Difficulty Adjustment**: Automatic optimization based on your performance
+- **📊 Category Breakdown**: Detailed performance by topic (Politik, Geschichte, etc.)
 
 ## 📋 Prerequisites
 
