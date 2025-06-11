@@ -53,7 +53,7 @@ jobs:
           pytest tests/ -v -m "not slow" --tb=short
       
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage.xml
           flags: unittests
