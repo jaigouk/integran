@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 import shutil
 from datetime import datetime
@@ -15,7 +16,7 @@ console = Console()
 
 
 @click.group()
-def cli():
+def cli() -> None:
     """Backup and restore question data files."""
     pass
 
@@ -155,7 +156,7 @@ def list() -> None:
         return
 
     # Group backups by suffix
-    backups_by_suffix = {}
+    backups_by_suffix: dict[str, builtins.list[Path]] = {}
     for backup_file in backup_files:
         # Extract suffix from filename
         parts = backup_file.stem.split("_backup_")
@@ -184,7 +185,7 @@ def preview(backup_file: Path) -> None:
         with open(backup_file, encoding="utf-8") as f:
             data = json.load(f)
 
-        if isinstance(data, list):
+        if isinstance(data, list):  # type: ignore[arg-type]
             console.print(f"Total items: {len(data)}")
             if data:
                 console.print("\nFirst 3 items:")
@@ -220,7 +221,7 @@ def preview(backup_file: Path) -> None:
                 )
 
 
-def main():
+def main() -> None:
     """Entry point for the backup CLI."""
     cli()
 

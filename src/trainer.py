@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -291,13 +292,13 @@ def _handle_random_practice(db_manager: DatabaseManager) -> None:
 
     # Ask how many questions to practice
     try:
-        num_questions = console.input(
+        num_questions_input = console.input(
             "[green]How many questions? (1-20, default 5): [/green]"
         ).strip()
-        if not num_questions:
+        if not num_questions_input:
             num_questions = 5
         else:
-            num_questions = int(num_questions)
+            num_questions = int(num_questions_input)
             if num_questions < 1 or num_questions > 20:
                 console.print("[yellow]Using default of 5 questions[/yellow]")
                 num_questions = 5
@@ -336,8 +337,10 @@ def _handle_practice_by_number(db_manager: DatabaseManager) -> None:
     console.print()
 
     try:
-        question_id = console.input("[green]Enter question number (1-460): [/green]")
-        question_id = int(question_id.strip())
+        question_id_input = console.input(
+            "[green]Enter question number (1-460): [/green]"
+        )
+        question_id = int(question_id_input.strip())
 
         if 1 <= question_id <= 460:
             # Get detailed question data
@@ -591,7 +594,7 @@ def _handle_reset_confirmation(db_manager: DatabaseManager) -> None:
     console.input("[dim]Press Enter to continue...[/dim]")
 
 
-def _get_random_questions(db_manager: DatabaseManager, limit: int = 5):
+def _get_random_questions(db_manager: DatabaseManager, limit: int = 5) -> list[Any]:
     """Get random questions for practice (simplified implementation)."""
     # For now, just get first few questions - will improve later
     with db_manager.get_session() as session:

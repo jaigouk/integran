@@ -35,7 +35,9 @@ console = Console()
     help="Number of questions to process per batch",
     type=int,
 )
-def main(pdf_path: Path, checkpoint_path: Path, final_output: Path, batch_size: int):
+def main(
+    pdf_path: Path, checkpoint_path: Path, final_output: Path, batch_size: int
+) -> None:
     """Extract questions directly from PDF using Gemini with transparent checkpointing."""
 
     console.print("[bold blue]Direct PDF Extraction with Checkpoint[/bold blue]")

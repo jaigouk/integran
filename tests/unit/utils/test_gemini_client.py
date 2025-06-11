@@ -173,11 +173,16 @@ class TestGeminiClient:
 
         assert result == test_json
 
+    @patch("src.utils.gemini_client.time.sleep")
     @patch("src.utils.gemini_client.get_settings")
     @patch("src.utils.gemini_client.genai")
     @patch("src.utils.gemini_client.types")
     def test_generate_json_response_with_markdown(
-        self, mock_types, mock_genai, mock_get_settings
+        self,
+        mock_types,
+        mock_genai,
+        mock_get_settings,
+        mock_sleep,  # noqa: ARG002
     ):
         """Test JSON response with markdown formatting."""
         # Setup mocks

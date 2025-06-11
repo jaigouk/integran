@@ -59,7 +59,7 @@ class DatasetSchema(BaseModel):
 class DirectPDFProcessor:
     """Upload PDF to Gemini File API and process with structured output."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize with Gemini client using service account credentials."""
         settings = get_settings()
 
@@ -187,10 +187,14 @@ Return JSON with proper German characters:
             for attempt in range(max_retries):
                 try:
                     response = self.client.models.generate_content(
-                        model=self.model_id, contents=contents, config=config
+                        model=self.model_id,
+                        contents=contents,  # type: ignore[arg-type]
+                        config=config,
                     )
 
                     # Parse and validate JSON response
+                    if not response or not response.text:
+                        raise ValueError("Empty response from API")
                     response_text = response.text.strip()
 
                     # Clean up response if needed
@@ -269,6 +273,9 @@ Return JSON with proper German characters:
         except Exception as e:
             logger.error(f"Failed to process batch {batch_start}-{batch_end}: {e}")
             raise
+
+        # This should never be reached, but mypy needs it
+        return []
 
     def load_checkpoint(
         self, checkpoint_path: Path
@@ -359,7 +366,7 @@ Return JSON with proper German characters:
 
     def _validate_batch(
         self, questions: list[dict[str, Any]], batch_start: int, batch_end: int
-    ):
+    ) -> None:
         """Validate that critical questions are correctly extracted."""
 
         # Check if Question 130 is in this batch
@@ -398,7 +405,7 @@ Return JSON with proper German characters:
         batch_start: int,
         batch_end: int,
         checkpoint_path: Path,
-    ):
+    ) -> None:
         """Save incremental progress with detailed metadata."""
         # Convert list to dictionary format
         questions_dict = {}
@@ -435,13 +442,13 @@ Return JSON with proper German characters:
         with open(checkpoint_path, "w", encoding="utf-8") as f:
             json.dump(checkpoint_data, f, ensure_ascii=False, indent=2)
 
-        progress_pct = checkpoint_data["metadata"]["progress_percentage"]
+        progress_pct = checkpoint_data["metadata"]["progress_percentage"]  # type: ignore[index]
         logger.info(
             f"💾 Checkpoint saved: {len(questions)} questions ({progress_pct}% complete)"
         )
 
 
-def main():
+def main() -> None:
     """Run direct PDF extraction with batching."""
     processor = DirectPDFProcessor()
 
@@ -449,10 +456,13 @@ def main():
     output_path = Path("data/direct_extraction.json")
 
     # Process PDF in batches
-    questions = processor.process_full_pdf_in_batches(pdf_path, batch_size=50)
+    checkpoint_path = Path("data/extraction_checkpoint.json")
+    questions = processor.process_full_pdf_in_batches(
+        pdf_path, checkpoint_path, batch_size=50
+    )
 
     # Save final results
-    final_dataset = {
+    final_dataset: dict[str, Any] = {
         "questions": questions,
         "metadata": {
             "total_questions": len(questions),
