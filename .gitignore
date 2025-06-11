@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 processing_log.txt
+notes/
 
 # C extensions
 *.so

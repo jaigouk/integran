@@ -4,13 +4,13 @@ version = "0.1.0"
 description = "Interactive terminal-based trainer for the German Integration Exam"
 authors = [{name = "Jaigouk Kim", email = "ping@jaigouk.kim"}]
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 requires-python = ">=3.12"
 keywords = ["german", "integration", "exam", "trainer", "education"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Education",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Topic :: Education",
