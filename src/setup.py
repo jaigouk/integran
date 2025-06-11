@@ -10,7 +10,7 @@ import click
 from rich.console import Console
 
 from src.core.database import DatabaseManager
-from src.utils.pdf_extractor import ensure_questions_available
+from src.utils.question_loader import ensure_questions_available
 
 console = Console()
 

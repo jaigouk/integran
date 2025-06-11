@@ -119,7 +119,7 @@ Examples:
         if not extraction_path.exists():
             logger.error("❌ Extraction checkpoint not found")
             logger.error("Please run PDF extraction first:")
-            logger.error("  integran-extract-questions")
+            logger.error("  integran-direct-extract")
             sys.exit(1)
 
         # Build dataset

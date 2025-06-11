@@ -190,8 +190,8 @@ integran-setup --language en
 integran-backup-data backup
 integran-backup-data restore --suffix 20250609_124243
 
-# LEGACY (for PDF extraction only - developers only):
-integran-extract-questions
+# Direct PDF extraction (developers only):
+integran-direct-extract  # Single-question extraction with checkpointing
 ```
 
 ## 🏗️ Unified Data Pipeline (Phase 1.8)
@@ -218,7 +218,7 @@ This **single command** orchestrates the entire pipeline:
 
 **❌ Old Broken Workflow (Phase 1.7 and earlier):**
 ```bash
-integran-extract-questions     # Extract from PDF
+integran-direct-extract       # Extract from PDF
 integran-generate-explanations # Generate explanations  
 integran-build-kb             # Build knowledge base
 # Manual CSV to JSON conversion
@@ -640,17 +640,18 @@ src/
 ├── cli/                            # Simplified CLI commands
 │   ├── __init__.py
 │   ├── backup_data.py              # Keep (works)
-│   └── build_dataset.py            # ✨ NEW: Main unified command
+│   ├── build_dataset.py            # ✨ NEW: Main unified command
+│   └── direct_extract.py           # Direct PDF extraction with checkpointing
 ├── utils/                          # Only working utilities
 │   ├── __init__.py
-│   ├── pdf_extractor.py            # Keep (works)
-│   ├── gemini_client.py            # Keep (works)
+│   ├── question_loader.py          # Simple utility to check for questions file
+│   ├── gemini_client.py            # Gemini API client utilities
 │   └── explanation_generator.py    # Keep (works with new system)
 ├── ui/                             # Future terminal UI
 │   └── __init__.py
 ├── trainer.py                      # ✨ UPDATED: Supports new multilingual format
 ├── setup.py                        # ✨ UPDATED: Phase 1.8 schema support
-└── extract_questions.py            # Developer tool (rarely used)
+└── direct_pdf_processor.py         # Direct PDF extraction with structured output
 ```
 
 ### Data Directory Structure (Phase 1.8)

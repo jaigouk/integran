@@ -1,5 +1,6 @@
 """Direct PDF processor - Upload PDF to Gemini File API and process with structured output."""
 
+import base64
 import json
 import logging
 import time
@@ -16,126 +17,150 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+class ImageData(BaseModel):
+    """Image data matching models.py ImageInfo."""
+    path: str = Field(description="Image file path")
+    description: str = Field(description="AI-generated description of image")
+    context: str = Field(description="Context about what the image represents")
+
+
 class QuestionSchema(BaseModel):
-    """Schema for individual questions with proper image handling."""
+    """Schema matching models.py QuestionData format."""
     id: int = Field(description="Sequential question number (1-460)")
     question: str = Field(description="Full German question text")
-    options: List[str] = Field(description="Four answer options as list")
-    correct_answer: str = Field(description="Letter A, B, C, or D")
-    correct_text: str = Field(description="Full text of the correct answer")
-    category: str = Field(description="Question category (Grundrechte, Geschichte, etc.)")
+    options: list[str] = Field(description="Four answer options as list")
+    correct: str = Field(description="Full text of the correct answer")
+    category: str = Field(description="Question category")
     difficulty: str = Field(description="easy, medium, or hard")
     question_type: str = Field(description="general or state_specific")
     state: str | None = Field(description="State name for state-specific questions", default=None)
     page_number: int = Field(description="PDF page number where question appears")
-    has_images: bool = Field(description="Whether question includes images")
-    image_type: str | None = Field(description="single, option_images, or null", default=None)
-    image_description: str | None = Field(description="Description of what images show", default=None)
+    is_image_question: bool = Field(description="Whether question includes images")
+    images: list[ImageData] = Field(description="Image data for image questions", default_factory=list)
+    # Legacy compatibility
+    correct_answer_letter: str | None = Field(description="Answer letter A/B/C/D", default=None)
 
 
 class DatasetSchema(BaseModel):
     """Schema for the complete dataset."""
-    questions: List[QuestionSchema] = Field(description="All 460 questions")
-    metadata: Dict[str, Any] = Field(description="Extraction metadata")
+    questions: dict[str, QuestionSchema] = Field(description="Questions indexed by ID")
+    metadata: dict[str, Any] = Field(description="Extraction metadata")
 
 
 class DirectPDFProcessor:
     """Upload PDF to Gemini File API and process with structured output."""
     
     def __init__(self):
-        """Initialize with Gemini client."""
+        """Initialize with Gemini client using service account credentials."""
         settings = get_settings()
+        
+        # Use Vertex AI client with service account credentials
         self.client = genai.Client(
             vertexai=True,
             project=settings.gcp_project_id,
-            location="global"
+            location=settings.gcp_region
         )
-        self.model_id = settings.gemini_model
+        # Use a stable model that's available in all regions
+        self.model_id = "gemini-1.5-pro"
         
-    def upload_pdf_to_file_api(self, pdf_path: Path) -> str:
-        """Upload PDF to Gemini File API and return file URI."""
+    def load_pdf_as_base64(self, pdf_path: Path) -> str:
+        """Load PDF as base64 for direct embedding."""
         
-        logger.info(f"Uploading PDF to Gemini File API: {pdf_path}")
+        logger.info(f"Loading PDF for direct processing: {pdf_path}")
         
         try:
-            # Upload file using File API
-            upload_response = self.client.files.upload(
-                path=str(pdf_path),
-                mime_type="application/pdf"
-            )
+            with open(pdf_path, "rb") as f:
+                pdf_data = f.read()
             
-            file_uri = upload_response.uri
-            logger.info(f"File uploaded successfully: {file_uri}")
+            pdf_base64 = base64.b64encode(pdf_data).decode('utf-8')
+            logger.info(f"PDF loaded successfully: {len(pdf_base64)} characters")
             
-            # Wait for file to be processed
-            logger.info("Waiting for file processing...")
-            time.sleep(10)  # Give time for processing
-            
-            return file_uri
+            return pdf_base64
             
         except Exception as e:
-            logger.error(f"Failed to upload PDF: {e}")
+            logger.error(f"Failed to load PDF: {e}")
             raise
     
-    def process_pdf_with_structured_output(self, file_uri: str, batch_start: int = 1, batch_end: int = 460) -> List[Dict[str, Any]]:
+    def process_pdf_with_structured_output(self, pdf_base64: str, batch_start: int = 1, batch_end: int = 460) -> List[Dict[str, Any]]:
         """Process PDF with structured JSON output and proper error handling."""
         
         logger.info(f"Processing questions {batch_start}-{batch_end} with structured output")
         
-        # Create the optimized prompt
-        prompt = f"""Extract questions {batch_start}-{batch_end} from the German Integration Exam PDF (Leben in Deutschland Test).
+        # Create a comprehensive prompt with proper PDF structure understanding
+        prompt = f"""Extract question {batch_start} from the German Integration Exam PDF (Leben in Deutschland Test).
 
-CRITICAL REQUIREMENTS:
+PDF STRUCTURE UNDERSTANDING:
+- Teil I (Pages 1-111): General questions 1-300 (Aufgabe 1, Aufgabe 2, ..., Aufgabe 300)
+- Teil II (Pages 112-191): State-specific questions, each state has 10 questions numbered 1-10
+  * Each state section starts fresh with "Aufgabe 1" through "Aufgabe 10"
+  * State sections: Baden-Württemberg, Bayern, Berlin, Brandenburg, Bremen, Hamburg, Hessen, Mecklenburg-Vorpommern, Niedersachsen, Nordrhein-Westfalen, Rheinland-Pfalz, Saarland, Sachsen, Sachsen-Anhalt, Schleswig-Holstein, Thüringen
 
-1. Extract questions {batch_start} to {batch_end} with these exact fields:
-   - id: Question number ({batch_start}-{batch_end})
-   - question: Full German text
-   - options: Array of 4 options OR ["Bild 1", "Bild 2", "Bild 3", "Bild 4"] for image questions
-   - correct_answer: Letter (A, B, C, or D)
-   - correct_text: Actual text/content of correct answer
-   - category: One of [Grundrechte, Demokratie und Wahlen, Geschichte, Geografie, Kultur und Gesellschaft, Rechtssystem, Föderalismus, Allgemein]
-   - difficulty: easy/medium/hard
-   - question_type: "general" (1-300) or "state_specific" (301-460)
-   - state: For questions 301-460, state name (Bayern, Berlin, etc.)
-   - page_number: Actual PDF page number
-   - has_images: true if question involves images
-   - image_type: "option_images" if options are images, "single" if one image in question, null otherwise
-   - image_description: For image questions, describe what images show
+TASK: Find the correct "Aufgabe {batch_start if batch_start <= 300 else (batch_start - 300) % 10 if (batch_start - 300) % 10 != 0 else 10}" in the appropriate section.
 
-2. SPECIAL ATTENTION for image questions:
-   - Questions like "Welches ist das Wappen..." → has_images=true, image_type="option_images"
-   - Question 130 (ballot papers) → has_images=true, image_type="option_images"
-   - Options should be ["Bild 1", "Bild 2", "Bild 3", "Bild 4"]
-   - Describe each image briefly
+IMAGE QUESTIONS (CRITICAL):
+Questions WITH images:
+- Teil I: 21, 55, 70, 130, 176, 181, 187, 209, 216, 226, 235
+- Teil II: Questions 1 and 8 for each state (total 32 image questions)
 
-3. STATE QUESTIONS (301-460):
-   - Pages 112-191 contain 160 state-specific questions
-   - 10 questions per state, 16 states total
-   - Include state name for each
+For question {batch_start}:
+{'- This is an IMAGE QUESTION! Set is_image_question=true' if batch_start in [21, 55, 70, 130, 176, 181, 187, 209, 216, 226, 235] or (batch_start > 300 and ((batch_start - 300 - 1) % 10 + 1) in [1, 8]) else '- This is a TEXT-ONLY question, set is_image_question=false'}
 
-4. VALIDATION POINTS:
-   - Question 130 must have has_images=true
-   - All questions 1-300 have question_type="general"
-   - All questions 301-460 have question_type="state_specific" with state name
-   - Each question has exactly 4 options
-   - correct_answer matches one of A/B/C/D
+EXTRACTION REQUIREMENTS:
+1. GERMAN CHARACTER HANDLING: Preserve ä, ö, ü, ß correctly (NO escape sequences like \\n)
 
-Return JSON with questions array and metadata about extraction."""
+2. QUESTION LOCATION:
+   {"- Look for 'Aufgabe " + str(batch_start) + "' in Teil I (pages 1-111)" if batch_start <= 300 else f"- Look for 'Aufgabe {(batch_start - 300 - 1) % 10 + 1}' in Teil II state section (pages 112-191)"}
+
+3. ANSWER OPTIONS: Extract A), B), C), D) with proper German characters
+
+4. CORRECT ANSWER: Find answer key (usually at document end) and match to option text
+
+5. IMAGE HANDLING:
+   {"- Must include 4 images in images array with descriptions" if batch_start in [21, 55, 70, 130, 176, 181, 187, 209, 216, 226, 235] or (batch_start > 300 and ((batch_start - 300 - 1) % 10 + 1) in [1, 8]) else "- No images needed (empty array)"}
+
+6. STATE DETECTION:
+   {f"- question_type='general', state=null" if batch_start <= 300 else f"- question_type='state_specific', extract state name from section header"}
+
+Return JSON with proper German characters:
+{{
+  "questions": {{
+    "{batch_start}": {{
+      "id": {batch_start},
+      "question": "German text with ä, ö, ü, ß preserved",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct": "Full correct option text",
+      "category": "Category",
+      "difficulty": "easy/medium/hard",
+      "question_type": "{'general' if batch_start <= 300 else 'state_specific'}",
+      "state": {'null' if batch_start <= 300 else '"State name"'},
+      "page_number": actual_page,
+      "is_image_question": {'true' if batch_start in [21, 55, 70, 130, 176, 181, 187, 209, 216, 226, 235] or (batch_start > 300 and ((batch_start - 300 - 1) % 10 + 1) in [1, 8]) else 'false'},
+      "images": [{'4 image objects' if batch_start in [21, 55, 70, 130, 176, 181, 187, 209, 216, 226, 235] or (batch_start > 300 and ((batch_start - 300 - 1) % 10 + 1) in [1, 8]) else 'empty array'}],
+      "correct_answer_letter": "A/B/C/D"
+    }}
+  }},
+  "metadata": {{
+    "total_questions": 1,
+    "extraction_method": "direct_pdf_single",
+    "has_images_count": {'1' if batch_start in [21, 55, 70, 130, 176, 181, 187, 209, 216, 226, 235] or (batch_start > 300 and ((batch_start - 300 - 1) % 10 + 1) in [1, 8]) else '0'},
+    "state_questions_count": {'1' if batch_start > 300 else '0'}
+  }}
+}}"""
 
         try:
-            # Create file part from uploaded file
-            file_part = types.Part.from_uri(
-                file_uri=file_uri,
+            # Create PDF part from base64 data
+            pdf_part = types.Part.from_bytes(
+                data=base64.b64decode(pdf_base64),
                 mime_type="application/pdf"
             )
             
             # Create text part with prompt
-            text_part = types.Part.from_text(prompt)
+            text_part = types.Part.from_text(text=prompt)
             
             # Create content
             contents = [types.Content(
                 role="user",
-                parts=[text_part, file_part]
+                parts=[text_part, pdf_part]
             )]
             
             # Configure generation with structured output
@@ -143,7 +168,7 @@ Return JSON with questions array and metadata about extraction."""
                 response_mime_type="application/json",
                 response_schema=DatasetSchema.model_json_schema(),
                 temperature=0.1,
-                max_output_tokens=65535
+                max_output_tokens=8192
             )
             
             logger.info("Generating structured output from PDF...")
@@ -160,11 +185,49 @@ Return JSON with questions array and metadata about extraction."""
                         config=config
                     )
                     
-                    # Parse JSON response
-                    result = json.loads(response.text)
-                    questions = result.get("questions", [])
+                    # Parse and validate JSON response
+                    response_text = response.text.strip()
                     
-                    logger.info(f"Successfully extracted {len(questions)} questions")
+                    # Clean up response if needed
+                    if response_text.startswith("```json"):
+                        response_text = response_text[7:]
+                    if response_text.startswith("```"):
+                        response_text = response_text[3:]
+                    if response_text.endswith("```"):
+                        response_text = response_text[:-3]
+                    response_text = response_text.strip()
+                    
+                    try:
+                        result = json.loads(response_text)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse JSON response: {e}")
+                        logger.error(f"Response text (first 500 chars): {response_text[:500]}")
+                        raise ValueError(f"Invalid JSON response: {e}")
+                    
+                    # Validate response structure
+                    if not isinstance(result, dict) or "questions" not in result:
+                        raise ValueError("Response missing 'questions' field")
+                    
+                    questions_dict = result.get("questions", {})
+                    if not questions_dict:
+                        logger.warning("No questions found in response")
+                        return []
+                    
+                    questions = list(questions_dict.values())
+                    
+                    # Validate question structure
+                    for q in questions:
+                        if not isinstance(q, dict) or "id" not in q:
+                            logger.error(f"Invalid question structure: {q}")
+                            continue
+                        
+                        # Ensure required fields exist
+                        required_fields = ["id", "question", "options", "correct", "category"]
+                        missing_fields = [f for f in required_fields if f not in q]
+                        if missing_fields:
+                            logger.error(f"Question {q.get('id')} missing fields: {missing_fields}")
+                    
+                    logger.info(f"Successfully extracted and validated {len(questions)} questions")
                     
                     # Validate critical questions
                     self._validate_batch(questions, batch_start, batch_end)
@@ -188,40 +251,77 @@ Return JSON with questions array and metadata about extraction."""
             logger.error(f"Failed to process batch {batch_start}-{batch_end}: {e}")
             raise
     
-    def process_full_pdf_in_batches(self, pdf_path: Path, batch_size: int = 50) -> List[Dict[str, Any]]:
-        """Process the full PDF in manageable batches to avoid timeouts."""
-        
-        # Upload PDF once to File API
-        file_uri = self.upload_pdf_to_file_api(pdf_path)
-        
-        all_questions = []
-        
-        # Process in batches to avoid timeouts
-        for start in range(1, 461, batch_size):
-            end = min(start + batch_size - 1, 460)
+    def load_checkpoint(self, checkpoint_path: Path) -> tuple[list[dict[str, Any]], int]:
+        """Load existing checkpoint and return questions and last processed ID."""
+        if not checkpoint_path.exists():
+            return [], 0
             
-            logger.info(f"Processing batch {start}-{end}")
+        try:
+            with open(checkpoint_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            questions = list(data.get("questions", {}).values())
+            last_processed = data.get("metadata", {}).get("last_processed", 0)
+            
+            logger.info(f"✓ Loaded checkpoint: {len(questions)} questions, last processed: {last_processed}")
+            return questions, last_processed
+            
+        except Exception as e:
+            logger.error(f"Failed to load checkpoint: {e}")
+            return [], 0
+    
+    def process_full_pdf_in_batches(self, pdf_path: Path, checkpoint_path: Path, batch_size: int = 50) -> List[Dict[str, Any]]:
+        """Process the full PDF with transparent checkpoint progress."""
+        
+        # Load existing checkpoint
+        all_questions, last_processed = self.load_checkpoint(checkpoint_path)
+        start_from = last_processed + 1
+        
+        if start_from > 460:
+            logger.info("✓ All questions already extracted!")
+            return all_questions
+            
+        logger.info(f"Starting extraction from question {start_from}/460")
+        
+        # Load PDF as base64 once
+        pdf_base64 = self.load_pdf_as_base64(pdf_path)
+        
+        # Process one question at a time starting from checkpoint
+        for question_id in range(start_from, 461):
+            progress_pct = (question_id / 460) * 100
+            logger.info(f"[{progress_pct:.1f}%] Processing question {question_id}/460")
             
             try:
-                batch_questions = self.process_pdf_with_structured_output(file_uri, start, end)
-                all_questions.extend(batch_questions)
+                # Process single question
+                batch_questions = self.process_pdf_with_structured_output(pdf_base64, question_id, question_id)
+                if batch_questions:
+                    all_questions.extend(batch_questions)
+                    logger.info(f"✓ Successfully extracted question {question_id}")
                 
-                # Save incremental progress
-                self._save_checkpoint(all_questions, start, end)
+                # Save checkpoint after every question for transparency
+                self._save_checkpoint(all_questions, start_from, question_id, checkpoint_path)
                 
-                # Throttle between batches
-                if end < 460:
-                    logger.info("Sleeping 10 seconds between batches...")
-                    time.sleep(10)
+                # Progress summary every 10 questions
+                if question_id % 10 == 0:
+                    completed = question_id
+                    remaining = 460 - question_id
+                    logger.info(f"📊 Progress: {completed}/460 completed, {remaining} remaining ({progress_pct:.1f}%)")
+                
+                # Throttle to avoid rate limits (2 seconds between questions)
+                if question_id < 460:
+                    time.sleep(2)
                     
             except Exception as e:
-                logger.error(f"Batch {start}-{end} failed: {e}")
-                # Continue with next batch instead of failing completely
+                logger.error(f"❌ Question {question_id} failed: {e}")
+                # Save progress even on failure
+                self._save_checkpoint(all_questions, start_from, question_id - 1, checkpoint_path)
+                # Continue with next question instead of failing completely
                 continue
         
+        logger.info(f"🎉 Extraction completed! Total questions: {len(all_questions)}")
         return all_questions
     
-    def _validate_batch(self, questions: List[Dict[str, Any]], batch_start: int, batch_end: int):
+    def _validate_batch(self, questions: list[dict[str, Any]], batch_start: int, batch_end: int):
         """Validate that critical questions are correctly extracted."""
         
         # Check if Question 130 is in this batch
@@ -229,15 +329,17 @@ Return JSON with questions array and metadata about extraction."""
             q130 = next((q for q in questions if q.get("id") == 130), None)
             
             if q130:
-                if not q130.get("has_images"):
+                if not q130.get("is_image_question"):
                     logger.error("Question 130 not marked as image question!")
                 else:
                     logger.info("✓ Question 130 correctly marked as image question")
                     
-                if q130.get("image_type") != "option_images":
-                    logger.error(f"Question 130 has wrong image_type: {q130.get('image_type')}")
+                # Check if it has image data
+                images = q130.get("images", [])
+                if not images:
+                    logger.warning("Question 130 has no image data")
                 else:
-                    logger.info("✓ Question 130 has correct image_type")
+                    logger.info(f"✓ Question 130 has {len(images)} images")
             else:
                 logger.error("Question 130 not found in batch!")
         
@@ -250,20 +352,41 @@ Return JSON with questions array and metadata about extraction."""
         image_questions = [q for q in questions if q.get("has_images")]
         logger.info(f"Found {len(image_questions)} image questions in batch {batch_start}-{batch_end}")
     
-    def _save_checkpoint(self, questions: List[Dict[str, Any]], batch_start: int, batch_end: int):
-        """Save incremental progress."""
-        checkpoint = {
-            "processed_batches": f"1-{batch_end}",
-            "total_questions": len(questions),
-            "last_batch": f"{batch_start}-{batch_end}",
-            "questions": questions
+    def _save_checkpoint(self, questions: list[dict[str, Any]], batch_start: int, batch_end: int, checkpoint_path: Path):
+        """Save incremental progress with detailed metadata."""
+        # Convert list to dictionary format
+        questions_dict = {}
+        for question in questions:
+            question_id = str(question.get("id", question.get("question_id", 0)))
+            questions_dict[question_id] = question
+        
+        # Calculate detailed statistics
+        image_questions = [q for q in questions if q.get("is_image_question") or q.get("has_images")]
+        state_questions = [q for q in questions if q.get("question_type") == "state_specific"]
+        
+        # Save as checkpoint format
+        checkpoint_data = {
+            "questions": questions_dict,
+            "metadata": {
+                "total_questions": len(questions),
+                "extraction_method": "direct_pdf_checkpoint",
+                "has_images_count": len(image_questions),
+                "state_questions_count": len(state_questions),
+                "last_processed": batch_end,
+                "progress_percentage": round((batch_end / 460) * 100, 1),
+                "status": "completed" if batch_end >= 460 else "in_progress",
+                "range_start": batch_start,
+                "range_end": batch_end,
+                "timestamp": time.time()
+            }
         }
         
-        checkpoint_path = Path("data/direct_extraction_checkpoint.json")
+        # Save checkpoint
         with open(checkpoint_path, "w", encoding="utf-8") as f:
-            json.dump(checkpoint, f, ensure_ascii=False, indent=2)
+            json.dump(checkpoint_data, f, ensure_ascii=False, indent=2)
         
-        logger.info(f"Checkpoint saved: {len(questions)} questions processed")
+        progress_pct = checkpoint_data["metadata"]["progress_percentage"]
+        logger.info(f"💾 Checkpoint saved: {len(questions)} questions ({progress_pct}% complete)")
 
 
 def main():

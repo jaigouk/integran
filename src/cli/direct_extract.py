@@ -17,51 +17,79 @@ console = Console()
     type=click.Path(exists=True, path_type=Path),
 )
 @click.option(
-    "--output-path",
+    "--checkpoint-path",
+    default="data/direct_extraction_checkpoint.json",
+    help="Path to save/load checkpoint",
+    type=click.Path(path_type=Path),
+)
+@click.option(
+    "--final-output",
     default="data/direct_extraction.json",
-    help="Path to save extracted questions",
+    help="Path to save final extracted questions",
     type=click.Path(path_type=Path),
 )
 @click.option(
     "--batch-size",
-    default=50,
+    default=1,
     help="Number of questions to process per batch",
     type=int,
 )
-def main(pdf_path: Path, output_path: Path, batch_size: int):
-    """Extract questions directly from PDF using Gemini File API."""
+def main(pdf_path: Path, checkpoint_path: Path, final_output: Path, batch_size: int):
+    """Extract questions directly from PDF using Gemini with transparent checkpointing."""
     
-    console.print("[bold blue]Direct PDF Extraction[/bold blue]")
+    console.print("[bold blue]Direct PDF Extraction with Checkpoint[/bold blue]")
     console.print(f"PDF: {pdf_path}")
-    console.print(f"Output: {output_path}")
+    console.print(f"Checkpoint: {checkpoint_path}")
+    console.print(f"Final output: {final_output}")
     console.print(f"Batch size: {batch_size}")
     
     try:
         processor = DirectPDFProcessor()
-        questions = processor.process_full_pdf_in_batches(pdf_path, batch_size)
         
-        # Save final results
-        final_dataset = {
-            "questions": questions,
-            "metadata": {
-                "total_questions": len(questions),
-                "extraction_method": "direct_pdf_file_api",
-                "has_images_count": len([q for q in questions if q.get("has_images")]),
-                "state_questions_count": len([q for q in questions if q.get("question_type") == "state_specific"])
-            }
-        }
-        
+        # Check existing checkpoint
         import json
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(final_dataset, f, ensure_ascii=False, indent=2)
+        if checkpoint_path.exists():
+            try:
+                with open(checkpoint_path, "r", encoding="utf-8") as f:
+                    checkpoint_data = json.load(f)
+                last_processed = checkpoint_data['metadata'].get('last_processed', 0)
+                total_questions = checkpoint_data['metadata'].get('total_questions', 0)
+                progress_pct = checkpoint_data['metadata'].get('progress_percentage', 0)
+                
+                console.print(f"[yellow]💾 Found checkpoint: {total_questions} questions, last processed: {last_processed} ({progress_pct}%)[/yellow]")
+                
+                if last_processed >= 460:
+                    console.print(f"[green]✓ Extraction already completed![/green]")
+                    # Copy to final output
+                    import shutil
+                    shutil.copy2(checkpoint_path, final_output)
+                    return
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not read checkpoint: {e}[/yellow]")
+        
+        # Start extraction with checkpoint
+        questions = processor.process_full_pdf_in_batches(pdf_path, checkpoint_path, batch_size)
+        
+        # Copy final result to output location
+        if checkpoint_path.exists():
+            import shutil
+            shutil.copy2(checkpoint_path, final_output)
             
         console.print(f"[green]✓ Successfully extracted {len(questions)} questions[/green]")
-        console.print(f"[green]✓ Image questions: {final_dataset['metadata']['has_images_count']}[/green]")
-        console.print(f"[green]✓ State questions: {final_dataset['metadata']['state_questions_count']}[/green]")
-        console.print(f"[green]✓ Saved to: {output_path}[/green]")
+        console.print(f"[green]✓ Final output saved to: {final_output}[/green]")
         
     except Exception as e:
         console.print(f"[red]❌ Extraction failed: {e}[/red]")
+        # Show checkpoint info even on failure
+        if checkpoint_path.exists():
+            try:
+                import json
+                with open(checkpoint_path, "r", encoding="utf-8") as f:
+                    checkpoint_data = json.load(f)
+                last_processed = checkpoint_data['metadata'].get('last_processed', 0)
+                console.print(f"[yellow]💾 Checkpoint preserved: {last_processed}/460 questions extracted[/yellow]")
+            except:
+                pass
         raise click.ClickException(str(e))
 
 

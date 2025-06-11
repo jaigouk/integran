@@ -72,7 +72,7 @@ all = [
 [project.scripts]
 integran = "src.trainer:main"
 integran-setup = "src.setup:main"
-integran-extract-questions = "src.extract_questions:main"
+integran-direct-extract = "src.cli.direct_extract:main"
 integran-backup-data = "src.cli.backup_data:main"
 integran-build-dataset = "src.cli.build_dataset:build_dataset_cli"
 
@@ -202,7 +202,6 @@ omit = [
     "*/tests/*",
     "*/test_*.py",
     "*/__init__.py",
-    "*/extract_questions.py",  # Developer-only PDF extraction tool
     "*/utils/pdf_extractor.py",  # Developer-only PDF extraction utility
 ]
 
