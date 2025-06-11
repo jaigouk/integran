@@ -11,13 +11,7 @@ from typing import Any
 from src.core.image_processor import ImageDescription
 from src.core.settings import get_settings, has_gemini_config
 
-try:
-    from src.knowledge_base.rag_engine import RAGEngine
-
-    RAG_AVAILABLE = True
-except ImportError:
-    RAG_AVAILABLE = False
-    RAGEngine = None
+# RAG functionality removed as it was not used in final dataset generation
 
 try:
     from google import genai
@@ -82,101 +76,30 @@ class AnswerEngine:
 
             self.client = genai.Client(api_key=self.api_key)
 
-        # Initialize RAG engine if available
-        self.rag_engine = None
-        if RAG_AVAILABLE:
-            try:
-                self.rag_engine = RAGEngine()
-                logger.info("RAG engine initialized for enhanced answers")
-            except Exception as e:
-                logger.warning(f"Failed to initialize RAG engine: {e}")
-                self.rag_engine = None
+        # RAG engine removed as it was not used in final dataset generation
 
     def generate_answer_with_explanation(
         self,
         question: dict[str, Any],
         images: list[ImageDescription] | None = None,
-        use_rag: bool = True,
     ) -> MultilingualAnswer:
         """Generate a complete multilingual answer with explanations."""
         if not has_gemini_config():
             raise ValueError("Gemini API not configured. Please set up authentication.")
 
-        # Gather context from RAG if available
-        rag_context = ""
-        rag_sources = []
-        if use_rag and self.rag_engine:
-            try:
-                # Search for relevant context using multiple queries
-                question_text = question.get("question", "")
-                category = question.get("category", "")
-                
-                # Create targeted search queries
-                search_queries = [
-                    f"{category}: {question_text}",  # Main topic search
-                    question_text,  # Direct question search
-                    category,  # Category-specific information
-                ]
-                
-                # Add option-specific searches for better "why others wrong" explanations
-                options = [
-                    question.get("option_a", ""),
-                    question.get("option_b", ""),
-                    question.get("option_c", ""),
-                    question.get("option_d", ""),
-                ]
-                for opt in options:
-                    if opt and len(opt) > 10:  # Only for substantial options
-                        search_queries.append(opt)
-                
-                # Gather context from all searches
-                all_results = []
-                for query in search_queries[:5]:  # Limit to prevent too many API calls
-                    try:
-                        results = self.rag_engine.search_knowledge_base(query, k=2)
-                        all_results.extend(results)
-                    except Exception as e:
-                        logger.warning(f"RAG search failed for query '{query}': {e}")
-                
-                # Deduplicate and compile context
-                seen_content = set()
-                unique_results = []
-                for result in all_results:
-                    content = result.get("content", "")
-                    if content and content not in seen_content:
-                        seen_content.add(content)
-                        unique_results.append(result)
-                
-                # Build comprehensive context
-                if unique_results:
-                    rag_context = "\n\n".join([
-                        f"Source: {r.get('metadata', {}).get('source', 'Unknown')}\n{r.get('content', '')}"
-                        for r in unique_results[:4]  # Top 4 most relevant
-                    ])
-                    rag_sources = [r.get("metadata", {}).get("source", "") for r in unique_results[:4]]
-                    logger.info(f"Gathered RAG context from {len(unique_results)} sources for Q{question.get('id', 0)}")
-                else:
-                    logger.warning(f"No RAG context found for Q{question.get('id', 0)}")
-                    
-            except Exception as e:
-                logger.warning(f"RAG failed for question {question.get('id')}: {e}")
-
-        # Create comprehensive prompt
-        prompt = self._create_multilingual_prompt(question, images, rag_context)
+        # Create comprehensive prompt (RAG removed as not used in final dataset)
+        prompt = self._create_multilingual_prompt(question, images)
 
         # Generate multilingual response
         response = self._call_gemini_api(prompt)
 
         # Parse and structure the response
-        return self._parse_multilingual_response(
-            response, question, images, rag_sources
-        )
+        return self._parse_multilingual_response(response, question, images)
 
     def _create_multilingual_prompt(
         self,
         question: dict[str, Any],
         images: list[ImageDescription] | None,
-        rag_context: str,
     ) -> str:
         """Create a comprehensive prompt for multilingual answer generation."""
         question_text = question.get("question", "")
@@ -209,14 +132,7 @@ Category: {category}
                 prompt += f"Context: {img.context}\n"
                 prompt += f"Relevance: {img.question_relevance}\n\n"
 
-        # Add RAG context if available
-        if rag_context:
-            prompt += f"""ADDITIONAL CONTEXT FROM KNOWLEDGE BASE:
-{rag_context}
-
-IMPORTANT: Use this context to provide specific, factual explanations. Reference specific laws, dates, facts, or historical events from the context when explaining why options are correct or incorrect.
-
-"""
+        # RAG context removed as it was not used in final dataset generation
 
         prompt += """REQUIREMENTS:
 1. Generate explanations in 5 languages: English (primary), German, Turkish, Ukrainian, Arabic
@@ -299,17 +215,19 @@ Generate the multilingual explanation now:"""
                     contents=contents,  # type: ignore[arg-type]
                     config=generate_config,
                 )
-                
+
                 response_text = response.text.strip() if response.text else ""
-                
+
                 # Check for truncated response (common issue)
-                if response_text and not response_text.endswith('}'):
-                    logger.warning(f"Response appears truncated (length: {len(response_text)})")
+                if response_text and not response_text.endswith("}"):
+                    logger.warning(
+                        f"Response appears truncated (length: {len(response_text)})"
+                    )
                     logger.warning(f"Response ends with: ...{response_text[-50:]}")
                     if attempt < max_retries - 1:
                         logger.info("Retrying due to truncated response...")
                         continue
-                
+
                 return response_text
 
             except Exception as e:
@@ -334,7 +252,6 @@ Generate the multilingual explanation now:"""
         response_text: str,
         question: dict[str, Any],
         images: list[ImageDescription] | None,
-        rag_sources: list[str],
     ) -> MultilingualAnswer:
         """Parse the API response into a structured multilingual answer."""
         # Clean up response text
@@ -363,7 +280,7 @@ Generate the multilingual explanation now:"""
                 key_concept=result.get("key_concept", {}),
                 mnemonic=result.get("mnemonic"),
                 image_context=image_context,
-                rag_sources=rag_sources,
+                rag_sources=[],  # Empty since RAG was removed
             )
 
         except json.JSONDecodeError as e:
@@ -371,9 +288,13 @@ Generate the multilingual explanation now:"""
             logger.error(f"Response length: {len(response_text)}")
             logger.error(f"Response text (first 500 chars): {response_text[:500]}")
             logger.error(f"Response text (last 100 chars): ...{response_text[-100:]}")
-            
+
             # Check if this looks like a truncated JSON
-            if response_text and '{' in response_text and response_text.count('{') > response_text.count('}'):
+            if (
+                response_text
+                and "{" in response_text
+                and response_text.count("{") > response_text.count("}")
+            ):
                 logger.error("Response appears to be truncated JSON (unmatched braces)")
 
             # Create fallback response
@@ -391,7 +312,7 @@ Generate the multilingual explanation now:"""
                 key_concept={},
                 mnemonic=None,
                 image_context=None,
-                rag_sources=rag_sources,
+                rag_sources=[],  # Empty since RAG was removed
             )
 
     def generate_batch_answers(
@@ -399,7 +320,6 @@ Generate the multilingual explanation now:"""
         questions: list[dict[str, Any]],
         question_image_mapping: dict[int, list[str]],
         image_descriptions: dict[str, ImageDescription],
-        use_rag: bool = True,
     ) -> list[MultilingualAnswer]:
         """Generate answers for a batch of questions."""
         answers = []
@@ -419,7 +339,7 @@ Generate the multilingual explanation now:"""
 
             try:
                 answer = self.generate_answer_with_explanation(
-                    question=question, images=images, use_rag=use_rag
+                    question=question, images=images
                 )
                 answers.append(answer)
                 logger.info(f"Generated multilingual answer for question {question_id}")

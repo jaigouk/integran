@@ -10,7 +10,7 @@ The "Leben in Deutschland" test consists of 460 questions (300 general + 160 sta
 
 - **Multilingual Support**: Explanations in 5 languages (English, German, Turkish, Ukrainian, Arabic)
 - **Image Question Support**: Visual questions with detailed image descriptions
-- **AI-Powered Explanations**: Comprehensive explanations enhanced with official sources
+- **AI-Powered Explanations**: Comprehensive explanations for all questions
 - **Interactive Practice Sessions**: Multiple learning modes
 - **Smart Failure Tracking**: Adaptive learning system
 - **Spaced Repetition Learning**: Optimize retention
@@ -115,7 +115,6 @@ This shows:
 - Conda (Anaconda or Miniconda)
 - Terminal with UTF-8 support
 - 100MB free disk space (includes images and multilingual data)
-- **Optional**: Firecrawl API key for enhanced content (developers only)
 
 ## 🛠️ Installation
 
@@ -154,19 +153,7 @@ make install
 integran-setup
 ```
 
-### 🔧 Optional: Enhanced Content (Developers Only)
-
-For developers who want to regenerate the dataset with enhanced content:
-
-```bash
-# Optional: Firecrawl API key for enhanced RAG content
-export FIRECRAWL_API_KEY="your-firecrawl-api-key"
-
-# Build enhanced multilingual dataset
-integran-build-dataset --verbose
-```
-
-**Note**: Regular users don't need API keys - the app comes with pre-built multilingual data.
+**Note**: The app comes with pre-built multilingual data - no additional setup required.
 
 ## 🔧 Configuration
 
@@ -198,8 +185,7 @@ Available explanation languages:
 For developers working with the dataset building:
 
 ```bash
-# Environment variables for enhanced features
-export FIRECRAWL_API_KEY="your-key"           # Optional: Enhanced RAG content
+# Environment variables for dataset building (developers only)
 export GEMINI_API_KEY="your-key"              # Required: For dataset building
 export GCP_PROJECT_ID="your-project"          # Required: For AI processing
 ```
@@ -207,7 +193,6 @@ export GCP_PROJECT_ID="your-project"          # Required: For AI processing
 ## 🙏 Acknowledgments
 
 - Questions sourced from the official BAMF exam catalog
-- Enhanced with content from official German government sources
 - AI-powered explanations using Google Gemini
 - Multilingual translations for diverse communities
 - Inspired by Anki's spaced repetition algorithm
@@ -223,7 +208,6 @@ The developer guide covers:
 - 🤖 PDF question extraction and AI processing
 - 🌍 Multilingual explanation generation
 - 🖼️ Image processing and description system
-- 🧠 RAG system with official German sources
 - 🔧 Development environment setup
 - 🧪 Testing and code quality
 - 📝 Contributing guidelines

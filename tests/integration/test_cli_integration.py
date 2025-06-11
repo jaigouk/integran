@@ -40,7 +40,7 @@ class TestCLIIntegration:
         captured = capsys.readouterr()
 
         # Verify help contains expected information
-        assert "Build multilingual dataset" in captured.out
+        assert "Build complete multilingual dataset" in captured.out
         assert "--force-rebuild" in captured.out
         assert "--status" in captured.out
         assert "--verbose" in captured.out

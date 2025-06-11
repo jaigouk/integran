@@ -334,8 +334,9 @@ class TestCategoryMode:
 class TestInteractiveMenu:
     """Test the interactive menu function."""
 
+    @patch("src.trainer.console.input", return_value="8")  # Choose exit option
     @patch("src.trainer.console.print")
-    def test_start_interactive_menu(self, mock_print):
+    def test_start_interactive_menu(self, mock_print, mock_input):  # noqa: ARG002
         """Test starting interactive menu."""
         mock_db = Mock()
 
@@ -351,6 +352,6 @@ class TestInteractiveMenu:
         menu_text = " ".join(print_calls)
         assert "Random Practice" in menu_text
         assert "Sequential Practice" in menu_text
-        assert "Practice by Category" in menu_text
-        assert "Review Questions" in menu_text
+        assert "Category Practice" in menu_text
+        assert "Review Failed Questions" in menu_text
         assert "View Statistics" in menu_text

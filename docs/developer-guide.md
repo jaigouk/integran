@@ -194,43 +194,42 @@ integran-backup-data restore --suffix 20250609_124243
 integran-direct-extract  # Single-question extraction with checkpointing
 ```
 
-## 🏗️ Unified Data Pipeline (Phase 1.8)
+## 🏗️ Current Data Pipeline (2025-06-11 Update)
 
-The new architecture provides a **single unified command** that replaces all previous scattered utilities:
+⚠️ **Important**: The unified `integran-build-dataset` command is outdated. Use the new step-by-step process documented in the [Dataset Generation Guide](./dataset-generation-guide.md).
 
-### Primary Command: integran-build-dataset
+### Current Workflow (Multi-Step Process)
+
+The current system uses multiple scripts for different phases:
 
 ```bash
-# Build complete multilingual dataset (replaces all old commands)
-integran-build-dataset
+# STEP 0: Extract from PDF (usually already done)
+python src/cli/direct_extract.py
+
+# STEP 1: Extract images (already done)  
+python scripts/extract_images.py
+
+# STEP 2: Fix image answers (already done)
+python scripts/fix_image_answers.py
+
+# STEP 3: Generate explanations (main task)
+python scripts/generate_explanations.py
+python scripts/retry_failed_questions.py
+
+# STEP 4: Create final dataset
+python scripts/finalize_dataset.py
 ```
 
-This **single command** orchestrates the entire pipeline:
+### Quick Start for Most Developers
 
-1. **Load Source Data**: Reads from `data/extraction_checkpoint.json` (460 questions)
-2. **AI Image Processing**: Uses Gemini Vision to describe all images with context
-3. **Image-Question Mapping**: Creates accurate mappings (fixes previous 25/42 broken mappings)
-4. **Multilingual Generation**: Generates answers in 5 languages (EN, DE, TR, UK, AR)
-5. **RAG Enhancement**: Enriches with official German government sources
-6. **Final Output**: Saves to `data/questions.json` ready for the application
+Most developers only need to run the final step:
 
-### Why This Replaces Old Commands
-
-**❌ Old Broken Workflow (Phase 1.7 and earlier):**
 ```bash
-integran-direct-extract       # Extract from PDF
-integran-generate-explanations # Generate explanations  
-integran-build-kb             # Build knowledge base
-# Manual CSV to JSON conversion
-# Manual image mapping fixes
-# Multiple checkpoint files
-# Inconsistent data formats
+# Create final dataset from existing progress
+python scripts/finalize_dataset.py
 ```
 
-**✅ New Unified Workflow (Phase 1.8+):**
-```bash
-integran-build-dataset         # Does everything above + fixes issues
-```
+📖 **For complete details, see**: [Dataset Generation Guide](./dataset-generation-guide.md)
 
 ### Advanced Options
 
@@ -317,78 +316,13 @@ integran-build-dataset  # Automatically resumes from checkpoint
 
 Progress is saved in `data/dataset_checkpoint.json`.
 
-## 🧠 Knowledge Base & RAG System ✨ **NEW**
+## 🔧 Data Generation Overview
 
-The application includes a sophisticated Retrieval-Augmented Generation (RAG) system for enhanced explanations using official German government sources.
-
-### Architecture Overview
-
-The RAG system consists of four main components:
-
-```
-src/knowledge_base/
-├── content_fetcher.py    # Downloads content from official sources
-├── rag_engine.py         # Main RAG orchestration and question answering
-├── text_splitter.py      # Intelligent document chunking
-└── vector_store.py       # ChromaDB vector database operations
-```
-
-### Content Sources
-
-The system automatically fetches content from:
-- **BAMF Official Documents**: Integration course materials
-- **Federal Government Resources**: Constitutional and legal documents
-- **Historical Context**: German history and political system
-- **Legal Framework**: Grundgesetz (German Constitution) articles
-
-### Knowledge Base Management
-
-#### Building the Knowledge Base
-
-```bash
-# Build knowledge base from official sources
-integran-build-kb build
-
-# Force refresh content even if cache exists
-integran-build-kb build --force-refresh
-
-# Check knowledge base statistics
-integran-build-kb stats
-
-# Search the knowledge base
-integran-build-kb search "Grundgesetz"
-
-# Test RAG with a query
-integran-build-kb test "Was ist Meinungsfreiheit?"
-
-# Clear knowledge base
-integran-build-kb clear
-```
-
-#### Configuration Options
-
-```bash
-# Custom vector store directory
-integran-build-kb build --vector-store-dir /custom/path
-
-# Custom collection name
-integran-build-kb build --collection-name my_collection
-
-# Custom chunking parameters
-integran-build-kb build --chunk-size 1500 --chunk-overlap 300
-```
-
-### Data Storage
-
-The knowledge base uses ChromaDB for vector storage:
-- **Location**: `data/vector_store/`
-- **Collection**: `german_integration_kb`
-- **Embeddings**: `sentence-transformers/all-MiniLM-L6-v2`
-- **Content Cache**: `data/knowledge_base/raw/`
+The application uses AI-powered explanations generated with Google Gemini for all exam questions. The RAG system was removed as it was not used in the final dataset generation.
 
 ## 🎓 AI Explanation Generation ✨ **NEW**
 
-The system generates comprehensive explanations for all exam questions using Google's Gemini AI, optionally enhanced with RAG.
+The system generates comprehensive explanations for all exam questions using Google's Gemini AI.
 
 ### Explanation Generation Process
 
@@ -408,15 +342,6 @@ integran-generate-explanations --no-resume
 integran-generate-explanations --verbose
 ```
 
-#### RAG-Enhanced Explanations
-
-```bash
-# Generate explanations with RAG enhancement
-integran-generate-explanations --use-rag
-
-# Combined example: RAG with custom batch size
-integran-generate-explanations --use-rag --batch-size 5 --verbose
-```
 
 ### Explanation Structure
 
@@ -434,8 +359,6 @@ Each generated explanation includes:
   },
   "key_concept": "Meinungsfreiheit (Artikel 5 Grundgesetz)",
   "mnemonic": "Memory aid to remember the concept",
-  "context_sources": ["source1", "source2"],  // When using RAG
-  "enhanced_with_rag": true                    // RAG enhancement flag
 }
 ```
 
@@ -546,23 +469,14 @@ cp .env.example .env
 # Edit .env with your Google Cloud credentials
 ```
 
-#### 2. Building Knowledge Base
-```bash
-# Build the knowledge base (one-time setup)
-integran-build-kb build
-
-# Verify knowledge base is working
-integran-build-kb stats
-integran-build-kb search "Grundgesetz"
-```
+# Knowledge base building removed as RAG was not used
 
 #### 3. Working with Explanations
 ```bash
 # Generate explanations for all questions (if needed)
 integran-generate-explanations --batch-size 10
 
-# Generate explanations with RAG enhancement
-integran-generate-explanations --use-rag --batch-size 5
+# RAG enhancement removed as it was not used
 
 # Check progress during generation
 tail -f data/explanations_checkpoint.json
@@ -591,32 +505,7 @@ ruff check . --fix && ruff format .         # Code quality
 mypy src/                                    # Type checking
 ```
 
-### Working with the RAG System
-
-#### Dependencies
-The RAG system requires additional packages:
-```bash
-# Core RAG dependencies (included in main install)
-chromadb>=0.4.22
-sentence-transformers>=2.2.2
-pypdf>=4.0.0
-beautifulsoup4>=4.12.0
-
-# Optional: Enhanced web scraping
-firecrawl-py>=0.0.16
-```
-
-#### Testing RAG Components
-```bash
-# Test individual components
-pytest tests/unit/knowledge_base/ -v
-
-# Test specific RAG functionality
-pytest tests/unit/knowledge_base/test_rag_engine.py -v
-
-# Integration tests
-pytest tests/integration/ -v
-```
+# RAG system removed as it was not used in final dataset generation
 
 ### Current Project Structure (Phase 1.8)
 
@@ -630,13 +519,7 @@ src/
 │   ├── image_processor.py          # ✨ NEW: AI vision & question-image mapping
 │   ├── answer_engine.py            # ✨ NEW: Multilingual answer generation
 │   └── data_builder.py             # ✨ NEW: Unified pipeline orchestrator
-├── knowledge_base/                 # Enhanced RAG system
-│   ├── __init__.py
-│   ├── content_fetcher.py
-│   ├── firecrawl_fetcher.py        # ✨ NEW: Official German sources
-│   ├── rag_engine.py               # Enhanced multilingual support
-│   ├── text_splitter.py
-│   └── vector_store.py
+# knowledge_base/ removed as RAG was not used in final dataset
 ├── cli/                            # Simplified CLI commands
 │   ├── __init__.py
 │   ├── backup_data.py              # Keep (works)
@@ -662,11 +545,7 @@ data/
 ├── extraction_checkpoint.json     # Source of truth (460 questions)
 ├── dataset_checkpoint.json        # ✨ NEW: Build progress tracking
 ├── images/                        # All extracted question images (42 image questions)
-├── knowledge_base/                # RAG content cache
-│   └── raw/
-│       └── content_cache.json     # Firecrawl cached content
-├── vector_store/                  # ChromaDB vector storage
-│   └── [chroma files]
+# knowledge_base/ and vector_store/ removed as RAG was not used
 ├── trainer.db                     # SQLite database (created by setup)
 └── gesamtfragenkatalog-lebenindeutschland.pdf
 
@@ -693,10 +572,7 @@ tests/
 │   │   ├── test_data_builder_validation.py   # End-to-end validation
 │   │   ├── test_database.py             # Database operations
 │   │   └── test_models.py               # Data models
-│   ├── knowledge_base/              # RAG system tests
-│   │   ├── test_rag_engine.py
-│   │   ├── test_firecrawl_fetcher.py
-│   │   └── test_vector_store.py
+# knowledge_base/ tests removed as RAG was not used
 │   └── cli/                        # CLI command tests
 │       └── test_build_dataset.py
 ├── integration/                    # End-to-end tests
@@ -809,6 +685,7 @@ integran-build-dataset --status     # Check current status
 
 ## 📚 Additional Resources
 
+- **[Dataset Generation Guide](./dataset-generation-guide.md)** - Complete workflow for generating final_dataset.json
 - [Integration Exam Research](./integration_exam_research.md) - Background research
 
 For questions or support, please open an issue on GitHub.

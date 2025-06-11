@@ -32,9 +32,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     gcp_project_id: str = Field(default="", alias="GCP_PROJECT_ID")
     gcp_region: str = Field(default="us-central1", alias="GCP_REGION")
-    gemini_model: str = Field(
-        default="gemini-2.5-pro-preview-06-05", alias="GEMINI_MODEL"
-    )
+    gemini_model: str = Field(default="gemini-1.5-pro", alias="GEMINI_MODEL")
     google_application_credentials: str = Field(
         default="", alias="GOOGLE_APPLICATION_CREDENTIALS"
     )
@@ -71,23 +69,7 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="INTEGRAN_LOG_LEVEL")
     log_file: str = Field(default="logs/integran.log", alias="INTEGRAN_LOG_FILE")
 
-    # RAG Configuration (optional for enhanced explanations)
-    firecrawl_api_key: str = Field(default="", alias="FIRECRAWL_API_KEY")
-    vector_store_dir: str = Field(
-        default="data/vector_store", alias="INTEGRAN_VECTOR_STORE_DIR"
-    )
-    vector_collection_name: str = Field(
-        default="german_integration_kb", alias="INTEGRAN_VECTOR_COLLECTION_NAME"
-    )
-    embedding_model: str = Field(
-        default="sentence-transformers/all-MiniLM-L6-v2",
-        alias="INTEGRAN_EMBEDDING_MODEL",
-    )
-    chunk_size: int = Field(default=1000, alias="INTEGRAN_CHUNK_SIZE")
-    chunk_overlap: int = Field(default=200, alias="INTEGRAN_CHUNK_OVERLAP")
-    knowledge_base_cache_dir: str = Field(
-        default="data/knowledge_base/raw", alias="INTEGRAN_KB_CACHE_DIR"
-    )
+    # RAG Configuration removed as it was not used in final dataset generation
 
     model_config = {
         "env_prefix": "",
@@ -119,18 +101,7 @@ def has_gemini_config() -> bool:
         return bool(settings.gemini_api_key and settings.gcp_project_id)
 
 
-def has_rag_config() -> bool:
-    """Check if RAG configuration is available."""
-    try:
-        # Check if required packages are available
-        import chromadb  # noqa: F401
-        import sentence_transformers  # noqa: F401
-
-        # Optional firecrawl for enhanced content fetching
-        # (will fall back to requests+BeautifulSoup if not available)
-        return True
-    except ImportError:
-        return False
+# has_rag_config function removed as RAG was not used in final dataset generation
 
 
 def get_env_var(key: str, default: Any = None) -> Any:

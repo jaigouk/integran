@@ -581,29 +581,23 @@ class DatabaseManager:
 
         This adds the new columns for multilingual support.
         """
-        with self.get_session() as session:
-            try:
-                # Add new columns if they don't exist
-                session.execute("ALTER TABLE questions ADD COLUMN images_data TEXT")
-            except Exception:
-                pass  # Column already exists
+        import contextlib
 
-            try:
+        with self.get_session() as session:
+            # Add new columns if they don't exist
+            with contextlib.suppress(Exception):
+                session.execute("ALTER TABLE questions ADD COLUMN images_data TEXT")
+
+            with contextlib.suppress(Exception):
                 session.execute(
                     "ALTER TABLE questions ADD COLUMN multilingual_answers TEXT"
                 )
-            except Exception:
-                pass  # Column already exists
 
-            try:
+            with contextlib.suppress(Exception):
                 session.execute("ALTER TABLE questions ADD COLUMN rag_sources TEXT")
-            except Exception:
-                pass  # Column already exists
 
-            try:
+            with contextlib.suppress(Exception):
                 session.execute("ALTER TABLE questions ADD COLUMN updated_at DATETIME")
-            except Exception:
-                pass  # Column already exists
 
             session.commit()
             logger.info("Phase 1.8 schema migration completed")

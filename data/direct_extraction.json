@@ -9536,10 +9536,31 @@
       "is_image_question": false,
       "images": [],
       "correct_answer_letter": "B"
+    },
+    "280": {
+      "id": 280,
+      "question": "Wenn Sie sich in Deutschland gegen einen falschen Steuerbescheid wehren wollen, müssen Sie ...",
+      "options": [
+        "nichts machen.",
+        "den Bescheid wegwerfen.",
+        "Einspruch einlegen.",
+        "warten, bis ein anderer Bescheid kommt."
+      ],
+      "correct": "Einspruch einlegen.",
+      "category": "Staat und Verwaltung",
+      "difficulty": "medium",
+      "question_type": "general",
+      "state": null,
+      "page_number": [
+        103
+      ],
+      "is_image_question": false,
+      "images": [],
+      "correct_answer_letter": "C"
     }
   },
   "metadata": {
-    "total_questions": 459,
+    "total_questions": 460,
     "extraction_method": "direct_pdf_checkpoint",
     "has_images_count": 41,
     "state_questions_count": 158,
@@ -9548,6 +9569,7 @@
     "status": "completed",
     "range_start": 6,
     "range_end": 460,
-    "timestamp": 1749581764.1452792
+    "timestamp": 1749581764.1452792,
+    "last_updated": "2025-06-11 12:26:44"
   }
 }

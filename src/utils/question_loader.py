@@ -19,15 +19,15 @@ def ensure_questions_available() -> Path:
     """
     settings = get_settings()
     json_path = Path(settings.questions_json_path)
-    
+
     # Check for the direct extraction checkpoint file as a fallback
     checkpoint_path = Path("data/direct_extraction_checkpoint.json")
-    
+
     # If JSON already exists, use it
     if json_path.exists():
         logger.info(f"Using existing questions file: {json_path}")
         return json_path
-    
+
     # If checkpoint file exists, suggest using it
     if checkpoint_path.exists():
         raise FileNotFoundError(
@@ -36,7 +36,7 @@ def ensure_questions_available() -> Path:
             f"Please run 'integran-build-dataset' to build the complete dataset, or\n"
             f"Copy the checkpoint file to {json_path} to use raw extracted data."
         )
-    
+
     # If nothing exists, provide helpful error message
     raise FileNotFoundError(
         f"Questions file not found. Please ensure one of the following:\n"
