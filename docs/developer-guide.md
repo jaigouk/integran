@@ -1256,7 +1256,7 @@ The new architecture addresses the core requirements for an effective spaced rep
 
 ### Implementation Priorities
 
-**Phase 3.1 (Current)**: Terminal UI Framework with Rich/Textual
+**Phase 3.1**: Terminal UI Framework with Rich/Textual
 **Phase 3.2**: FSRS algorithm implementation and database integration  
 **Phase 3.3**: Advanced features (analytics, leech management, interleaving)
 **Phase 3.4**: Performance optimization and user testing

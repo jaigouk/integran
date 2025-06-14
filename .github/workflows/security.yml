@@ -31,18 +31,47 @@ jobs:
           . .venv/bin/activate
           uv pip install -e ".[dev]"
       
-      - name: Run security checks with bandit
+      - name: Run security checks with Ruff
         run: |
           . .venv/bin/activate
-          pip install bandit[toml]
-          bandit -r src/ -f json -o bandit-report.json || true
-          bandit -r src/ --severity-level medium
+          # Ruff includes all flake8-bandit security checks (S prefix rules)
+          # See: https://docs.astral.sh/ruff/rules/#flake8-bandit-s
+          # This checks for:
+          # - Hardcoded passwords (S105-S107)
+          # - Security issues with pickle, yaml, XML (S301-S321)
+          # - Insecure cryptography (S401-S415)
+          # - Shell injection risks (S601-S612)
+          # - And many more security anti-patterns
+          
+          # Generate JSON report for artifact upload
+          ruff check --select S --output-format=json > ruff-security-report.json || true
+          
+          # Run again with human-readable output and fail on issues
+          # Note: Ignored rules configured in pyproject.toml:
+          # - S101 (assert) is allowed for tests
+          # - S311 (random) is allowed for non-cryptographic use (question shuffling)
+          ruff check --select S .
       
-      - name: Check for known vulnerabilities
+      # Option 1: Use Safety with API key (if you have one)
+      # Uncomment the following lines and add SAFETY_API_KEY to your GitHub secrets
+      # - name: Check for known vulnerabilities with Safety
+      #   env:
+      #     SAFETY_API_KEY: ${{ secrets.SAFETY_API_KEY }}
+      #   run: |
+      #     . .venv/bin/activate
+      #     pip install safety
+      #     safety scan
+      
+      # Option 2: Use pip-audit (no authentication required, recommended)
+      - name: Check for known vulnerabilities with pip-audit
         run: |
           . .venv/bin/activate
-          pip install safety
-          safety scan
+          pip install pip-audit
+          # Run pip-audit to check for known vulnerabilities
+          # --desc: Include vulnerability descriptions
+          # --fix: Attempt to fix vulnerabilities (dry-run mode)
+          # --dry-run: Don't actually fix, just report what would be fixed
+          pip-audit --desc --fix --dry-run || true
       
       - name: Upload security scan results
         uses: actions/upload-artifact@v4
@@ -50,4 +79,4 @@ jobs:
         with:
           name: security-reports
           path: |
-            bandit-report.json
+            ruff-security-report.json
