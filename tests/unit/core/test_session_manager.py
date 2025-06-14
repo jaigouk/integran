@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from src.core.database import DatabaseManager
-from src.core.fsrs_scheduler import FSRSScheduler
+from src.core.learning.domain.services.schedule_card import ScheduleCard
 from src.core.models import FSRSCard, FSRSRating, Question
 from src.core.session_manager import (
     QuestionPresentation,
@@ -28,14 +28,14 @@ class TestSessionManager:
         return Mock(spec=DatabaseManager)
 
     @pytest.fixture
-    def mock_fsrs_scheduler(self):
-        """Create mock FSRS scheduler."""
-        return Mock(spec=FSRSScheduler)
+    def mock_schedule_card_service(self):
+        """Create mock ScheduleCard domain service."""
+        return Mock(spec=ScheduleCard)
 
     @pytest.fixture
-    def session_manager(self, mock_db_manager, mock_fsrs_scheduler):
+    def session_manager(self, mock_db_manager, mock_schedule_card_service):
         """Create session manager with mock dependencies."""
-        return SessionManager(mock_db_manager, mock_fsrs_scheduler)
+        return SessionManager(mock_db_manager, mock_schedule_card_service)
 
     @pytest.fixture
     def sample_config(self):
@@ -115,11 +115,12 @@ class TestSessionManager:
         assert progress.questions_total == 2
         assert progress.questions_completed == 0
 
-    def test_submit_answer_correct(
+    @pytest.mark.asyncio
+    async def test_submit_answer_correct(
         self,
         session_manager,
         mock_db_manager,
-        mock_fsrs_scheduler,
+        mock_schedule_card_service,
         sample_card,
         sample_question,
     ):
@@ -142,11 +143,29 @@ class TestSessionManager:
         # Setup mocks
         mock_db_manager.get_fsrs_card_by_id.return_value = sample_card
         mock_db_manager.get_question.return_value = sample_question
-        mock_review_result = Mock()
-        mock_fsrs_scheduler.review_card.return_value = mock_review_result
+
+        from src.core.learning.domain.services.schedule_card import ScheduleCardResult
+        from src.core.models import FSRSState
+
+        mock_schedule_result = ScheduleCardResult(
+            success=True,
+            card_id=1,
+            question_id=100,
+            difficulty_before=5.0,
+            stability_before=2.0,
+            retrievability_before=0.9,
+            state_before=FSRSState.REVIEW,
+            difficulty_after=4.8,
+            stability_after=2.5,
+            retrievability_after=0.85,
+            state_after=FSRSState.REVIEW,
+            next_review_date=datetime.now(UTC),
+            next_interval_days=3.0,
+        )
+        mock_schedule_card_service.call.return_value = mock_schedule_result
 
         # Submit answer
-        result = session_manager.submit_answer(
+        result = await session_manager.submit_answer(
             session_id=1,
             card_id=1,
             user_answer="A",  # Correct answer
@@ -154,24 +173,29 @@ class TestSessionManager:
         )
 
         # Verify
-        assert result == mock_review_result
-        mock_fsrs_scheduler.review_card.assert_called_once_with(
-            card_id=1,
-            rating=FSRSRating.GOOD,  # Good rating for correct answer in reasonable time
-            response_time_ms=3000,
-            session_id=1,
-        )
+        assert result == mock_schedule_result
+        assert mock_schedule_card_service.call.call_count == 1
+
+        # Verify the request was created correctly
+        call_args = mock_schedule_card_service.call.call_args[0][0]
+        assert call_args.card_id == 1
+        assert (
+            call_args.rating == FSRSRating.GOOD
+        )  # Good rating for correct answer in reasonable time
+        assert call_args.response_time_ms == 3000
+        assert call_args.session_id == 1
 
         # Check progress update
         progress = session_manager._active_sessions[1]
         assert progress.questions_completed == 1
         assert progress.questions_correct == 1
 
-    def test_submit_answer_incorrect(
+    @pytest.mark.asyncio
+    async def test_submit_answer_incorrect(
         self,
         session_manager,
         mock_db_manager,
-        mock_fsrs_scheduler,
+        mock_schedule_card_service,
         sample_card,
         sample_question,
     ):
@@ -194,11 +218,29 @@ class TestSessionManager:
         # Setup mocks
         mock_db_manager.get_fsrs_card_by_id.return_value = sample_card
         mock_db_manager.get_question.return_value = sample_question
-        mock_review_result = Mock()
-        mock_fsrs_scheduler.review_card.return_value = mock_review_result
+
+        from src.core.learning.domain.services.schedule_card import ScheduleCardResult
+        from src.core.models import FSRSState
+
+        mock_schedule_result = ScheduleCardResult(
+            success=True,
+            card_id=1,
+            question_id=100,
+            difficulty_before=5.0,
+            stability_before=2.0,
+            retrievability_before=0.9,
+            state_before=FSRSState.REVIEW,
+            difficulty_after=5.2,
+            stability_after=1.5,
+            retrievability_after=0.75,
+            state_after=FSRSState.REVIEW,
+            next_review_date=datetime.now(UTC),
+            next_interval_days=1.0,
+        )
+        mock_schedule_card_service.call.return_value = mock_schedule_result
 
         # Submit wrong answer
-        session_manager.submit_answer(
+        await session_manager.submit_answer(
             session_id=1,
             card_id=1,
             user_answer="B",  # Wrong answer
@@ -206,23 +248,23 @@ class TestSessionManager:
         )
 
         # Verify rating is AGAIN for wrong answer
-        mock_fsrs_scheduler.review_card.assert_called_once_with(
-            card_id=1,
-            rating=FSRSRating.AGAIN,
-            response_time_ms=5000,
-            session_id=1,
-        )
+        call_args = mock_schedule_card_service.call.call_args[0][0]
+        assert call_args.card_id == 1
+        assert call_args.rating == FSRSRating.AGAIN
+        assert call_args.response_time_ms == 5000
+        assert call_args.session_id == 1
 
         # Check progress update
         progress = session_manager._active_sessions[1]
         assert progress.questions_completed == 1
         assert progress.questions_incorrect == 1
 
-    def test_submit_answer_skipped(
+    @pytest.mark.asyncio
+    async def test_submit_answer_skipped(
         self,
         session_manager,
         mock_db_manager,
-        mock_fsrs_scheduler,
+        mock_schedule_card_service,
         sample_card,
         sample_question,
     ):
@@ -245,11 +287,29 @@ class TestSessionManager:
         # Setup mocks
         mock_db_manager.get_fsrs_card_by_id.return_value = sample_card
         mock_db_manager.get_question.return_value = sample_question
-        mock_review_result = Mock()
-        mock_fsrs_scheduler.review_card.return_value = mock_review_result
+
+        from src.core.learning.domain.services.schedule_card import ScheduleCardResult
+        from src.core.models import FSRSState
+
+        mock_schedule_result = ScheduleCardResult(
+            success=True,
+            card_id=1,
+            question_id=100,
+            difficulty_before=5.0,
+            stability_before=2.0,
+            retrievability_before=0.9,
+            state_before=FSRSState.REVIEW,
+            difficulty_after=5.5,
+            stability_after=1.0,
+            retrievability_after=0.7,
+            state_after=FSRSState.REVIEW,
+            next_review_date=datetime.now(UTC),
+            next_interval_days=1.0,
+        )
+        mock_schedule_card_service.call.return_value = mock_schedule_result
 
         # Submit skipped answer
-        session_manager.submit_answer(
+        await session_manager.submit_answer(
             session_id=1,
             card_id=1,
             user_answer=None,  # Skipped
@@ -257,36 +317,37 @@ class TestSessionManager:
         )
 
         # Verify rating is AGAIN for skipped
-        mock_fsrs_scheduler.review_card.assert_called_once_with(
-            card_id=1,
-            rating=FSRSRating.AGAIN,
-            response_time_ms=1000,
-            session_id=1,
-        )
+        call_args = mock_schedule_card_service.call.call_args[0][0]
+        assert call_args.card_id == 1
+        assert call_args.rating == FSRSRating.AGAIN
+        assert call_args.response_time_ms == 1000
+        assert call_args.session_id == 1
 
         # Check progress update
         progress = session_manager._active_sessions[1]
         assert progress.questions_completed == 1
         assert progress.questions_skipped == 1
 
-    def test_submit_answer_session_not_found(self, session_manager):
+    @pytest.mark.asyncio
+    async def test_submit_answer_session_not_found(self, session_manager):
         """Test submitting answer for non-existent session."""
         with pytest.raises(ValueError, match="Session 999 not found"):
-            session_manager.submit_answer(
+            await session_manager.submit_answer(
                 session_id=999,
                 card_id=1,
                 user_answer="A",
                 response_time_ms=3000,
             )
 
-    def test_submit_answer_card_not_found(self, session_manager, mock_db_manager):
+    @pytest.mark.asyncio
+    async def test_submit_answer_card_not_found(self, session_manager, mock_db_manager):
         """Test submitting answer for non-existent card."""
         # Setup session
         session_manager._active_sessions[1] = Mock()
         mock_db_manager.get_fsrs_card_by_id.return_value = None
 
         with pytest.raises(ValueError, match="Card 1 not found"):
-            session_manager.submit_answer(
+            await session_manager.submit_answer(
                 session_id=1,
                 card_id=1,
                 user_answer="A",
@@ -374,7 +435,6 @@ class TestSessionManager:
     def test_get_next_question(
         self,
         session_manager,
-        mock_fsrs_scheduler,
         mock_db_manager,
         sample_card,
         sample_question,
@@ -396,9 +456,8 @@ class TestSessionManager:
         )
 
         # Setup mocks
-        mock_fsrs_scheduler.get_due_cards.return_value = [sample_card]
+        mock_db_manager.get_due_fsrs_cards.return_value = [sample_card]
         mock_db_manager.get_question.return_value = sample_question
-        mock_fsrs_scheduler.predict_retention.return_value = 0.85
 
         presentation = session_manager.get_next_question(1)
 
@@ -406,7 +465,9 @@ class TestSessionManager:
         assert presentation.question == sample_question
         assert presentation.card == sample_card
         assert presentation.question_number == 3  # questions_completed + 1
-        assert presentation.predicted_retention == 0.85
+        assert (
+            presentation.predicted_retention > 0
+        )  # Basic check that retention is calculated
 
     def test_get_next_question_session_complete(self, session_manager):
         """Test getting next question when session is complete."""
@@ -429,7 +490,7 @@ class TestSessionManager:
 
         assert presentation is None
 
-    def test_get_next_question_no_due_cards(self, session_manager, mock_fsrs_scheduler):
+    def test_get_next_question_no_due_cards(self, session_manager, mock_db_manager):
         """Test getting next question when no cards are due."""
         # Setup session
         session_manager._active_sessions[1] = SessionProgress(
@@ -446,7 +507,7 @@ class TestSessionManager:
             elapsed_time_minutes=5,
         )
 
-        mock_fsrs_scheduler.get_due_cards.return_value = []
+        mock_db_manager.get_due_fsrs_cards.return_value = []
 
         presentation = session_manager.get_next_question(1)
 
@@ -455,7 +516,6 @@ class TestSessionManager:
     def test_get_session_questions_review_type(
         self,
         session_manager,
-        mock_fsrs_scheduler,
         mock_db_manager,
         sample_card,
         sample_question,
@@ -463,7 +523,7 @@ class TestSessionManager:
         """Test getting questions for review session."""
         config = SessionConfig(session_type=SessionType.REVIEW, max_reviews=10)
 
-        mock_fsrs_scheduler.get_due_cards.return_value = [sample_card]
+        mock_db_manager.get_due_fsrs_cards.return_value = [sample_card]
         mock_db_manager.get_question.return_value = sample_question
 
         with patch.object(
@@ -505,11 +565,9 @@ class TestSessionManager:
                 assert len(questions) == 1
 
     def test_create_question_presentation(
-        self, session_manager, mock_fsrs_scheduler, sample_question, sample_card
+        self, session_manager, sample_question, sample_card
     ):
         """Test creating question presentation."""
-        mock_fsrs_scheduler.predict_retention.return_value = 0.75
-
         presentation = session_manager._create_question_presentation(
             sample_question, sample_card, question_num=3, total=10
         )
@@ -519,7 +577,9 @@ class TestSessionManager:
         assert presentation.card == sample_card
         assert presentation.question_number == 3
         assert presentation.total_questions == 10
-        assert presentation.predicted_retention == 0.75
+        assert (
+            presentation.predicted_retention > 0
+        )  # Basic check that retention is calculated
 
     def test_get_difficulty_rating_new(self, session_manager):
         """Test difficulty rating for new card."""

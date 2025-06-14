@@ -6,13 +6,18 @@ question presentation, and progress tracking for optimal learning experiences.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
 from src.core.database import DatabaseManager
-from src.core.fsrs_scheduler import FSRSScheduler, ReviewResult
+from src.core.learning.domain.services.schedule_card import (
+    ScheduleCard,
+    ScheduleCardRequest,
+    ScheduleCardResult,
+)
 from src.core.models import FSRSCard, FSRSRating, Question
 
 
@@ -84,16 +89,18 @@ class SessionManager:
     """Manages learning session lifecycle and coordination."""
 
     def __init__(
-        self, db_manager: DatabaseManager, fsrs_scheduler: FSRSScheduler
+        self,
+        db_manager: DatabaseManager,
+        schedule_card_service: ScheduleCard,
     ) -> None:
         """Initialize session manager.
 
         Args:
             db_manager: Database manager instance
-            fsrs_scheduler: FSRS scheduler instance
+            schedule_card_service: Domain service for card scheduling
         """
         self.db_manager = db_manager
-        self.fsrs_scheduler = fsrs_scheduler
+        self.schedule_card_service = schedule_card_service
         self._active_sessions: dict[int, SessionProgress] = {}
 
     def start_session(
@@ -140,14 +147,14 @@ class SessionManager:
 
         return session_id, questions
 
-    def submit_answer(
+    async def submit_answer(
         self,
         session_id: int,
         card_id: int,
         user_answer: str | None,
         response_time_ms: int,
         rating: FSRSRating | None = None,
-    ) -> ReviewResult:
+    ) -> ScheduleCardResult:
         """Submit an answer for a question in the session.
 
         Args:
@@ -158,7 +165,7 @@ class SessionManager:
             rating: Optional FSRS difficulty rating
 
         Returns:
-            Review result with updated scheduling
+            Schedule card result with updated scheduling
         """
         if session_id not in self._active_sessions:
             raise ValueError(f"Session {session_id} not found or not active")
@@ -191,20 +198,22 @@ class SessionManager:
             else:
                 rating = FSRSRating.AGAIN
 
-        # Process review with FSRS
-        review_result = self.fsrs_scheduler.review_card(
+        # Process review with domain service
+        request = ScheduleCardRequest(
             card_id=card_id,
             rating=rating,
             response_time_ms=response_time_ms,
             session_id=session_id,
         )
 
+        schedule_result = await self.schedule_card_service.call(request)
+
         # Update session progress
         self._update_session_progress(
             session_id, is_correct, is_skipped, response_time_ms
         )
 
-        return review_result
+        return schedule_result
 
     def get_session_progress(self, session_id: int) -> SessionProgress:
         """Get current session progress.
@@ -313,7 +322,7 @@ class SessionManager:
             return None
 
         # Get due cards for this session
-        due_cards = self.fsrs_scheduler.get_due_cards(limit=1)
+        due_cards = self._get_due_cards(limit=1)
         if not due_cards:
             return None
 
@@ -323,7 +332,7 @@ class SessionManager:
             return None
 
         # Calculate presentation metadata
-        predicted_retention = self.fsrs_scheduler.predict_retention(card)
+        predicted_retention = self._predict_retention(card)
 
         difficulty_rating = self._get_difficulty_rating(card)
 
@@ -361,9 +370,7 @@ class SessionManager:
 
         if config.session_type == SessionType.REVIEW:
             # Get due cards
-            due_cards = self.fsrs_scheduler.get_due_cards(
-                limit=config.max_reviews, user_id=user_id
-            )
+            due_cards = self._get_due_cards(limit=config.max_reviews, user_id=user_id)
             for card in due_cards:
                 question = self.db_manager.get_question(card.question_id)
                 if question:
@@ -429,7 +436,7 @@ class SessionManager:
         Returns:
             Question presentation
         """
-        predicted_retention = self.fsrs_scheduler.predict_retention(card)
+        predicted_retention = self._predict_retention(card)
         difficulty_rating = self._get_difficulty_rating(card)
 
         last_review = None
@@ -526,3 +533,31 @@ class SessionManager:
         """
         # Estimate 30 seconds per question on average
         return max(1, int(num_questions * 0.5))
+
+    def _get_due_cards(self, limit: int = 50, user_id: int = 1) -> list[FSRSCard]:
+        """Get cards due for review.
+
+        Args:
+            limit: Maximum number of cards to return
+            user_id: User ID
+
+        Returns:
+            List of due cards sorted by priority
+        """
+        return self.db_manager.get_due_fsrs_cards(user_id=user_id, limit=limit)
+
+    def _predict_retention(self, card: FSRSCard, days_ahead: int = 1) -> float:
+        """Predict retention rate for a card after specified days.
+
+        Args:
+            card: FSRS card
+            days_ahead: Number of days in the future to predict
+
+        Returns:
+            Predicted retention probability (0.0-1.0)
+        """
+        if card.stability <= 0:
+            return 0.0
+
+        # R = exp(-t/S) where t=time, S=stability
+        return math.exp(-days_ahead / card.stability)
