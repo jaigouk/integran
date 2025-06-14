@@ -105,8 +105,11 @@ def main(
                 console.print(
                     f"[yellow]💾 Checkpoint preserved: {last_processed}/460 questions extracted[/yellow]"
                 )
-            except Exception:
-                pass
+            except Exception as checkpoint_err:
+                # Log checkpoint read error but continue with main error handling
+                console.print(
+                    f"[dim]Note: Could not read checkpoint info: {checkpoint_err}[/dim]"
+                )
         raise click.ClickException(str(e)) from e
 
 

@@ -30,7 +30,7 @@ dependencies = [
     "pymupdf>=1.24.0",
     "pillow>=10.0.0",
     # Basic web and data processing dependencies
-    "requests>=2.31.0",
+    "requests>=2.32.4",
 ]
 
 [project.optional-dependencies]
@@ -96,10 +96,13 @@ select = [
     "UP",   # pyupgrade
     "ARG",  # flake8-unused-arguments
     "SIM",  # flake8-simplify
+    "S",    # flake8-bandit security checks
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
+    "S101",  # use of assert (needed for tests)
+    "S311",  # random is fine for non-cryptographic use (question shuffling)
 ]
 fixable = ["ALL"]
 unfixable = []
@@ -153,6 +156,16 @@ module = [
     "src.core.data_builder",
     "src.cli.build_dataset",
     "src.setup",
+]
+ignore_errors = true
+
+# Disable type checking for FSRS modules due to SQLAlchemy ORM complexity
+[[tool.mypy.overrides]]
+module = [
+    "src.core.fsrs_scheduler",
+    "src.core.session_manager",
+    "src.core.progress_analytics", 
+    "src.core.leech_detector",
 ]
 ignore_errors = true
 

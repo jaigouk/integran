@@ -2,13 +2,294 @@
 
 This guide is for developers and contributors working on the Integran project. Regular users don't need this information.
 
-## 🎯 Phase 1.8 Architecture Overview
+## 🎯 Phase 3.0 Architecture Overview - DDD Event-Driven Learning System (PLANNED)
 
-As of 2025-01-09, Integran has undergone a complete architecture refactor (Phase 1.8-1.9.4) to address critical image mapping issues and introduce multilingual support. The new system is built around three core components:
+⚠️ **DEVELOPMENT STATUS**: This section describes the **PLANNED** Phase 3.0 architecture. Currently, only Phase 1 DDD infrastructure is implemented (EventBus, DomainService base classes, and domain events). The complete DDD event-driven system described below is under development.
 
-1. **ImageProcessor** - AI vision for accurate image-to-question mapping
-2. **AnswerEngine** - Multilingual answer generation (5 languages)
-3. **DataBuilder** - Unified pipeline orchestrating the entire workflow
+**Current Status as of 2025-01-14:**
+- ✅ **Phase 1 Complete**: EventBus (`src/core/event_bus.py`), DomainService base class (`src/core/domain_service.py`), domain events (`src/core/domain_events.py`)
+- 🚧 **Phase 2 Planned**: Concrete domain services (ScheduleCard, GenerateAnswer, etc.)
+- 🚧 **Phase 3 Planned**: Bounded context organization and cross-context communication
+- 🚧 **Phase 4 Planned**: Terminal UI integration with async command/query patterns
+
+The planned architecture will follow **Domain-Driven Design (DDD)** principles with **async event-based communication** and **local-first principles**.
+
+### Core Design Principles
+
+1. **Domain-Driven Design**: Clear separation of business logic into domain services with single responsibilities
+2. **Event-Based Architecture**: Async event-driven communication between bounded contexts
+3. **Local-First**: All learning data stored locally in SQLite - no cloud dependencies
+4. **Scientific Learning**: FSRS algorithm for optimal spaced repetition scheduling  
+5. **Cross-Platform**: Unified core supporting terminal, desktop, and mobile UIs
+6. **Multilingual**: 5-language support (EN/DE/TR/UK/AR) for diverse learners
+7. **Privacy-Focused**: User learning patterns stay on device
+
+### DDD Architecture Patterns
+
+#### Bounded Contexts
+- **Learning Context**: FSRS scheduling, session management, progress tracking
+- **Content Context**: Question management, multilingual answers, image processing
+- **Analytics Context**: Performance tracking, leech detection, interleaving optimization
+- **User Context**: Settings, preferences, data export/import
+
+#### Domain Services Pattern
+Each complex business operation is encapsulated in a domain service with:
+- **Verb + Noun naming**: `ScheduleCard`, `GenerateAnswer`, `ProcessImage`, `DetectLeech`
+- **Single `call` method**: Clean interface exposing only the primary operation
+- **Async execution**: All services support async/await for event-driven architecture
+- **Event publishing**: Services emit domain events for cross-context communication
+
+### DDD Event-Driven System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        UI LAYER                             │
+├─────────────────┬─────────────────┬─────────────────────────┤
+│  Terminal UI    │   Desktop UI    │     Mobile UI           │
+│  (Rich/Textual) │   (Future)      │     (Future)            │
+└─────────────────┴─────────────────┴─────────────────────────┘
+                           │ (Commands/Queries)
+┌─────────────────────────────────────────────────────────────┐
+│                    APPLICATION LAYER                        │
+├─────────────────┬─────────────────┬─────────────────────────┤
+│  Command Bus    │    Query Bus    │    Event Bus            │
+│  - Async Cmds   │  - Read Models  │  - Domain Events        │
+│  - Validation   │  - Projections  │  - Event Handlers       │
+└─────────────────┴─────────────────┴─────────────────────────┘
+                           │ (Domain Events)
+┌─────────────────────────────────────────────────────────────┐
+│                     DOMAIN LAYER                            │
+├───────────────┬───────────────┬───────────────┬─────────────┤
+│ Learning      │ Content       │ Analytics     │ User        │
+│ Context       │ Context       │ Context       │ Context     │
+│ ┌───────────┐ │ ┌───────────┐ │ ┌───────────┐ │ ┌─────────┐ │
+│ │ScheduleCard││ │GenerateAns│ │ │DetectLeech│ │ │SavePrefs│ │
+│ │ManageSession│ │ProcessImg │ │ │AnalyzePer │ │ │ExportDat│ │
+│ │TrackProgress│ │ LoadQuest │ │ │Interleave │ │ │ImportDat│ │
+│ └───────────┘ │ └───────────┘ │ └───────────┘ │ └─────────┘ │
+└───────────────┴───────────────┴───────────────┴─────────────┘
+                           │ (Async Operations)
+┌─────────────────────────────────────────────────────────────┐
+│                    INFRASTRUCTURE LAYER                     │
+├─────────────────┬─────────────────┬─────────────────────────┤
+│  In-Memory      │  Read Models    │    External APIs        │
+│  Event Bus      │  - Projections  │  - Gemini AI            │
+│  - Event Queue  │  - Aggregations │  - Image Processing     │
+│  - Subscriptions│  - Statistics   │  - Data Export          │
+└─────────────────┴─────────────────┴─────────────────────────┘
+                           │
+┌─────────────────────────────────────────────────────────────┐
+│                  SQLITE DATABASE (Local)                    │
+│  📋 Read Models      ⚙️ Projections      📾 Application Data│
+│  - question_views   - user_settings      - fsrs_cards       │
+│  - progress_views   - algorithm_config   - review_history   │
+│  - analytics_views  - ui_preferences     - learning_sessions│
+│  - leech_views      - export_data        - questions        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+1. **FSRS Learning Engine** - Core spaced repetition algorithm with memory modeling
+2. **Session Manager** - Orchestrates learning sessions and user interactions  
+3. **Progress Analytics** - Real-time learning insights and retention tracking
+4. **Leech Detection** - Identifies and manages difficult questions intelligently
+5. **Multilingual Content** - Serves explanations in user's preferred language
+
+## 🏗️ DDD Domain Services Architecture
+
+### Domain Service Pattern Implementation
+
+Each complex business operation follows the **Command Pattern** with async execution:
+
+```python
+from abc import ABC, abstractmethod
+from typing import Any, TypeVar, Generic
+from dataclasses import dataclass
+import asyncio
+
+# Base Domain Service Interface
+T = TypeVar('T')
+U = TypeVar('U')
+
+class DomainService(ABC, Generic[T, U]):
+    """Base class for all domain services following DDD patterns."""
+    
+    @abstractmethod
+    async def call(self, request: T) -> U:
+        """Single entry point for domain service execution."""
+        pass
+
+# Example Implementation
+@dataclass
+class ScheduleCardRequest:
+    card_id: int
+    rating: int
+    response_time_ms: int
+    session_id: int | None = None
+
+@dataclass
+class ScheduleCardResult:
+    success: bool
+    next_review_date: datetime
+    difficulty: float
+    stability: float
+    events: list[DomainEvent]
+
+class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
+    """Domain service for FSRS card scheduling using pure business logic."""
+    
+    def __init__(self, db_manager: DatabaseManager, event_bus: EventBus):
+        self.db_manager = db_manager
+        self.event_bus = event_bus
+    
+    async def call(self, request: ScheduleCardRequest) -> ScheduleCardResult:
+        # Execute FSRS algorithm
+        result = await self._execute_fsrs_algorithm(request)
+        
+        # Emit domain events via in-memory event bus
+        await self.event_bus.publish(CardScheduledEvent(
+            card_id=request.card_id,
+            new_difficulty=result.difficulty,
+            next_review_date=result.next_review_date
+        ))
+        
+        return result
+```
+
+### Event-Driven Communication
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+# Domain Events
+@dataclass
+class DomainEvent(ABC):
+    """Base class for all domain events."""
+    occurred_at: datetime
+    event_id: str
+
+@dataclass
+class CardScheduledEvent(DomainEvent):
+    card_id: int
+    new_difficulty: float
+    next_review_date: datetime
+
+@dataclass 
+class AnswerGeneratedEvent(DomainEvent):
+    question_id: int
+    languages: list[str]
+    generation_time_ms: int
+
+@dataclass
+class LeechDetectedEvent(DomainEvent):
+    card_id: int
+    lapse_count: int
+    recommended_action: str
+
+# Lightweight In-Memory Event Bus for Local-First Architecture
+class EventBus:
+    """Lightweight async event bus for domain event publishing.
+    
+    Designed for local-first applications where events are processed
+    in-memory without persistent storage to avoid database bloat.
+    """
+    
+    def __init__(self):
+        self._handlers: dict[type[DomainEvent], list[callable]] = {}
+        self._event_queue: list[DomainEvent] = []
+        self._processing = False
+    
+    async def publish(self, event: DomainEvent) -> None:
+        """Publish event to all registered handlers asynchronously."""
+        handlers = self._handlers.get(type(event), [])
+        if handlers:
+            # Process events immediately in memory
+            await asyncio.gather(*[handler(event) for handler in handlers])
+    
+    def subscribe(self, event_type: type[DomainEvent], handler: callable) -> None:
+        """Subscribe handler to event type."""
+        if event_type not in self._handlers:
+            self._handlers[event_type] = []
+        self._handlers[event_type].append(handler)
+    
+    def get_active_subscriptions(self) -> dict[str, int]:
+        """Get count of active subscriptions by event type."""
+        return {event_type.__name__: len(handlers) 
+                for event_type, handlers in self._handlers.items()}
+```
+
+### Bounded Context Structure
+
+#### Learning Context (`src/core/learning/`)
+```
+src/core/learning/
+├── __init__.py
+├── domain/
+│   ├── services/
+│   │   ├── schedule_card.py        # ScheduleCard domain service
+│   │   ├── manage_session.py       # ManageSession domain service
+│   │   └── track_progress.py       # TrackProgress domain service
+│   ├── events/
+│   │   ├── card_events.py          # Card-related domain events
+│   │   └── session_events.py       # Session-related domain events
+│   └── models/
+│       ├── fsrs_models.py          # FSRS domain models
+│       └── session_models.py       # Session aggregates
+├── application/
+│   ├── handlers/                   # Command/query handlers
+│   └── queries/                    # Read model queries
+└── infrastructure/
+    ├── repositories/               # Data access
+    └── external/                   # External service adapters
+```
+
+#### Content Context (`src/core/content/`)
+```
+src/core/content/
+├── __init__.py
+├── domain/
+│   ├── services/
+│   │   ├── generate_answer.py      # GenerateAnswer domain service
+│   │   ├── process_image.py        # ProcessImage domain service
+│   │   └── load_question.py        # LoadQuestion domain service
+│   ├── events/
+│   │   ├── content_events.py       # Content-related events
+│   │   └── generation_events.py    # AI generation events
+│   └── models/
+│       ├── question_models.py      # Question aggregates
+│       └── content_models.py       # Multilingual content
+├── application/
+│   ├── handlers/
+│   └── queries/
+└── infrastructure/
+    ├── ai_clients/                 # Gemini AI integration
+    └── content_store/              # Content storage
+```
+
+#### Analytics Context (`src/core/analytics/`)
+```
+src/core/analytics/
+├── __init__.py
+├── domain/
+│   ├── services/
+│   │   ├── detect_leech.py         # DetectLeech domain service
+│   │   ├── analyze_performance.py  # AnalyzePerformance domain service
+│   │   └── optimize_interleaving.py # OptimizeInterleaving domain service
+│   ├── events/
+│   │   └── analytics_events.py     # Analytics domain events
+│   └── models/
+│       ├── analytics_models.py     # Performance aggregates
+│       └── leech_models.py         # Leech detection models
+├── application/
+│   ├── handlers/
+│   └── projections/                # Analytics projections
+└── infrastructure/
+    └── calculators/                # Performance calculation engines
+```
 
 ## 📊 Enhanced Data Structure
 
@@ -58,54 +339,472 @@ Questions are now stored in `questions.json` with the new Phase 1.8 multilingual
 }
 ```
 
-## 🗄️ Database Schema (Phase 1.8)
+## 🗄️ SQLite Database Schema - FSRS Learning System
 
-The app uses SQLite to track progress with enhanced models supporting multilingual content:
+The app uses SQLite for **local-first** storage with tables optimized for spaced repetition learning:
 
-### Core Tables
-- **Question**: Enhanced with Phase 1.8 multilingual support
-- **QuestionAttempt**: Individual question attempt tracking
-- **PracticeSession**: Practice session data
-- **LearningData**: Spaced repetition learning data per question
-- **UserProgress**: Overall user progress tracking
-- **CategoryProgress**: Category-specific performance
-- **UserSettings**: User preferences including language selection
-- **QuestionExplanation**: ⚠️ **DEPRECATED** (kept for migration compatibility)
+### Learning Engine Tables (FSRS Core)
 
-### Enhanced Question Model (Phase 1.8)
-```python
-class Question(Base):
-    # Basic fields
-    id: int
-    question: str
-    options: str              # JSON serialized list
-    correct: str
-    category: str
-    difficulty: str
+#### `fsrs_cards` - Individual Card Learning States
+```sql
+CREATE TABLE fsrs_cards (
+    card_id INTEGER PRIMARY KEY,
+    question_id INTEGER NOT NULL,
+    user_id INTEGER DEFAULT 1,
     
-    # Enhanced fields
-    question_type: str        # "general" or "state_specific"
-    state: str               # Federal state for state-specific questions
-    page_number: int         # PDF page number
-    is_image_question: int   # Boolean flag
+    -- FSRS Core State (DSR Model)
+    difficulty REAL NOT NULL DEFAULT 5.0,        -- D: Inherent difficulty (0-10)
+    stability REAL NOT NULL DEFAULT 1.0,         -- S: Memory strength (days)
+    retrievability REAL NOT NULL DEFAULT 1.0,    -- R: Current recall probability (0-1)
     
-    # Phase 1.8 NEW: Multilingual support
-    images_data: str         # JSON serialized list of image objects
-    multilingual_answers: str # JSON serialized multilingual data
-    rag_sources: str         # JSON serialized list of sources
+    -- Learning Progress
+    state INTEGER NOT NULL DEFAULT 0,            -- 0:New, 1:Learning, 2:Review, 3:Relearning
+    step_number INTEGER DEFAULT 0,               -- Current learning step
+    last_review_date REAL,                       -- Unix timestamp
+    next_review_date REAL,                       -- Scheduled review time
     
-    # Legacy fields (deprecated but kept for migration)
-    image_paths: str         # DEPRECATED: Use images_data
-    image_mapping: str       # DEPRECATED: Use images_data
+    -- Performance Tracking
+    review_count INTEGER DEFAULT 0,              -- Total reviews
+    lapse_count INTEGER DEFAULT 0,               -- Number of times forgotten
+    success_count INTEGER DEFAULT 0,             -- Successful recalls
+    
+    -- Metadata
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    
+    FOREIGN KEY (question_id) REFERENCES questions(id)
+);
 ```
 
-### User Settings Model (Phase 1.8)
+#### `review_history` - Complete Review Log
+```sql
+CREATE TABLE review_history (
+    review_id INTEGER PRIMARY KEY,
+    card_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    
+    -- Review Details
+    review_date REAL NOT NULL,                   -- Unix timestamp
+    rating INTEGER NOT NULL,                     -- 1:Again, 2:Hard, 3:Good, 4:Easy
+    response_time_ms INTEGER,                    -- Time to answer
+    
+    -- FSRS State Before Review
+    difficulty_before REAL,
+    stability_before REAL,
+    retrievability_before REAL,
+    
+    -- FSRS State After Review
+    difficulty_after REAL,
+    stability_after REAL,
+    retrievability_after REAL,
+    next_interval_days REAL,
+    
+    -- Session Context
+    session_id INTEGER,
+    review_type TEXT,                            -- 'learn', 'review', 'relearn', 'cram'
+    
+    FOREIGN KEY (card_id) REFERENCES fsrs_cards(card_id),
+    FOREIGN KEY (question_id) REFERENCES questions(id),
+    FOREIGN KEY (session_id) REFERENCES learning_sessions(session_id)
+);
+```
+
+#### `learning_sessions` - Study Session Tracking
+```sql
+CREATE TABLE learning_sessions (
+    session_id INTEGER PRIMARY KEY,
+    user_id INTEGER DEFAULT 1,
+    
+    -- Session Details
+    start_time REAL NOT NULL,
+    end_time REAL,
+    duration_seconds INTEGER,
+    
+    -- Session Stats
+    questions_reviewed INTEGER DEFAULT 0,
+    questions_correct INTEGER DEFAULT 0,
+    new_cards_learned INTEGER DEFAULT 0,
+    
+    -- Session Configuration
+    session_type TEXT,                           -- 'review', 'learn', 'weak_focus', 'quiz'
+    target_retention REAL DEFAULT 0.9,          -- User's retention goal
+    max_reviews INTEGER DEFAULT 50,
+    
+    -- Performance Metrics
+    average_response_time_ms INTEGER,
+    retention_rate REAL,
+    
+    created_at REAL NOT NULL
+);
+```
+
+### Content Tables (Question Data)
+
+#### `questions` - Enhanced Question Model
+```sql
+CREATE TABLE questions (
+    id INTEGER PRIMARY KEY,
+    question TEXT NOT NULL,
+    options TEXT NOT NULL,                       -- JSON: ["A", "B", "C", "D"]
+    correct TEXT NOT NULL,
+    category TEXT NOT NULL,
+    difficulty TEXT DEFAULT 'medium',            -- Content difficulty estimate
+    
+    -- Question Metadata
+    question_type TEXT DEFAULT 'general',       -- 'general' or 'state_specific'
+    state TEXT,                                  -- For state-specific questions
+    page_number INTEGER,
+    is_image_question BOOLEAN DEFAULT FALSE,
+    
+    -- Multilingual Content (JSON)
+    images_data TEXT,                            -- Image paths and descriptions
+    multilingual_answers TEXT,                   -- 5-language explanations
+    rag_sources TEXT,                           -- Source references
+    
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+```
+
+#### `categories` - Learning Categories
+```sql
+CREATE TABLE categories (
+    category_id INTEGER PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    description TEXT,
+    total_questions INTEGER DEFAULT 0,
+    color_hex TEXT DEFAULT '#3498db'
+);
+```
+
+### Analytics & Configuration Tables
+
+#### `user_analytics` - Learning Analytics
+```sql
+CREATE TABLE user_analytics (
+    analytics_id INTEGER PRIMARY KEY,
+    user_id INTEGER DEFAULT 1,
+    date TEXT NOT NULL,                          -- YYYY-MM-DD format
+    
+    -- Daily Statistics
+    reviews_due INTEGER DEFAULT 0,
+    reviews_completed INTEGER DEFAULT 0,
+    new_cards_learned INTEGER DEFAULT 0,
+    retention_rate REAL,
+    
+    -- Category Performance (JSON)
+    category_stats TEXT,                         -- Per-category performance
+    
+    -- Streak Tracking
+    study_streak_days INTEGER DEFAULT 0,
+    
+    created_at REAL NOT NULL
+);
+```
+
+#### `algorithm_config` - FSRS Parameters
+```sql
+CREATE TABLE algorithm_config (
+    config_id INTEGER PRIMARY KEY,
+    user_id INTEGER DEFAULT 1,
+    
+    -- FSRS Algorithm Parameters (19 parameters for FSRS-5)
+    parameters TEXT NOT NULL,                    -- JSON array of 19 floats
+    target_retention REAL DEFAULT 0.9,
+    maximum_interval_days INTEGER DEFAULT 365,
+    
+    -- Learning Steps Configuration
+    learning_steps TEXT DEFAULT '[1, 10]',      -- JSON: minutes for new cards
+    relearning_steps TEXT DEFAULT '[10]',       -- JSON: minutes for forgotten cards
+    
+    -- Optimization Settings
+    optimization_enabled BOOLEAN DEFAULT TRUE,
+    min_reviews_for_optimization INTEGER DEFAULT 1000,
+    
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+```
+
+#### `user_settings` - User Preferences
+```sql
+CREATE TABLE user_settings (
+    setting_id INTEGER PRIMARY KEY,
+    setting_key TEXT UNIQUE NOT NULL,
+    setting_value TEXT NOT NULL,                -- JSON for complex values
+    setting_type TEXT DEFAULT 'string',         -- 'string', 'integer', 'boolean', 'json'
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+```
+
+### Leech Detection & Management
+
+#### `leech_cards` - Difficult Question Tracking
+```sql
+CREATE TABLE leech_cards (
+    leech_id INTEGER PRIMARY KEY,
+    card_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    
+    -- Leech Metrics
+    lapse_count INTEGER NOT NULL,               -- Number of times forgotten
+    leech_threshold INTEGER DEFAULT 8,         -- Threshold for leech status
+    detected_at REAL NOT NULL,
+    
+    -- Management Actions
+    action_taken TEXT,                          -- 'suspend', 'note_added', 'modified'
+    action_date REAL,
+    is_suspended BOOLEAN DEFAULT FALSE,
+    
+    -- User Notes
+    user_notes TEXT,
+    
+    FOREIGN KEY (card_id) REFERENCES fsrs_cards(card_id),
+    FOREIGN KEY (question_id) REFERENCES questions(id)
+);
+```
+
+### Database Indexes (Performance Optimization)
+
+```sql
+-- FSRS Performance Indexes
+CREATE INDEX idx_fsrs_cards_next_review ON fsrs_cards(next_review_date);
+CREATE INDEX idx_fsrs_cards_question ON fsrs_cards(question_id);
+CREATE INDEX idx_fsrs_cards_state ON fsrs_cards(state);
+
+-- Review History Indexes  
+CREATE INDEX idx_review_history_date ON review_history(review_date);
+CREATE INDEX idx_review_history_card ON review_history(card_id);
+CREATE INDEX idx_review_history_session ON review_history(session_id);
+
+-- Analytics Indexes
+CREATE INDEX idx_user_analytics_date ON user_analytics(date);
+CREATE INDEX idx_leech_cards_detected ON leech_cards(detected_at);
+```
+
+## 🧠 FSRS Learning System Implementation
+
+### Core FSRS Algorithm Components
+
+The system implements the **Free Spaced Repetition Scheduler (FSRS)** algorithm, which models memory using three key variables:
+
+#### DSR Memory Model
+- **D (Difficulty)**: How hard it is to increase memory stability for this item (0-10)
+- **S (Stability)**: Memory strength measured in days until 90% retention probability
+- **R (Retrievability)**: Current probability of successful recall (0-1)
+
+#### Learning State Machine
+```
+New Card → Learning → Review ↔ Relearning
+    ↓         ↓         ↓         ↓
+   [1]       [2]      [3]       [4]
+```
+
+**States:**
+- **0 (New)**: Never studied before
+- **1 (Learning)**: Initial learning phase with short intervals  
+- **2 (Review)**: Successfully learned, scheduled for spaced review
+- **3 (Relearning)**: Previously learned but forgotten, needs reinforcement
+
+### Core Learning Engine Classes
+
+#### `FSRSScheduler` - Main Algorithm Implementation
 ```python
-class UserSettings(Base):
-    setting_key: str         # e.g., "preferred_language"
-    setting_value: str       # JSON serialized value
-    created_at: datetime
-    updated_at: datetime
+class FSRSScheduler:
+    """Core FSRS algorithm for spaced repetition scheduling."""
+    
+    def __init__(self, parameters: List[float], target_retention: float = 0.9):
+        self.parameters = parameters  # 19 FSRS parameters
+        self.target_retention = target_retention
+    
+    def schedule_card(self, card: FSRSCard, rating: int) -> ScheduleResult:
+        """Calculate next review date based on user rating."""
+        # Algorithm implementation details...
+        
+    def calculate_retrievability(self, card: FSRSCard, days_elapsed: float) -> float:
+        """Calculate current recall probability."""
+        
+    def optimize_parameters(self, review_history: List[Review]) -> List[float]:
+        """Optimize FSRS parameters based on user's review history."""
+```
+
+#### `SessionManager` - Learning Session Orchestration
+```python
+class SessionManager:
+    """Manages learning sessions and question flow."""
+    
+    def __init__(self, db: Database, scheduler: FSRSScheduler):
+        self.db = db
+        self.scheduler = scheduler
+        
+    def start_session(self, session_type: str, max_reviews: int) -> Session:
+        """Start a new learning session with specified parameters."""
+        
+    def get_next_question(self, session: Session) -> Optional[Question]:
+        """Get next question based on FSRS scheduling and session settings."""
+        
+    def process_answer(self, question_id: int, rating: int, response_time: int):
+        """Process user answer and update FSRS states."""
+        
+    def get_session_stats(self, session: Session) -> SessionStats:
+        """Calculate real-time session statistics."""
+```
+
+#### `ProgressAnalytics` - Learning Insights
+```python
+class ProgressAnalytics:
+    """Provides learning analytics and progress tracking."""
+    
+    def get_retention_rate(self, user_id: int, days: int = 30) -> float:
+        """Calculate user's retention rate over specified period."""
+        
+    def get_category_performance(self, user_id: int) -> Dict[str, CategoryStats]:
+        """Analyze performance by question category."""
+        
+    def detect_leeches(self, user_id: int) -> List[LeechCard]:
+        """Identify cards that need special attention."""
+        
+    def calculate_forecast(self, user_id: int, days: int = 30) -> ReviewForecast:
+        """Predict future review workload."""
+```
+
+### Learning Session Flow
+
+#### 1. Session Initialization
+```python
+# User starts a review session
+session = session_manager.start_session(
+    session_type="review",  # or "learn", "weak_focus", "quiz"
+    max_reviews=50,
+    target_retention=0.9
+)
+```
+
+#### 2. Question Selection Algorithm
+```python
+def get_next_question(self) -> Question:
+    """Intelligent question selection based on:
+    - FSRS scheduling (due dates)
+    - User preferences (weak areas, categories)
+    - Session limits and goals
+    - Interleaving for related topics
+    """
+    # Priority 1: Overdue reviews
+    overdue = self.get_overdue_cards()
+    if overdue:
+        return self.select_by_urgency(overdue)
+    
+    # Priority 2: Due reviews  
+    due = self.get_due_cards()
+    if due:
+        return self.select_with_interleaving(due)
+        
+    # Priority 3: New cards (if daily limit not reached)
+    if self.can_learn_new():
+        return self.get_new_card()
+        
+    return None  # Session complete
+```
+
+#### 3. Answer Processing & FSRS Update
+```python
+def process_answer(self, question_id: int, rating: int, response_time: int):
+    """Complete FSRS update cycle:
+    1. Calculate new DSR values
+    2. Update card state and next review date
+    3. Log review in history
+    4. Update session statistics
+    5. Check for leech detection
+    """
+    card = self.db.get_fsrs_card(question_id)
+    
+    # Calculate new FSRS state
+    result = self.scheduler.schedule_card(card, rating)
+    
+    # Update database
+    self.db.update_card_state(card.id, result)
+    self.db.log_review(card.id, rating, response_time, result)
+    
+    # Analytics
+    self.check_leech_threshold(card)
+    self.update_session_stats()
+```
+
+### Advanced Features
+
+#### Leech Detection & Management
+```python
+class LeechDetector:
+    """Identifies and manages difficult questions."""
+    
+    def detect_leech(self, card: FSRSCard) -> bool:
+        """Check if card qualifies as a leech (default: 8+ lapses)."""
+        return card.lapse_count >= self.threshold
+        
+    def suggest_intervention(self, leech: LeechCard) -> List[str]:
+        """Provide suggestions for handling leeches:
+        - Break into smaller concepts
+        - Add visual memory aids  
+        - Create mnemonics
+        - Suspend temporarily
+        """
+```
+
+#### Interleaved Practice
+```python
+class InterleavingManager:
+    """Implements interleaved practice for better discrimination."""
+    
+    def select_interleaved_questions(self, due_cards: List[Card]) -> List[Card]:
+        """Mix related topics to improve conceptual understanding."""
+        # Group by similar categories
+        # Alternate between groups
+        # Maintain cognitive load balance
+```
+
+#### Parameter Optimization
+```python
+class ParameterOptimizer:
+    """Optimizes FSRS parameters based on user's review history."""
+    
+    def should_optimize(self, user_id: int) -> bool:
+        """Check if user has enough review data (1000+ reviews)."""
+        
+    def optimize_parameters(self, user_id: int) -> List[float]:
+        """Use machine learning to find optimal FSRS parameters."""
+        # Analyze review history
+        # Minimize prediction error
+        # Return personalized parameters
+```
+
+### Local-First Architecture Benefits
+
+#### Lightweight Event Processing
+- **In-Memory Events**: Domain events processed immediately without persistence
+- **Reduced Database Size**: No event store tables means smaller local database
+- **Better Performance**: No disk I/O for event processing, only final state storage
+- **Mobile-Friendly**: Minimal storage footprint for mobile and desktop apps
+
+#### Export/Import System
+```python
+class DataPortability:
+    """Handle data export/import for cross-device sync."""
+    
+    def export_user_data(self, user_id: int) -> str:
+        """Export complete learning state to JSON."""
+        return {
+            "fsrs_cards": self.export_cards(user_id),
+            "review_history": self.export_history(user_id), 
+            "settings": self.export_settings(user_id),
+            "analytics": self.export_analytics(user_id)
+        }
+        
+    def import_user_data(self, data: str) -> bool:
+        """Import learning state, handling conflicts intelligently."""
+        # Merge review histories
+        # Update FSRS states
+        # Preserve newer settings
 ```
 
 ## 🤖 PDF Question Extraction
@@ -177,56 +876,72 @@ export GEMINI_MODEL="gemini-2.5-pro-preview-06-05" # Model version (optional)
 
 The application automatically uses pre-extracted question data from `data/questions.json` and will never call external APIs during normal usage.
 
-### Developer Commands (Phase 1.8)
+### Available Developer Commands
 
 ```bash
-# PRIMARY COMMAND: Build complete multilingual dataset
-integran-build-dataset
+# Working Commands:
+integran-setup                        # Database setup and initialization
+integran-direct-extract               # PDF question extraction (requires API keys)
 
-# Database setup with language preference
-integran-setup --language en
+# Working Scripts (dataset generation complete):
+python scripts/verify_dataset.py      # Verify final dataset integrity
+python scripts/finalize_dataset.py    # Create final dataset (already completed)
+python scripts/extract_images.py      # Extract images from PDF (already completed)
+python scripts/export_for_review.py   # Export data for manual review
+python scripts/import_from_review.py  # Import reviewed data back
+python scripts/generate_explanations_single.py  # Generate individual explanations
+python scripts/fix_image_answers.py   # Fix image question mappings
 
-# Backup and restore data
-integran-backup-data backup
-integran-backup-data restore --suffix 20250609_124243
+# Dataset Status:
+# ✅ data/final_dataset.json - Complete with 460 questions, multilingual explanations (EN/DE/TR/UK/AR), and images
 
-# Direct PDF extraction (developers only):
-integran-direct-extract  # Single-question extraction with checkpointing
+# Planned Commands (not yet implemented):
+# integran-build-dataset               # Unified dataset building command
+# integran-backup-data backup          # Data backup functionality
+# integran-backup-data restore         # Data restore functionality
 ```
 
-## 🏗️ Current Data Pipeline (2025-06-11 Update)
+## 🏗️ Dataset Status - COMPLETE ✅ 
 
-⚠️ **Important**: The unified `integran-build-dataset` command is outdated. Use the new step-by-step process documented in the [Dataset Generation Guide](./dataset-generation-guide.md).
+**Current Status**: Dataset generation is **COMPLETE**. All 460 questions have been processed with multilingual explanations.
 
-### Current Workflow (Multi-Step Process)
+### Completed Dataset Pipeline
 
-The current system uses multiple scripts for different phases:
+The dataset generation has been completed using the following pipeline:
 
 ```bash
-# STEP 0: Extract from PDF (usually already done)
-python src/cli/direct_extract.py
+# ✅ COMPLETED STEPS:
+# STEP 0: Extract from PDF ✅ Done
+# python src/cli/direct_extract.py
 
-# STEP 1: Extract images (already done)  
-python scripts/extract_images.py
+# STEP 1: Extract images ✅ Done  
+# python scripts/extract_images.py
 
-# STEP 2: Fix image answers (already done)
-python scripts/fix_image_answers.py
+# STEP 2: Fix image answers ✅ Done
+# python scripts/fix_image_answers.py
 
-# STEP 3: Generate explanations (main task)
-python scripts/generate_explanations.py
-python scripts/retry_failed_questions.py
+# STEP 3: Generate explanations ✅ Done
+# python scripts/generate_explanations_single.py (for remaining questions)
 
-# STEP 4: Create final dataset
-python scripts/finalize_dataset.py
+# STEP 4: Create final dataset ✅ Done
+# python scripts/finalize_dataset.py
+
+# RESULT: data/final_dataset.json - Complete with 460 questions
 ```
 
-### Quick Start for Most Developers
+### For New Developers
 
-Most developers only need to run the final step:
+**No dataset generation needed** - the complete dataset already exists at `data/final_dataset.json`.
+
+For dataset verification or modifications only:
 
 ```bash
-# Create final dataset from existing progress
-python scripts/finalize_dataset.py
+# Verify existing dataset integrity
+python scripts/verify_dataset.py
+
+# For manual review workflows (if needed)
+python scripts/export_for_review.py
+python scripts/import_from_review.py
 ```
 
 📖 **For complete details, see**: [Dataset Generation Guide](./dataset-generation-guide.md)
@@ -329,17 +1044,11 @@ The system generates comprehensive explanations for all exam questions using Goo
 #### Basic Explanation Generation
 
 ```bash
-# Generate explanations for all 460 questions
-integran-generate-explanations
-
-# Use specific batch size (default: 10)
-integran-generate-explanations --batch-size 15
-
-# Start fresh (ignore existing checkpoint)
-integran-generate-explanations --no-resume
-
-# Enable verbose logging
-integran-generate-explanations --verbose
+# PLANNED Commands (not yet implemented):
+# integran-generate-explanations                    # Generate explanations for all 460 questions
+# integran-generate-explanations --batch-size 15    # Use specific batch size  
+# integran-generate-explanations --no-resume        # Start fresh (ignore checkpoint)
+# integran-generate-explanations --verbose          # Enable verbose logging
 ```
 
 
@@ -473,13 +1182,13 @@ cp .env.example .env
 
 #### 3. Working with Explanations
 ```bash
-# Generate explanations for all questions (if needed)
-integran-generate-explanations --batch-size 10
+# PLANNED: Generate explanations for all questions (if needed)
+# integran-generate-explanations --batch-size 10
 
 # RAG enhancement removed as it was not used
 
-# Check progress during generation
-tail -f data/explanations_checkpoint.json
+# PLANNED: Check progress during generation  
+# tail -f data/explanations_checkpoint.json
 ```
 
 #### 4. Development Cycle
@@ -507,35 +1216,77 @@ mypy src/                                    # Type checking
 
 # RAG system removed as it was not used in final dataset generation
 
-### Current Project Structure (Phase 1.8)
+### Updated Project Structure (Phase 3.0 - FSRS Learning System)
 
 ```
 src/
-├── core/                           # ✨ NEW: Core business logic
+├── core/                           # Core Learning Engine
 │   ├── __init__.py
-│   ├── models.py                   # Enhanced with Phase 1.8 multilingual support
-│   ├── database.py                 # Enhanced with migration scripts
+│   ├── models.py                   # FSRS data models (Card, Review, Session)
+│   ├── database.py                 # SQLite operations with FSRS schema
 │   ├── settings.py                 # Configuration management
-│   ├── image_processor.py          # ✨ NEW: AI vision & question-image mapping
-│   ├── answer_engine.py            # ✨ NEW: Multilingual answer generation
-│   └── data_builder.py             # ✨ NEW: Unified pipeline orchestrator
-# knowledge_base/ removed as RAG was not used in final dataset
-├── cli/                            # Simplified CLI commands
+│   ├── fsrs_scheduler.py           # ✨ NEW: FSRS algorithm implementation
+│   ├── session_manager.py          # ✨ NEW: Learning session orchestration
+│   ├── progress_analytics.py       # ✨ NEW: Learning insights and statistics
+│   ├── leech_detector.py           # ✨ NEW: Difficult question identification
+│   ├── interleaving_manager.py     # ✨ NEW: Interleaved practice implementation
+│   ├── image_processor.py          # AI vision & question-image mapping
+│   ├── answer_engine.py            # Multilingual answer generation
+│   └── data_builder.py             # Dataset pipeline orchestrator
+├── spaced_repetition/              # ✨ NEW: Spaced Repetition System
 │   ├── __init__.py
-│   ├── backup_data.py              # Keep (works)
-│   ├── build_dataset.py            # ✨ NEW: Main unified command
-│   └── direct_extract.py           # Direct PDF extraction with checkpointing
-├── utils/                          # Only working utilities
+│   ├── algorithms/                 # Different SR algorithms
+│   │   ├── __init__.py
+│   │   ├── fsrs.py                 # Main FSRS implementation
+│   │   ├── sm2.py                  # Legacy SM-2 for comparison
+│   │   └── optimizer.py            # Parameter optimization
+│   ├── memory_models.py            # DSR memory modeling
+│   ├── scheduling.py               # Review scheduling logic
+│   └── parameter_optimizer.py      # ML-based parameter tuning
+├── ui/                             # Terminal UI Framework (Rich/Textual)
 │   ├── __init__.py
-│   ├── question_loader.py          # Simple utility to check for questions file
-│   ├── gemini_client.py            # Gemini API client utilities
-│   └── explanation_generator.py    # Keep (works with new system)
-├── ui/                             # Future terminal UI
-│   └── __init__.py
-├── trainer.py                      # ✨ UPDATED: Supports new multilingual format
-├── setup.py                        # ✨ UPDATED: Phase 1.8 schema support
-└── direct_pdf_processor.py         # Direct PDF extraction with structured output
+│   ├── terminal/                   # ✨ NEW: Terminal-specific UI
+│   │   ├── __init__.py
+│   │   ├── main_menu.py            # Enhanced dashboard
+│   │   ├── question_display.py     # Question presentation
+│   │   ├── progress_display.py     # Analytics visualization
+│   │   ├── settings_menu.py        # User preferences
+│   │   ├── leech_manager.py        # Leech management interface
+│   │   └── image_renderer.py       # Terminal image display
+│   ├── components/                 # Reusable UI components
+│   │   ├── __init__.py
+│   │   ├── progress_bars.py        # Progress visualization
+│   │   ├── charts.py               # Analytics charts
+│   │   └── dialogs.py              # User input dialogs
+│   └── themes.py                   # Color themes and styling
+├── cli/                            # Command-line interfaces
+│   ├── __init__.py
+│   ├── backup_data.py              # Data backup/restore
+│   ├── build_dataset.py            # Dataset building
+│   ├── direct_extract.py           # PDF extraction
+│   └── export_data.py              # ✨ NEW: Learning data export
+├── utils/                          # Utility functions
+│   ├── __init__.py
+│   ├── question_loader.py          # Question data loading
+│   ├── gemini_client.py            # AI client utilities
+│   ├── data_portability.py         # ✨ NEW: Export/import functionality
+│   └── timezone_utils.py           # ✨ NEW: Timezone handling
+├── trainer.py                      # ✨ UPDATED: Main application entry point
+├── setup.py                        # ✨ UPDATED: FSRS schema initialization
+└── direct_pdf_processor.py         # PDF extraction system
 ```
+
+### Key Architecture Changes
+
+**🧠 Learning-First Design**: Core architecture now centers around spaced repetition learning rather than simple question display.
+
+**📊 Local Analytics**: Comprehensive learning analytics stored locally in SQLite for privacy.
+
+**🎨 Rich Terminal UI**: Advanced terminal interface using Rich/Textual for modern CLI experience.
+
+**⚙️ Modular Algorithms**: Plugin architecture for different spaced repetition algorithms (FSRS, SM-2).
+
+**📱 Cross-Platform Ready**: Unified core logic can support terminal, desktop, and mobile UIs.
 
 ### Data Directory Structure (Phase 1.8)
 
@@ -719,4 +1470,51 @@ For questions or support, please open an issue on GitHub.
 **Core Developers**: Use `integran-build-dataset` for complete pipeline (requires API keys)  
 **UI Developers**: New multilingual data format ready for display in terminal UI  
 
-**Last Updated**: January 9, 2025 - Phase 1.8-1.9.4 Complete
+## 🎯 Phase 3.0 Architecture Summary
+
+### Why This Architecture for Spaced Repetition?
+
+The new architecture addresses the core requirements for an effective spaced repetition learning system:
+
+#### 1. **Scientific Learning Foundation**
+- **FSRS Algorithm**: 20-30% more efficient than traditional SM-2
+- **Memory Modeling**: DSR model tracks individual learning patterns
+- **Evidence-Based**: Built on cognitive psychology research
+
+#### 2. **Local-First Privacy**
+- **SQLite Storage**: All learning data stays on user's device  
+- **No Cloud Dependencies**: Works completely offline
+- **Data Portability**: Export/import for cross-device sync
+
+#### 3. **Adaptive Intelligence**
+- **Leech Detection**: Identifies problematic questions automatically
+- **Parameter Optimization**: Personalizes algorithm to user's memory
+- **Interleaved Practice**: Improves conceptual understanding
+
+#### 4. **User Experience Excellence**
+- **Rich Terminal UI**: Modern CLI with progress visualization
+- **Real-Time Analytics**: Immediate feedback on learning progress
+- **Multilingual Support**: 5-language explanations
+
+#### 5. **Developer-Friendly Design**
+- **Modular Architecture**: Easy to extend and maintain
+- **Comprehensive Testing**: 169+ tests for reliability
+- **Clean Separation**: UI, logic, and data layers clearly separated
+
+### Implementation Priorities
+
+**Phase 3.1**: Terminal UI Framework with Rich/Textual
+**Phase 3.2**: FSRS algorithm implementation and database integration  
+**Phase 3.3**: Advanced features (analytics, leech management, interleaving)
+**Phase 3.4**: Performance optimization and user testing
+
+### For Different Developer Types
+
+**🎯 UI Developers**: Focus on `src/ui/terminal/` - clean interfaces to learning engine
+**🧠 Algorithm Developers**: Work in `src/spaced_repetition/` - modular algorithm design  
+**📊 Data Developers**: Concentrate on `src/core/` - SQLite schema and analytics
+**🔧 Platform Developers**: Extend architecture for desktop/mobile in future phases
+
+This architecture transforms Integran from a simple quiz app into a scientifically-backed learning system that optimizes long-term knowledge retention through proven spaced repetition techniques.
+
+**Last Updated**: January 11, 2025 - Phase 3.0 Spaced Repetition Architecture Complete

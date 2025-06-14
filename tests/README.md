@@ -6,35 +6,14 @@ This directory contains all tests for the Integran project, organized to mirror 
 
 ```
 tests/
-├── README.md           # This file
 ├── conftest.py         # Shared pytest configuration and fixtures
-├── __init__.py         # Makes tests a Python package
-├── unit/               # Unit tests organized by source module
-│   ├── __init__.py
-│   ├── core/           # Tests for src/core/
-│   │   ├── __init__.py
-│   │   ├── test_database.py     # Tests for src/core/database.py
-│   │   ├── test_models.py       # Tests for src/core/models.py
-│   │   └── test_settings.py     # Tests for src/core/settings.py
-│   ├── cli/            # Tests for src/cli/
-│   │   ├── __init__.py
-│   │   ├── test_cli_build_knowledge_base.py   # Tests for src/cli/build_knowledge_base.py
-│   │   └── test_cli_generate_explanations.py  # Tests for src/cli/generate_explanations.py
-│   ├── knowledge_base/ # Tests for src/knowledge_base/
-│   │   ├── __init__.py
-│   │   ├── test_content_fetcher.py    # Tests for src/knowledge_base/content_fetcher.py
-│   │   ├── test_rag_engine.py         # Tests for src/knowledge_base/rag_engine.py
-│   │   ├── test_text_splitter.py      # Tests for src/knowledge_base/text_splitter.py
-│   │   └── test_vector_store.py       # Tests for src/knowledge_base/vector_store.py
-│   └── utils/          # Tests for src/utils/
-│       ├── __init__.py
-│       ├── test_explanation_generator.py  # Tests for src/utils/explanation_generator.py
-│       ├── test_gemini_client.py          # Tests for src/utils/gemini_client.py
-│       └── test_pdf_extractor.py          # Tests for src/utils/pdf_extractor.py
-├── integration/        # Integration tests (future)
-│   └── __init__.py
-├── test_setup.py       # Tests for src/setup.py (root level module)
-└── test_trainer.py     # Tests for src/trainer.py (root level module)
+├── unit/               # Unit tests for individual modules
+│   ├── core/           # Core functionality tests
+│   ├── cli/            # Command-line interface tests  
+│   ├── ui/             # Terminal UI component tests
+│   └── utils/          # Utility function tests
+├── integration/        # End-to-end integration tests
+└── test_*.py           # Main application tests
 ```
 
 ## Test Types
