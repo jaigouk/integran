@@ -99,27 +99,22 @@ Select option:
 ### Command Line Options
 
 ```bash
-# Start in a specific mode
-integran --mode random
-
-# Review only failed questions
-integran --review
-
-# Practice specific category
-integran --category "Grundrechte"
-
-# Export progress report
-integran --export-stats
+# Planned Command Line Options (not yet implemented):
+# integran --mode random          # Start in a specific mode
+# integran --review               # Review only failed questions  
+# integran --category "Grundrechte"  # Practice specific category
+# integran --export-stats         # Export progress report
 ```
 
 ## 🚀 Features (Planned & In Development)
 
 ### ✅ **Currently Implemented**
-- **Dataset Generation**: Extract questions from official BAMF PDF
-- **AI Processing**: Generate multilingual explanations using Google Gemini
-- **Image Processing**: Analyze and describe visual questions
-- **Data Validation**: Comprehensive question and answer validation
-- **Database Schema**: SQLite backend with progress tracking
+- **Complete Dataset**: ✅ All 460 questions with multilingual explanations (EN/DE/TR/UK/AR) and images
+- **Dataset Generation**: ✅ Extraction tools from official BAMF PDF
+- **AI Processing**: ✅ Multilingual explanations using Google Gemini
+- **Image Processing**: ✅ Visual question analysis and descriptions  
+- **Data Validation**: ✅ Comprehensive question and answer validation
+- **Database Schema**: ✅ SQLite backend with progress tracking ready
 
 ### 🚧 **In Development** 
 
@@ -225,13 +220,15 @@ integran-setup
 ```
 
 ### What Works Currently
-- ✅ **Dataset Building Tools**: `integran-build-dataset`, `integran-direct-extract`
-- ✅ **PDF Processing**: Extract questions from official BAMF PDF
-- ✅ **AI Integration**: Generate multilingual explanations
+- ✅ **Complete Dataset**: All 460 questions with multilingual explanations available in `data/final_dataset.json`
+- ✅ **Dataset Scripts**: Full pipeline in `scripts/` directory for dataset processing
+- ✅ **PDF Processing**: Questions extracted from official BAMF PDF
+- ✅ **AI Integration**: Multilingual explanations generated using Google Gemini
+- ✅ **Database Setup**: `integran-setup` initializes SQLite database
 - 🚧 **Terminal Trainer**: Under development
 - 🚧 **Practice Sessions**: Coming soon
 
-**Note**: The dataset building tools are functional for developers working with question extraction and processing.
+**Note**: The complete dataset (460 questions with 5-language explanations) is ready. Only the terminal trainer interface needs implementation.
 
 ## 🔧 Configuration
 
@@ -330,14 +327,13 @@ The developer guide covers:
 ### Quick Developer Commands
 
 ```bash
-# Check dataset build status
-integran-build-dataset --status
+# Available Commands:
+integran-setup                        # Database initialization and setup
 
-# Build complete multilingual dataset
-integran-build-dataset --verbose
-
-# Backup existing data
-integran-backup-data backup
+# Planned Commands (not yet implemented):
+# integran-build-dataset --status      # Check dataset build status
+# integran-build-dataset --verbose     # Build complete multilingual dataset  
+# integran-backup-data backup          # Backup existing data
 ```
 
 ## 📝 License

@@ -2,19 +2,44 @@
 
 This guide is for developers and contributors working on the Integran project. Regular users don't need this information.
 
-## 🎯 Phase 3.0 Architecture Overview - Spaced Repetition Learning System
+## 🎯 Phase 3.0 Architecture Overview - DDD Event-Driven Learning System (PLANNED)
 
-As of 2025-01-11, Integran has evolved into a scientifically-backed spaced repetition learning system. The architecture is designed around **local-first principles** with SQLite as the primary data store, supporting terminal, desktop, and mobile platforms.
+⚠️ **DEVELOPMENT STATUS**: This section describes the **PLANNED** Phase 3.0 architecture. Currently, only Phase 1 DDD infrastructure is implemented (EventBus, DomainService base classes, and domain events). The complete DDD event-driven system described below is under development.
+
+**Current Status as of 2025-01-14:**
+- ✅ **Phase 1 Complete**: EventBus (`src/core/event_bus.py`), DomainService base class (`src/core/domain_service.py`), domain events (`src/core/domain_events.py`)
+- 🚧 **Phase 2 Planned**: Concrete domain services (ScheduleCard, GenerateAnswer, etc.)
+- 🚧 **Phase 3 Planned**: Bounded context organization and cross-context communication
+- 🚧 **Phase 4 Planned**: Terminal UI integration with async command/query patterns
+
+The planned architecture will follow **Domain-Driven Design (DDD)** principles with **async event-based communication** and **local-first principles**.
 
 ### Core Design Principles
 
-1. **Local-First**: All learning data stored locally in SQLite - no cloud dependencies
-2. **Scientific Learning**: FSRS algorithm for optimal spaced repetition scheduling  
-3. **Cross-Platform**: Unified core supporting terminal, desktop, and mobile UIs
-4. **Multilingual**: 5-language support (EN/DE/TR/UK/AR) for diverse learners
-5. **Privacy-Focused**: User learning patterns stay on device
+1. **Domain-Driven Design**: Clear separation of business logic into domain services with single responsibilities
+2. **Event-Based Architecture**: Async event-driven communication between bounded contexts
+3. **Local-First**: All learning data stored locally in SQLite - no cloud dependencies
+4. **Scientific Learning**: FSRS algorithm for optimal spaced repetition scheduling  
+5. **Cross-Platform**: Unified core supporting terminal, desktop, and mobile UIs
+6. **Multilingual**: 5-language support (EN/DE/TR/UK/AR) for diverse learners
+7. **Privacy-Focused**: User learning patterns stay on device
 
-### System Architecture
+### DDD Architecture Patterns
+
+#### Bounded Contexts
+- **Learning Context**: FSRS scheduling, session management, progress tracking
+- **Content Context**: Question management, multilingual answers, image processing
+- **Analytics Context**: Performance tracking, leech detection, interleaving optimization
+- **User Context**: Settings, preferences, data export/import
+
+#### Domain Services Pattern
+Each complex business operation is encapsulated in a domain service with:
+- **Verb + Noun naming**: `ScheduleCard`, `GenerateAnswer`, `ProcessImage`, `DetectLeech`
+- **Single `call` method**: Clean interface exposing only the primary operation
+- **Async execution**: All services support async/await for event-driven architecture
+- **Event publishing**: Services emit domain events for cross-context communication
+
+### DDD Event-Driven System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -23,32 +48,43 @@ As of 2025-01-11, Integran has evolved into a scientifically-backed spaced repet
 │  Terminal UI    │   Desktop UI    │     Mobile UI           │
 │  (Rich/Textual) │   (Future)      │     (Future)            │
 └─────────────────┴─────────────────┴─────────────────────────┘
-                           │
+                           │ (Commands/Queries)
 ┌─────────────────────────────────────────────────────────────┐
-│                    CORE LEARNING ENGINE                     │
+│                    APPLICATION LAYER                        │
 ├─────────────────┬─────────────────┬─────────────────────────┤
-│ Session Manager │ FSRS Scheduler  │  Progress Analytics     │
-│ - Question Flow │ - Memory States │  - Retention Tracking   │
-│ - User Input    │ - Intervals     │  - Category Analysis    │
-│ - Feedback      │ - Difficulty    │  - Leech Detection      │
+│  Command Bus    │    Query Bus    │    Event Bus            │
+│  - Async Cmds   │  - Read Models  │  - Domain Events        │
+│  - Validation   │  - Projections  │  - Event Handlers       │
 └─────────────────┴─────────────────┴─────────────────────────┘
-                           │
+                           │ (Domain Events)
 ┌─────────────────────────────────────────────────────────────┐
-│                     DATA ACCESS LAYER                       │
+│                     DOMAIN LAYER                            │
+├───────────────┬───────────────┬───────────────┬─────────────┤
+│ Learning      │ Content       │ Analytics     │ User        │
+│ Context       │ Context       │ Context       │ Context     │
+│ ┌───────────┐ │ ┌───────────┐ │ ┌───────────┐ │ ┌─────────┐ │
+│ │ScheduleCard││ │GenerateAns│ │ │DetectLeech│ │ │SavePrefs│ │
+│ │ManageSession│ │ProcessImg │ │ │AnalyzePer │ │ │ExportDat│ │
+│ │TrackProgress│ │ LoadQuest │ │ │Interleave │ │ │ImportDat│ │
+│ └───────────┘ │ └───────────┘ │ └───────────┘ │ └─────────┘ │
+└───────────────┴───────────────┴───────────────┴─────────────┘
+                           │ (Async Operations)
+┌─────────────────────────────────────────────────────────────┐
+│                    INFRASTRUCTURE LAYER                     │
 ├─────────────────┬─────────────────┬─────────────────────────┤
-│  Learning Data  │  Question Data  │    User Settings        │
-│  - FSRS States  │  - Multilingual │  - Preferences          │
-│  - Review Hist. │  - Images       │  - Algorithm Config     │
-│  - Analytics    │  - Categories   │  - UI Themes            │
+│  In-Memory      │  Read Models    │    External APIs        │
+│  Event Bus      │  - Projections  │  - Gemini AI            │
+│  - Event Queue  │  - Aggregations │  - Image Processing     │
+│  - Subscriptions│  - Statistics   │  - Data Export          │
 └─────────────────┴─────────────────┴─────────────────────────┘
                            │
 ┌─────────────────────────────────────────────────────────────┐
 │                  SQLITE DATABASE (Local)                    │
-│  📊 Learning Tables    📋 Content Tables  ⚙️ Config Tables  │
-│  - fsrs_cards         - questions         - user_settings   │
-│  - review_history     - categories        - algorithm_config│
-│  - learning_sessions  - images_metadata   - ui_preferences  │
-│  - user_analytics     - multilingual_data - export_data     │
+│  📋 Read Models      ⚙️ Projections      📾 Application Data│
+│  - question_views   - user_settings      - fsrs_cards       │
+│  - progress_views   - algorithm_config   - review_history   │
+│  - analytics_views  - ui_preferences     - learning_sessions│
+│  - leech_views      - export_data        - questions        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -59,6 +95,201 @@ As of 2025-01-11, Integran has evolved into a scientifically-backed spaced repet
 3. **Progress Analytics** - Real-time learning insights and retention tracking
 4. **Leech Detection** - Identifies and manages difficult questions intelligently
 5. **Multilingual Content** - Serves explanations in user's preferred language
+
+## 🏗️ DDD Domain Services Architecture
+
+### Domain Service Pattern Implementation
+
+Each complex business operation follows the **Command Pattern** with async execution:
+
+```python
+from abc import ABC, abstractmethod
+from typing import Any, TypeVar, Generic
+from dataclasses import dataclass
+import asyncio
+
+# Base Domain Service Interface
+T = TypeVar('T')
+U = TypeVar('U')
+
+class DomainService(ABC, Generic[T, U]):
+    """Base class for all domain services following DDD patterns."""
+    
+    @abstractmethod
+    async def call(self, request: T) -> U:
+        """Single entry point for domain service execution."""
+        pass
+
+# Example Implementation
+@dataclass
+class ScheduleCardRequest:
+    card_id: int
+    rating: int
+    response_time_ms: int
+    session_id: int | None = None
+
+@dataclass
+class ScheduleCardResult:
+    success: bool
+    next_review_date: datetime
+    difficulty: float
+    stability: float
+    events: list[DomainEvent]
+
+class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
+    """Domain service for FSRS card scheduling using pure business logic."""
+    
+    def __init__(self, db_manager: DatabaseManager, event_bus: EventBus):
+        self.db_manager = db_manager
+        self.event_bus = event_bus
+    
+    async def call(self, request: ScheduleCardRequest) -> ScheduleCardResult:
+        # Execute FSRS algorithm
+        result = await self._execute_fsrs_algorithm(request)
+        
+        # Emit domain events via in-memory event bus
+        await self.event_bus.publish(CardScheduledEvent(
+            card_id=request.card_id,
+            new_difficulty=result.difficulty,
+            next_review_date=result.next_review_date
+        ))
+        
+        return result
+```
+
+### Event-Driven Communication
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+# Domain Events
+@dataclass
+class DomainEvent(ABC):
+    """Base class for all domain events."""
+    occurred_at: datetime
+    event_id: str
+
+@dataclass
+class CardScheduledEvent(DomainEvent):
+    card_id: int
+    new_difficulty: float
+    next_review_date: datetime
+
+@dataclass 
+class AnswerGeneratedEvent(DomainEvent):
+    question_id: int
+    languages: list[str]
+    generation_time_ms: int
+
+@dataclass
+class LeechDetectedEvent(DomainEvent):
+    card_id: int
+    lapse_count: int
+    recommended_action: str
+
+# Lightweight In-Memory Event Bus for Local-First Architecture
+class EventBus:
+    """Lightweight async event bus for domain event publishing.
+    
+    Designed for local-first applications where events are processed
+    in-memory without persistent storage to avoid database bloat.
+    """
+    
+    def __init__(self):
+        self._handlers: dict[type[DomainEvent], list[callable]] = {}
+        self._event_queue: list[DomainEvent] = []
+        self._processing = False
+    
+    async def publish(self, event: DomainEvent) -> None:
+        """Publish event to all registered handlers asynchronously."""
+        handlers = self._handlers.get(type(event), [])
+        if handlers:
+            # Process events immediately in memory
+            await asyncio.gather(*[handler(event) for handler in handlers])
+    
+    def subscribe(self, event_type: type[DomainEvent], handler: callable) -> None:
+        """Subscribe handler to event type."""
+        if event_type not in self._handlers:
+            self._handlers[event_type] = []
+        self._handlers[event_type].append(handler)
+    
+    def get_active_subscriptions(self) -> dict[str, int]:
+        """Get count of active subscriptions by event type."""
+        return {event_type.__name__: len(handlers) 
+                for event_type, handlers in self._handlers.items()}
+```
+
+### Bounded Context Structure
+
+#### Learning Context (`src/core/learning/`)
+```
+src/core/learning/
+├── __init__.py
+├── domain/
+│   ├── services/
+│   │   ├── schedule_card.py        # ScheduleCard domain service
+│   │   ├── manage_session.py       # ManageSession domain service
+│   │   └── track_progress.py       # TrackProgress domain service
+│   ├── events/
+│   │   ├── card_events.py          # Card-related domain events
+│   │   └── session_events.py       # Session-related domain events
+│   └── models/
+│       ├── fsrs_models.py          # FSRS domain models
+│       └── session_models.py       # Session aggregates
+├── application/
+│   ├── handlers/                   # Command/query handlers
+│   └── queries/                    # Read model queries
+└── infrastructure/
+    ├── repositories/               # Data access
+    └── external/                   # External service adapters
+```
+
+#### Content Context (`src/core/content/`)
+```
+src/core/content/
+├── __init__.py
+├── domain/
+│   ├── services/
+│   │   ├── generate_answer.py      # GenerateAnswer domain service
+│   │   ├── process_image.py        # ProcessImage domain service
+│   │   └── load_question.py        # LoadQuestion domain service
+│   ├── events/
+│   │   ├── content_events.py       # Content-related events
+│   │   └── generation_events.py    # AI generation events
+│   └── models/
+│       ├── question_models.py      # Question aggregates
+│       └── content_models.py       # Multilingual content
+├── application/
+│   ├── handlers/
+│   └── queries/
+└── infrastructure/
+    ├── ai_clients/                 # Gemini AI integration
+    └── content_store/              # Content storage
+```
+
+#### Analytics Context (`src/core/analytics/`)
+```
+src/core/analytics/
+├── __init__.py
+├── domain/
+│   ├── services/
+│   │   ├── detect_leech.py         # DetectLeech domain service
+│   │   ├── analyze_performance.py  # AnalyzePerformance domain service
+│   │   └── optimize_interleaving.py # OptimizeInterleaving domain service
+│   ├── events/
+│   │   └── analytics_events.py     # Analytics domain events
+│   └── models/
+│       ├── analytics_models.py     # Performance aggregates
+│       └── leech_models.py         # Leech detection models
+├── application/
+│   ├── handlers/
+│   └── projections/                # Analytics projections
+└── infrastructure/
+    └── calculators/                # Performance calculation engines
+```
 
 ## 📊 Enhanced Data Structure
 
@@ -547,7 +778,13 @@ class ParameterOptimizer:
         # Return personalized parameters
 ```
 
-### Local-First Data Synchronization
+### Local-First Architecture Benefits
+
+#### Lightweight Event Processing
+- **In-Memory Events**: Domain events processed immediately without persistence
+- **Reduced Database Size**: No event store tables means smaller local database
+- **Better Performance**: No disk I/O for event processing, only final state storage
+- **Mobile-Friendly**: Minimal storage footprint for mobile and desktop apps
 
 #### Export/Import System
 ```python
@@ -639,56 +876,72 @@ export GEMINI_MODEL="gemini-2.5-pro-preview-06-05" # Model version (optional)
 
 The application automatically uses pre-extracted question data from `data/questions.json` and will never call external APIs during normal usage.
 
-### Developer Commands (Phase 1.8)
+### Available Developer Commands
 
 ```bash
-# PRIMARY COMMAND: Build complete multilingual dataset
-integran-build-dataset
+# Working Commands:
+integran-setup                        # Database setup and initialization
+integran-direct-extract               # PDF question extraction (requires API keys)
 
-# Database setup with language preference
-integran-setup --language en
+# Working Scripts (dataset generation complete):
+python scripts/verify_dataset.py      # Verify final dataset integrity
+python scripts/finalize_dataset.py    # Create final dataset (already completed)
+python scripts/extract_images.py      # Extract images from PDF (already completed)
+python scripts/export_for_review.py   # Export data for manual review
+python scripts/import_from_review.py  # Import reviewed data back
+python scripts/generate_explanations_single.py  # Generate individual explanations
+python scripts/fix_image_answers.py   # Fix image question mappings
 
-# Backup and restore data
-integran-backup-data backup
-integran-backup-data restore --suffix 20250609_124243
+# Dataset Status:
+# ✅ data/final_dataset.json - Complete with 460 questions, multilingual explanations (EN/DE/TR/UK/AR), and images
 
-# Direct PDF extraction (developers only):
-integran-direct-extract  # Single-question extraction with checkpointing
+# Planned Commands (not yet implemented):
+# integran-build-dataset               # Unified dataset building command
+# integran-backup-data backup          # Data backup functionality
+# integran-backup-data restore         # Data restore functionality
 ```
 
-## 🏗️ Current Data Pipeline (2025-06-11 Update)
+## 🏗️ Dataset Status - COMPLETE ✅ 
 
-⚠️ **Important**: The unified `integran-build-dataset` command is outdated. Use the new step-by-step process documented in the [Dataset Generation Guide](./dataset-generation-guide.md).
+**Current Status**: Dataset generation is **COMPLETE**. All 460 questions have been processed with multilingual explanations.
 
-### Current Workflow (Multi-Step Process)
+### Completed Dataset Pipeline
 
-The current system uses multiple scripts for different phases:
+The dataset generation has been completed using the following pipeline:
 
 ```bash
-# STEP 0: Extract from PDF (usually already done)
-python src/cli/direct_extract.py
+# ✅ COMPLETED STEPS:
+# STEP 0: Extract from PDF ✅ Done
+# python src/cli/direct_extract.py
 
-# STEP 1: Extract images (already done)  
-python scripts/extract_images.py
+# STEP 1: Extract images ✅ Done  
+# python scripts/extract_images.py
 
-# STEP 2: Fix image answers (already done)
-python scripts/fix_image_answers.py
+# STEP 2: Fix image answers ✅ Done
+# python scripts/fix_image_answers.py
 
-# STEP 3: Generate explanations (main task)
-python scripts/generate_explanations.py
-python scripts/retry_failed_questions.py
+# STEP 3: Generate explanations ✅ Done
+# python scripts/generate_explanations_single.py (for remaining questions)
 
-# STEP 4: Create final dataset
-python scripts/finalize_dataset.py
+# STEP 4: Create final dataset ✅ Done
+# python scripts/finalize_dataset.py
+
+# RESULT: data/final_dataset.json - Complete with 460 questions
 ```
 
-### Quick Start for Most Developers
+### For New Developers
 
-Most developers only need to run the final step:
+**No dataset generation needed** - the complete dataset already exists at `data/final_dataset.json`.
+
+For dataset verification or modifications only:
 
 ```bash
-# Create final dataset from existing progress
-python scripts/finalize_dataset.py
+# Verify existing dataset integrity
+python scripts/verify_dataset.py
+
+# For manual review workflows (if needed)
+python scripts/export_for_review.py
+python scripts/import_from_review.py
 ```
 
 📖 **For complete details, see**: [Dataset Generation Guide](./dataset-generation-guide.md)
@@ -791,17 +1044,11 @@ The system generates comprehensive explanations for all exam questions using Goo
 #### Basic Explanation Generation
 
 ```bash
-# Generate explanations for all 460 questions
-integran-generate-explanations
-
-# Use specific batch size (default: 10)
-integran-generate-explanations --batch-size 15
-
-# Start fresh (ignore existing checkpoint)
-integran-generate-explanations --no-resume
-
-# Enable verbose logging
-integran-generate-explanations --verbose
+# PLANNED Commands (not yet implemented):
+# integran-generate-explanations                    # Generate explanations for all 460 questions
+# integran-generate-explanations --batch-size 15    # Use specific batch size  
+# integran-generate-explanations --no-resume        # Start fresh (ignore checkpoint)
+# integran-generate-explanations --verbose          # Enable verbose logging
 ```
 
 
@@ -935,13 +1182,13 @@ cp .env.example .env
 
 #### 3. Working with Explanations
 ```bash
-# Generate explanations for all questions (if needed)
-integran-generate-explanations --batch-size 10
+# PLANNED: Generate explanations for all questions (if needed)
+# integran-generate-explanations --batch-size 10
 
 # RAG enhancement removed as it was not used
 
-# Check progress during generation
-tail -f data/explanations_checkpoint.json
+# PLANNED: Check progress during generation  
+# tail -f data/explanations_checkpoint.json
 ```
 
 #### 4. Development Cycle
