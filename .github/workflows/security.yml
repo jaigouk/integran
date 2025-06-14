@@ -43,14 +43,18 @@ jobs:
           # - Shell injection risks (S601-S612)
           # - And many more security anti-patterns
           
+          # NOTE: We explicitly pass --ignore flags because GitHub Actions
+          # may not always pick up the pyproject.toml configuration correctly
+          
           # Generate JSON report for artifact upload
-          ruff check --select S --output-format=json > ruff-security-report.json || true
+          ruff check --select S --ignore S101,S311 --output-format=json > ruff-security-report.json || true
           
           # Run again with human-readable output and fail on issues
           # Note: Ignored rules configured in pyproject.toml:
           # - S101 (assert) is allowed for tests
           # - S311 (random) is allowed for non-cryptographic use (question shuffling)
-          ruff check --select S .
+          # Explicitly pass ignore rules since CI might not pick up pyproject.toml
+          ruff check --select S --ignore S101,S311 .
       
       # Option 1: Use Safety with API key (if you have one)
       # Uncomment the following lines and add SAFETY_API_KEY to your GitHub secrets
