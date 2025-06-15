@@ -5,14 +5,16 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.utils.gemini_client import GeminiClient
+from src.infrastructure.external.gemini_client import GeminiClient
 
 
+@pytest.mark.external_api
 class TestGeminiClient:
     """Test Gemini AI client."""
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
     def test_init_vertex_ai(self, mock_genai, mock_get_settings):
         """Test initialization with Vertex AI."""
         # Mock settings
@@ -35,8 +37,9 @@ class TestGeminiClient:
             vertexai=True, project="test-project", location="global"
         )
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
     def test_init_api_key(self, mock_genai, mock_get_settings):
         """Test initialization with API key."""
         # Mock settings
@@ -53,11 +56,12 @@ class TestGeminiClient:
 
         client = GeminiClient()
 
-        assert client.api_key == "test-api-key"
+        assert hasattr(client, "api_key") and client.api_key == "test-api-key"
         assert client.use_vertex_ai is False
         mock_genai.Client.assert_called_once_with(api_key="test-api-key")
 
-    @patch("src.utils.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
     def test_init_missing_project_id(self, mock_get_settings):
         """Test initialization fails with missing project ID for Vertex AI."""
         mock_settings = Mock()
@@ -68,7 +72,8 @@ class TestGeminiClient:
         with pytest.raises(ValueError, match="GCP_PROJECT_ID is required"):
             GeminiClient()
 
-    @patch("src.utils.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
     def test_init_missing_api_key(self, mock_get_settings):
         """Test initialization fails with missing API key."""
         mock_settings = Mock()
@@ -82,14 +87,15 @@ class TestGeminiClient:
     def test_init_genai_not_available(self):
         """Test initialization fails when genai is not available."""
         with (
-            patch("src.utils.gemini_client.GENAI_AVAILABLE", False),
+            patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", False),
             pytest.raises(ImportError, match="google-genai package is required"),
         ):
             GeminiClient()
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
-    @patch("src.utils.gemini_client.types")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.types")
     def test_generate_text_success(self, mock_types, mock_genai, mock_get_settings):
         """Test successful text generation."""
         # Setup mocks
@@ -117,9 +123,10 @@ class TestGeminiClient:
         assert result == "Generated response"
         mock_client.models.generate_content.assert_called_once()
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
-    @patch("src.utils.gemini_client.types")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.types")
     def test_generate_text_retry_on_overload(
         self, mock_types, mock_genai, mock_get_settings
     ):
@@ -141,16 +148,17 @@ class TestGeminiClient:
         # Mock types
         self._setup_types_mocks(mock_types)
 
-        with patch("src.utils.gemini_client.time.sleep"):
+        with patch("src.infrastructure.external.gemini_client.time.sleep"):
             client = GeminiClient()
             result = client.generate_text("Test prompt", max_retries=2)
 
         assert result == "Generated response"
         assert mock_client.models.generate_content.call_count == 2
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
-    @patch("src.utils.gemini_client.types")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.types")
     def test_generate_json_response(self, mock_types, mock_genai, mock_get_settings):
         """Test JSON response generation."""
         # Setup mocks
@@ -173,16 +181,17 @@ class TestGeminiClient:
 
         assert result == test_json
 
-    @patch("src.utils.gemini_client.time.sleep")
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
-    @patch("src.utils.gemini_client.types")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.time.sleep")
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.types")
     def test_generate_json_response_with_markdown(
         self,
         mock_types,
         mock_genai,
         mock_get_settings,
-        mock_sleep,  # noqa: ARG002
+        _mock_sleep,  # noqa: ARG002
     ):
         """Test JSON response with markdown formatting."""
         # Setup mocks
@@ -205,9 +214,10 @@ class TestGeminiClient:
 
         assert result == test_json
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
-    @patch("src.utils.gemini_client.types")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.types")
     def test_generate_with_context(self, mock_types, mock_genai, mock_get_settings):
         """Test generation with context for RAG."""
         # Setup mocks
@@ -235,9 +245,10 @@ class TestGeminiClient:
         call_args = mock_client.models.generate_content.call_args
         assert call_args is not None
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
-    @patch("src.utils.gemini_client.types")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.types")
     def test_summarize_text(self, mock_types, mock_genai, mock_get_settings):
         """Test text summarization."""
         # Setup mocks
@@ -258,9 +269,10 @@ class TestGeminiClient:
 
         assert result == "Summary of the text"
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
-    @patch("src.utils.gemini_client.types")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.types")
     def test_extract_key_concepts(self, mock_types, mock_genai, mock_get_settings):
         """Test key concept extraction."""
         # Setup mocks
@@ -285,9 +297,10 @@ class TestGeminiClient:
         assert "Concept Two" in result
         assert "Concept Three" in result
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
-    @patch("src.utils.gemini_client.types")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.types")
     def test_check_relevance_relevant(self, mock_types, mock_genai, mock_get_settings):
         """Test relevance checking for relevant document."""
         # Setup mocks
@@ -308,9 +321,10 @@ class TestGeminiClient:
 
         assert result is True
 
-    @patch("src.utils.gemini_client.get_settings")
-    @patch("src.utils.gemini_client.genai")
-    @patch("src.utils.gemini_client.types")
+    @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
+    @patch("src.infrastructure.external.gemini_client.get_settings")
+    @patch("src.infrastructure.external.gemini_client.genai")
+    @patch("src.infrastructure.external.gemini_client.types")
     def test_check_relevance_not_relevant(
         self, mock_types, mock_genai, mock_get_settings
     ):

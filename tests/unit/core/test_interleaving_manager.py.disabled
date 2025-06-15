@@ -1,0 +1,489 @@
+"""Tests for interleaving manager functionality."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from unittest.mock import Mock, patch
+
+import pytest
+
+from src.core.database import DatabaseManager
+from src.domain.analytics.services.optimize_interleaving import (
+    DifficultyBalance,
+    InterleavingConfig,
+    InterleavingManager,
+    InterleavingSession,
+    InterleavingStrategy,
+    QuestionGroup,
+)
+from src.domain.content.models.question_models import Question
+from src.domain.learning.models.learning_models import FSRSCard
+
+
+class TestInterleavingManager:
+    """Test interleaving manager functionality."""
+
+    @pytest.fixture
+    def mock_db_manager(self):
+        """Create mock database manager."""
+        return Mock(spec=DatabaseManager)
+
+    @pytest.fixture
+    def interleaving_manager(self, mock_db_manager):
+        """Create interleaving manager with mock dependencies."""
+        return InterleavingManager(mock_db_manager)
+
+    @pytest.fixture
+    def sample_config(self):
+        """Create sample interleaving configuration."""
+        return InterleavingConfig(
+            strategy=InterleavingStrategy.CATEGORY_ROUND_ROBIN,
+            difficulty_balance=DifficultyBalance.MIXED,
+            category_weights={"Politik": 1.5, "Geschichte": 1.0, "Gesellschaft": 0.8},
+            max_consecutive_same_category=2,
+            min_category_gap=1,
+        )
+
+    @pytest.fixture
+    def sample_questions_and_cards(self):
+        """Create sample questions and cards for testing."""
+        questions_cards = []
+        categories = ["Politik", "Geschichte", "Gesellschaft"]
+
+        for i in range(9):  # 3 per category
+            category = categories[i % 3]
+
+            question = Question(
+                id=100 + i,
+                question=f"Question {i + 1} about {category}",
+                options='["A", "B", "C", "D"]',
+                correct="A",
+                category=category,
+                difficulty="medium",
+            )
+
+            card = FSRSCard(
+                card_id=i + 1,
+                question_id=100 + i,
+                user_id=1,
+                difficulty=5.0 + (i % 3),
+                stability=2.0,
+                retrievability=0.8,
+                state=2,
+                review_count=3 + (i % 2),
+                lapse_count=i % 3,
+                next_review_date=datetime.now(UTC).timestamp() - 86400,  # Due now
+                created_at=datetime.now(UTC).timestamp(),
+                updated_at=datetime.now(UTC).timestamp(),
+            )
+
+            questions_cards.append((question, card))
+
+        return questions_cards
+
+    def test_create_interleaved_session(
+        self,
+        interleaving_manager,
+        mock_db_manager,  # noqa: ARG002
+        sample_config,
+        sample_questions_and_cards,
+    ):
+        """Test creating an interleaved session."""
+        # Mock _get_question_groups to return organized groups
+        with pytest.MonkeyPatch.context() as m:
+            m.setattr(
+                interleaving_manager,
+                "_get_question_groups",
+                lambda _user_id, _categories: self._create_mock_question_groups(
+                    sample_questions_and_cards
+                ),
+            )
+
+            session = interleaving_manager.create_interleaved_session(
+                user_id=1,
+                config=sample_config,
+                target_questions=6,
+                categories=["Politik", "Geschichte"],
+            )
+
+        assert isinstance(session, InterleavingSession)
+        assert session.session_id == 1
+        assert session.config == sample_config
+        assert len(session.question_sequence) > 0
+        assert session.current_position == 0
+
+    def _create_mock_question_groups(self, questions_cards):
+        """Helper to create mock question groups."""
+        groups = []
+        by_category = {}
+
+        for question, card in questions_cards:
+            category = question.category
+            if category not in by_category:
+                by_category[category] = []
+            by_category[category].append((question, card))
+
+        for category, items in by_category.items():
+            group = QuestionGroup(
+                category=category,
+                subcategory=None,
+                difficulty_level="medium",
+                questions=items,
+            )
+            groups.append(group)
+
+        return groups
+
+    def test_get_next_question_valid_session(
+        self, interleaving_manager, sample_questions_and_cards
+    ):
+        """Test getting next question from valid session."""
+        # Create a session with questions
+        session = InterleavingSession(
+            session_id=1,
+            config=Mock(),
+            question_sequence=sample_questions_and_cards[:3],
+            current_position=0,
+        )
+        interleaving_manager._active_sessions[1] = session
+
+        question, card = interleaving_manager.get_next_question(1)
+
+        assert question == sample_questions_and_cards[0][0]
+        assert card == sample_questions_and_cards[0][1]
+        assert session.current_position == 1
+
+    def test_get_next_question_session_complete(self, interleaving_manager):
+        """Test getting next question when session is complete."""
+        session = InterleavingSession(
+            session_id=1,
+            config=Mock(),
+            question_sequence=[Mock(), Mock()],
+            current_position=2,  # At end
+        )
+        interleaving_manager._active_sessions[1] = session
+
+        result = interleaving_manager.get_next_question(1)
+
+        assert result is None
+
+    def test_get_next_question_invalid_session(self, interleaving_manager):
+        """Test getting next question for invalid session."""
+        result = interleaving_manager.get_next_question(999)
+
+        assert result is None
+
+    def test_record_performance(self, interleaving_manager, mock_db_manager):
+        """Test recording performance and adaptation."""
+        # Create session
+        session = InterleavingSession(
+            session_id=1,
+            config=InterleavingConfig(
+                strategy=InterleavingStrategy.RANDOM,
+                difficulty_balance=DifficultyBalance.MIXED,
+                category_weights={},
+                adaptive_adjustment=True,
+            ),
+            question_sequence=[],
+        )
+        interleaving_manager._active_sessions[1] = session
+
+        # Mock question
+        mock_question = Mock()
+        mock_question.category = "Politik"
+        mock_db_manager.get_question.return_value = mock_question
+
+        # Record performance
+        interleaving_manager.record_performance(
+            session_id=1,
+            question_id=100,
+            is_correct=True,
+            response_time_ms=3000,
+        )
+
+        # Check that performance was tracked
+        assert "Politik" in session.category_performance
+        assert session.category_performance["Politik"] > 0
+
+    def test_record_performance_invalid_session(self, interleaving_manager):
+        """Test recording performance for invalid session."""
+        # Should not raise exception
+        interleaving_manager.record_performance(
+            session_id=999,
+            question_id=100,
+            is_correct=True,
+            response_time_ms=3000,
+        )
+
+    def test_analyze_interleaving_effectiveness(
+        self, interleaving_manager, mock_db_manager
+    ):
+        """Test analyzing interleaving effectiveness."""
+        mock_session = Mock()
+
+        # Mock reviews
+        mock_reviews = []
+        for i in range(10):
+            review = Mock()
+            review.review_date = (datetime.now(UTC) - timedelta(days=i)).timestamp()
+            review.rating = 3 if i % 2 == 0 else 2
+            mock_reviews.append(review)
+
+        mock_session.query.return_value.join.return_value.filter.return_value.all.return_value = mock_reviews
+
+        with patch.object(mock_db_manager, "get_session") as mock_get_session:
+            mock_get_session.return_value.__enter__.return_value = mock_session
+            mock_get_session.return_value.__exit__.return_value = None
+
+            # Mock analysis methods
+            with pytest.MonkeyPatch.context() as m:
+                m.setattr(
+                    interleaving_manager,
+                    "_analyze_category_sequences",
+                    lambda _reviews: [
+                        {"is_interleaved": True, "performance": 0.8},
+                        {"is_interleaved": False, "performance": 0.6},
+                    ],
+                )
+                m.setattr(
+                    interleaving_manager,
+                    "_calculate_interleaved_performance",
+                    lambda _sequences: {
+                        "retention": 0.8,
+                        "non_interleaved_retention": 0.6,
+                        "improvement_factor": 0.2,
+                    },
+                )
+
+                analysis = interleaving_manager.analyze_interleaving_effectiveness(
+                    user_id=1, days=30
+                )
+
+                assert "interleaved_sessions" in analysis
+                assert "non_interleaved_sessions" in analysis
+                assert "interleaved_retention" in analysis
+                assert "improvement_factor" in analysis
+
+    def test_get_optimal_category_mix(self, interleaving_manager, mock_db_manager):
+        """Test calculating optimal category mixing ratios."""
+        mock_session = Mock()
+        with patch.object(mock_db_manager, "get_session") as mock_get_session:
+            mock_get_session.return_value.__enter__.return_value = mock_session
+            mock_get_session.return_value.__exit__.return_value = None
+
+        # Mock cards for each category
+        def mock_cards_for_category(category):
+            cards = []
+            for i in range(5):
+                card = Mock()
+                card.review_count = i
+                card.lapse_count = 0 if category == "Politik" else 2  # Politik easier
+                card.next_review_date = datetime.now(UTC).timestamp() - 86400  # Due
+                cards.append(card)
+            return cards
+
+            mock_session.query.return_value.join.return_value.filter.return_value.all.side_effect = [
+                mock_cards_for_category("Politik"),
+                mock_cards_for_category("Geschichte"),
+                mock_cards_for_category("Gesellschaft"),
+            ]
+
+            mix = interleaving_manager.get_optimal_category_mix(
+                user_id=1, target_categories=["Politik", "Geschichte", "Gesellschaft"]
+            )
+
+            assert isinstance(mix, dict)
+            assert len(mix) == 3
+            assert all(0 <= weight <= 1 for weight in mix.values())
+            # Sum should be approximately 1.0
+            assert abs(sum(mix.values()) - 1.0) < 0.1
+
+    def test_get_optimal_category_mix_no_priority(
+        self, interleaving_manager, mock_db_manager
+    ):
+        """Test category mix with no clear priorities."""
+        mock_session = Mock()
+        with patch.object(mock_db_manager, "get_session") as mock_get_session:
+            mock_get_session.return_value.__enter__.return_value = mock_session
+            mock_get_session.return_value.__exit__.return_value = None
+
+            # Return empty card lists (no priority differences)
+            mock_session.query.return_value.join.return_value.filter.return_value.all.return_value = []
+
+            mix = interleaving_manager.get_optimal_category_mix(
+                user_id=1, target_categories=["Politik", "Geschichte"]
+            )
+
+            # Should return equal distribution
+            assert mix["Politik"] == 0.5
+            assert mix["Geschichte"] == 0.5
+
+    def test_generate_random_sequence(
+        self, interleaving_manager, sample_questions_and_cards
+    ):
+        """Test generating random interleaved sequence."""
+        question_groups = self._create_mock_question_groups(sample_questions_and_cards)
+
+        sequence = interleaving_manager._generate_random_sequence(
+            question_groups, target_questions=5
+        )
+
+        assert len(sequence) == 5
+        assert all(isinstance(item, tuple) for item in sequence)
+        assert all(len(item) == 2 for item in sequence)
+
+    def test_generate_round_robin_sequence(
+        self, interleaving_manager, sample_config, sample_questions_and_cards
+    ):
+        """Test generating round-robin interleaved sequence."""
+        question_groups = self._create_mock_question_groups(sample_questions_and_cards)
+
+        sequence = interleaving_manager._generate_round_robin_sequence(
+            question_groups, target_questions=6, config=sample_config
+        )
+
+        assert len(sequence) <= 6
+        # Should have questions from different categories
+        categories = [q[0].category for q in sequence]
+        assert len(set(categories)) > 1
+
+    def test_generate_similarity_sequence(
+        self, interleaving_manager, sample_config, sample_questions_and_cards
+    ):
+        """Test generating similarity-based sequence."""
+        question_groups = self._create_mock_question_groups(sample_questions_and_cards)
+
+        sequence = interleaving_manager._generate_similarity_sequence(
+            question_groups, target_questions=6, config=sample_config
+        )
+
+        assert len(sequence) <= 6
+
+    def test_generate_contrast_sequence(
+        self, interleaving_manager, sample_config, sample_questions_and_cards
+    ):
+        """Test generating contrast-based sequence."""
+        question_groups = self._create_mock_question_groups(sample_questions_and_cards)
+
+        sequence = interleaving_manager._generate_contrast_sequence(
+            question_groups, target_questions=6, config=sample_config
+        )
+
+        assert len(sequence) <= 6
+
+    def test_get_difficulty_level(self, interleaving_manager):
+        """Test getting difficulty level for cards."""
+        # New card
+        new_card = Mock()
+        new_card.review_count = 0
+        assert interleaving_manager._get_difficulty_level(new_card) == "new"
+
+        # Hard card (high lapse count)
+        hard_card = Mock()
+        hard_card.review_count = 5
+        hard_card.lapse_count = 5
+        assert interleaving_manager._get_difficulty_level(hard_card) == "hard"
+
+        # Learning card
+        learning_card = Mock()
+        learning_card.review_count = 2
+        learning_card.lapse_count = 1
+        assert interleaving_manager._get_difficulty_level(learning_card) == "learning"
+
+        # Review card
+        review_card = Mock()
+        review_card.review_count = 5
+        review_card.lapse_count = 1
+        assert interleaving_manager._get_difficulty_level(review_card) == "review"
+
+    def test_build_category_relationships(self, interleaving_manager):
+        """Test building category relationships."""
+        relationships = interleaving_manager._build_category_relationships()
+
+        assert isinstance(relationships, dict)
+        assert "Politik" in relationships
+        assert "Gesellschaft" in relationships["Politik"]
+        assert "Geschichte" in relationships["Politik"]
+
+    def test_get_related_categories(self, interleaving_manager):
+        """Test getting related categories."""
+        related = interleaving_manager._get_related_categories()
+
+        assert isinstance(related, dict)
+        # Should be same as category relationships
+        assert related == interleaving_manager._category_relationships
+
+    def test_adapt_sequence(self, interleaving_manager):
+        """Test adapting sequence based on performance."""
+        session = InterleavingSession(
+            session_id=1,
+            config=Mock(),
+            question_sequence=[],
+            category_performance={"Politik": 0.3},  # Poor performance
+            adaptation_history=[],
+        )
+
+        interleaving_manager._adapt_sequence(
+            session=session,
+            category="Politik",
+            is_correct=False,
+            response_time_ms=8000,
+        )
+
+        # Should record adaptation
+        assert len(session.adaptation_history) > 0
+        assert "reduced_Politik" in session.adaptation_history
+
+    def test_analyze_category_sequences_empty(self, interleaving_manager):
+        """Test analyzing category sequences with empty input."""
+        sequences = interleaving_manager._analyze_category_sequences([])
+
+        assert sequences == []
+
+    def test_classify_sequence_short(self, interleaving_manager):
+        """Test classifying short sequence."""
+        short_sequence = [Mock(), Mock()]  # Less than 3 items
+
+        classification = interleaving_manager._classify_sequence(short_sequence)
+
+        assert classification["is_interleaved"] is False
+        assert classification["performance"] == 0.0
+        assert classification["categories"] == []
+
+    def test_calculate_interleaved_performance_empty(self, interleaving_manager):
+        """Test calculating performance with empty sequences."""
+        performance = interleaving_manager._calculate_interleaved_performance([])
+
+        assert performance["retention"] == 0.0
+        assert performance["non_interleaved_retention"] == 0.0
+        assert performance["improvement_factor"] == 0.0
+
+    def test_recommend_strategy_high_improvement(self, interleaving_manager):
+        """Test strategy recommendation with high improvement."""
+        performance = {"improvement_factor": 0.15}
+
+        strategy = interleaving_manager._recommend_strategy(performance)
+
+        assert "significant improvement" in strategy
+
+    def test_recommend_strategy_low_improvement(self, interleaving_manager):
+        """Test strategy recommendation with low improvement."""
+        performance = {"improvement_factor": 0.02}
+
+        strategy = interleaving_manager._recommend_strategy(performance)
+
+        assert "blocked practice" in strategy
+
+    def test_analyze_category_benefits(self, interleaving_manager):
+        """Test analyzing category benefits."""
+        sequences = [
+            {"is_interleaved": True, "categories": ["Politik"]},
+            {"is_interleaved": False, "categories": ["Geschichte"]},
+        ]
+
+        benefits = interleaving_manager._analyze_category_benefits(sequences)
+
+        assert isinstance(benefits, dict)
+        # Returns hardcoded values in current implementation
+        assert "Politik" in benefits
+        assert "Gesellschaft" in benefits

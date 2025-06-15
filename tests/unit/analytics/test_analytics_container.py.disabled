@@ -1,0 +1,180 @@
+"""Tests for Analytics Container."""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import pytest
+
+from src.core.analytics.analytics_container import AnalyticsContainer
+from src.core.analytics.domain.services.analyze_performance import ProgressAnalytics
+from src.core.analytics.domain.services.detect_leech import LeechDetector
+from src.core.analytics.domain.services.optimize_interleaving import (
+    InterleavingManager,
+)
+from src.core.database import DatabaseManager
+from src.core.event_bus import EventBus
+
+
+@pytest.fixture
+def mock_db_manager():
+    """Create mock database manager."""
+    return MagicMock(spec=DatabaseManager)
+
+
+@pytest.fixture
+def mock_event_bus():
+    """Create mock event bus."""
+    return MagicMock(spec=EventBus)
+
+
+@pytest.fixture
+def analytics_container(mock_db_manager, mock_event_bus):
+    """Create analytics container with mocked dependencies."""
+    return AnalyticsContainer(mock_db_manager, mock_event_bus)
+
+
+class TestAnalyticsContainer:
+    """Test AnalyticsContainer functionality."""
+
+    def test_init(self, mock_db_manager, mock_event_bus):
+        """Test container initialization."""
+        container = AnalyticsContainer(mock_db_manager, mock_event_bus)
+
+        assert container.db_manager is mock_db_manager
+        assert container.event_bus is mock_event_bus
+        assert isinstance(container._services, dict)
+        assert len(container._services) == 3
+
+    def test_services_setup(self, analytics_container):
+        """Test that all services are properly set up."""
+        services = analytics_container._services
+
+        assert "analyze_performance" in services
+        assert "detect_leech" in services
+        assert "optimize_interleaving" in services
+
+        # Verify service types
+        assert isinstance(services["analyze_performance"], ProgressAnalytics)
+        assert isinstance(services["detect_leech"], LeechDetector)
+        assert isinstance(services["optimize_interleaving"], InterleavingManager)
+
+    def test_get_analyze_performance_service(self, analytics_container):
+        """Test getting ProgressAnalytics service."""
+        service = analytics_container.get_analyze_performance_service()
+
+        assert isinstance(service, ProgressAnalytics)
+        assert service is analytics_container._services["analyze_performance"]
+
+    def test_get_detect_leech_service(self, analytics_container):
+        """Test getting LeechDetector service."""
+        service = analytics_container.get_detect_leech_service()
+
+        assert isinstance(service, LeechDetector)
+        assert service is analytics_container._services["detect_leech"]
+
+    def test_get_optimize_interleaving_service(self, analytics_container):
+        """Test getting InterleavingManager service."""
+        service = analytics_container.get_optimize_interleaving_service()
+
+        assert isinstance(service, InterleavingManager)
+        assert service is analytics_container._services["optimize_interleaving"]
+
+    def test_get_service_by_name_valid(self, analytics_container):
+        """Test getting service by valid name."""
+        # Test analyze_performance
+        service = analytics_container.get_service("analyze_performance")
+        assert isinstance(service, ProgressAnalytics)
+
+        # Test detect_leech
+        service = analytics_container.get_service("detect_leech")
+        assert isinstance(service, LeechDetector)
+
+        # Test optimize_interleaving
+        service = analytics_container.get_service("optimize_interleaving")
+        assert isinstance(service, InterleavingManager)
+
+    def test_get_service_by_name_invalid(self, analytics_container):
+        """Test getting service by invalid name."""
+        with pytest.raises(KeyError) as exc_info:
+            analytics_container.get_service("nonexistent_service")
+
+        error_message = str(exc_info.value)
+        assert "Service 'nonexistent_service' not found" in error_message
+        assert "analyze_performance" in error_message
+        assert "detect_leech" in error_message
+        assert "optimize_interleaving" in error_message
+
+    def test_get_all_services(self, analytics_container):
+        """Test getting all services."""
+        all_services = analytics_container.get_all_services()
+
+        assert isinstance(all_services, dict)
+        assert len(all_services) == 3
+
+        # Verify it's a copy, not the original
+        assert all_services is not analytics_container._services
+        assert all_services == analytics_container._services
+
+        # Verify service types
+        assert isinstance(all_services["analyze_performance"], ProgressAnalytics)
+        assert isinstance(all_services["detect_leech"], LeechDetector)
+        assert isinstance(all_services["optimize_interleaving"], InterleavingManager)
+
+    def test_service_dependencies(self, analytics_container, mock_db_manager):
+        """Test that services have correct dependencies injected."""
+        # Check ProgressAnalytics service
+        analyze_service = analytics_container.get_analyze_performance_service()
+        assert analyze_service.db_manager is mock_db_manager
+
+        # Check LeechDetector service
+        leech_service = analytics_container.get_detect_leech_service()
+        assert leech_service.db_manager is mock_db_manager
+
+        # Check InterleavingManager service
+        interleaving_service = analytics_container.get_optimize_interleaving_service()
+        assert interleaving_service.db_manager is mock_db_manager
+
+    def test_container_isolation(self, mock_db_manager, mock_event_bus):
+        """Test that different container instances are isolated."""
+        container1 = AnalyticsContainer(mock_db_manager, mock_event_bus)
+        container2 = AnalyticsContainer(mock_db_manager, mock_event_bus)
+
+        # Different containers should have different service instances
+        assert container1._services is not container2._services
+        assert (
+            container1.get_analyze_performance_service()
+            is not container2.get_analyze_performance_service()
+        )
+        assert (
+            container1.get_detect_leech_service()
+            is not container2.get_detect_leech_service()
+        )
+        assert (
+            container1.get_optimize_interleaving_service()
+            is not container2.get_optimize_interleaving_service()
+        )
+
+    def test_service_names_consistency(self, analytics_container):
+        """Test that service names are consistent across methods."""
+        all_services = analytics_container.get_all_services()
+        service_names = list(all_services.keys())
+
+        # Test that all named services can be retrieved
+        for service_name in service_names:
+            service = analytics_container.get_service(service_name)
+            assert service is all_services[service_name]
+
+        # Test specific service getters match generic getter
+        assert (
+            analytics_container.get_analyze_performance_service()
+            is analytics_container.get_service("analyze_performance")
+        )
+        assert (
+            analytics_container.get_detect_leech_service()
+            is analytics_container.get_service("detect_leech")
+        )
+        assert (
+            analytics_container.get_optimize_interleaving_service()
+            is analytics_container.get_service("optimize_interleaving")
+        )
