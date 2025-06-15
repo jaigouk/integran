@@ -4,7 +4,10 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
 
+
+@pytest.mark.external_api
 def test_single_question():
     """Test single question extraction workflow with mocked Gemini API.
 
@@ -41,7 +44,7 @@ def test_single_question():
     mock_response.text = json.dumps(mock_response_data)
 
     # Mock the Gemini client initialization and API call
-    with patch("src.direct_pdf_processor.genai.Client") as MockClient:
+    with patch("google.genai.Client") as MockClient:
         # Set up the mock client
         mock_client_instance = MagicMock()
         mock_client_instance.models.generate_content.return_value = mock_response
@@ -49,7 +52,7 @@ def test_single_question():
 
         # Also mock the PDF loading to avoid file I/O
         with patch(
-            "src.direct_pdf_processor.DirectPDFProcessor.load_pdf_as_base64"
+            "src.infrastructure.processors.pdf_processor.DirectPDFProcessor.load_pdf_as_base64"
         ) as mock_load_pdf:
             # Return a valid base64 string (empty PDF)
             mock_load_pdf.return_value = (
@@ -57,7 +60,7 @@ def test_single_question():
             )
 
             # Import and create processor
-            from src.direct_pdf_processor import DirectPDFProcessor
+            from src.infrastructure.processors.pdf_processor import DirectPDFProcessor
 
             processor = DirectPDFProcessor()
 
@@ -89,6 +92,7 @@ def test_single_question():
             assert not question["is_image_question"], "Should not be an image question"
 
 
+@pytest.mark.external_api
 def test_batch_processing_integration():
     """Test the batch processing integration with mocked API."""
     # Mock multiple questions for batch processing
@@ -127,13 +131,17 @@ def test_batch_processing_integration():
     mock_response = MagicMock()
     mock_response.text = json.dumps(mock_response_data)
 
-    with patch("src.direct_pdf_processor.genai.Client") as MockClient:
+    with patch(
+        "src.infrastructure.processors.pdf_processor.genai.Client"
+    ) as MockClient:
         mock_client_instance = MagicMock()
         mock_client_instance.models.generate_content.return_value = mock_response
         MockClient.return_value = mock_client_instance
 
-        with patch("src.direct_pdf_processor.DirectPDFProcessor.load_pdf_as_base64"):
-            from src.direct_pdf_processor import DirectPDFProcessor
+        with patch(
+            "src.infrastructure.processors.pdf_processor.DirectPDFProcessor.load_pdf_as_base64"
+        ):
+            from src.infrastructure.processors.pdf_processor import DirectPDFProcessor
 
             processor = DirectPDFProcessor()
 

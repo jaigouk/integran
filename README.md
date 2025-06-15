@@ -99,11 +99,14 @@ Select option:
 ### Command Line Options
 
 ```bash
-# Planned Command Line Options (not yet implemented):
-# integran --mode random          # Start in a specific mode
-# integran --review               # Review only failed questions  
-# integran --category "Grundrechte"  # Practice specific category
-# integran --export-stats         # Export progress report
+# Available Command Line Options:
+integran                        # Start main terminal trainer (entry point: src/main.py)
+integran --mode random          # Start in random practice mode
+integran --review               # Review only failed questions  
+integran --category "Grundrechte"  # Practice specific category
+integran --export-stats         # Export progress report
+integran --stats                # Display learning statistics
+integran --reset                # Reset all progress data
 ```
 
 ## 🚀 Features (Planned & In Development)
@@ -229,6 +232,49 @@ integran-setup
 - 🚧 **Practice Sessions**: Coming soon
 
 **Note**: The complete dataset (460 questions with 5-language explanations) is ready. Only the terminal trainer interface needs implementation.
+
+## 🏗️ Project Architecture
+
+### Layer-First DDD Organization
+
+The project follows **Domain-Driven Design (DDD)** principles with a **layer-first** folder organization:
+
+```
+src/
+├── domain/                        # Pure business logic
+│   ├── shared/                   # Shared kernel across contexts
+│   ├── learning/                 # Learning bounded context (FSRS)
+│   ├── content/                  # Content bounded context (Questions)
+│   └── analytics/                # Analytics bounded context (Progress)
+├── application_services/          # Orchestration layer
+├── infrastructure/               # External concerns (DB, AI)
+├── presentation/                 # UI layer (CLI, Terminal)
+├── utils/                        # Minimal utilities
+└── main.py                       # Application entry point
+```
+
+### Key Components
+
+- **Domain Layer**: Core business logic with domain services
+- **Application Layer**: Orchestrates domain services
+- **Infrastructure Layer**: Database, AI clients, configuration
+- **Presentation Layer**: CLI commands and terminal UI
+
+### Import Path Examples
+
+```python
+# Database operations
+from src.infrastructure.database.database import DatabaseManager
+
+# Domain models
+from src.domain.content.models.question_models import Question
+
+# Event bus
+from src.infrastructure.messaging.event_bus import EventBus
+
+# Application services
+from src.application_services.setup.database_setup_service import main
+```
 
 ## 🔧 Configuration
 

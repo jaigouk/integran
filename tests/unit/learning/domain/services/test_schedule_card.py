@@ -17,21 +17,20 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.core.database import DatabaseManager
-from src.core.domain_service import ValidationError
-from src.core.event_bus import EventBus
-from src.core.learning.domain.events.card_events import CardScheduledEvent
-from src.core.learning.domain.services.schedule_card import (
+from src.domain.learning.events.card_events import CardScheduledEvent
+from src.domain.learning.models.learning_models import (
+    FSRSCard,
+    FSRSParameters,
+)
+from src.domain.learning.services.schedule_card import (
     ScheduleCard,
     ScheduleCardRequest,
     ScheduleCardResult,
 )
-from src.core.models import (
-    FSRSCard,
-    FSRSParameters,
-    FSRSRating,
-    FSRSState,
-)
+from src.domain.shared.models import FSRSRating, FSRSState
+from src.domain.shared.services import ValidationError
+from src.infrastructure.database.database import DatabaseManager
+from src.infrastructure.messaging.event_bus import EventBus
 
 
 class TestScheduleCardRequest:

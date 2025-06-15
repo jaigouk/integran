@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from src.core.settings import get_settings
+from src.infrastructure.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 

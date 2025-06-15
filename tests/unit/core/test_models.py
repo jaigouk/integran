@@ -7,15 +7,13 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from src.core.models import (
-    AnswerStatus,
-    Difficulty,
-    PracticeMode,
+from src.domain.content.models.question_models import (
     Question,
     QuestionData,
     QuestionResult,
     SessionStats,
 )
+from src.domain.shared.models import AnswerStatus, Difficulty, PracticeMode
 
 
 class TestEnums:
@@ -194,3 +192,147 @@ class TestDataClasses:
         assert stats.accuracy == 0.0
         assert stats.average_time == 0.0
         assert stats.categories_practiced == []
+
+
+class TestFSRSParameters:
+    """Test FSRSParameters model."""
+
+    def test_fsrs_parameters_defaults(self) -> None:
+        """Test FSRSParameters default values."""
+        from src.domain.learning.models.learning_models import FSRSParameters
+
+        params = FSRSParameters()
+
+        # Test default weights
+        assert len(params.w) == 19
+        assert params.w[0] == 0.5701  # First weight in the default list
+
+        # Test other defaults
+        assert params.request_retention == 0.9
+        assert params.maximum_interval == 36500  # 100 years
+
+    def test_fsrs_parameters_custom_values(self) -> None:
+        """Test FSRSParameters with custom values."""
+        from src.domain.learning.models.learning_models import FSRSParameters
+
+        custom_weights = [0.5] * 19
+        params = FSRSParameters(
+            w=custom_weights,
+        )
+
+        assert params.w == custom_weights
+        assert params.request_retention == 0.9  # Property always returns 0.9
+        assert params.maximum_interval == 36500  # Property always returns 36500
+
+
+class TestAdditionalModelFeatures:
+    """Test additional model features for improved coverage."""
+
+    def test_enum_string_representations(self) -> None:
+        """Test enum string representations."""
+        assert str(Difficulty.EASY) == "Difficulty.EASY"
+        assert str(PracticeMode.RANDOM) == "PracticeMode.RANDOM"
+        assert str(AnswerStatus.CORRECT) == "AnswerStatus.CORRECT"
+
+    def test_enum_equality(self) -> None:
+        """Test enum equality comparisons."""
+        assert Difficulty.EASY == Difficulty.EASY
+        assert Difficulty.EASY != Difficulty.HARD
+        assert PracticeMode.RANDOM != PracticeMode.SEQUENTIAL
+
+    def test_question_data_json_serialization(self) -> None:
+        """Test QuestionData JSON serialization."""
+        data = QuestionData(
+            id=1,
+            question="Test question?",
+            options=["A", "B", "C", "D"],
+            correct="A",
+            category="Test",
+            difficulty=Difficulty.EASY,
+        )
+
+        # Should be able to convert to dict
+        dict_data = data.model_dump()
+        assert dict_data["id"] == 1
+        assert dict_data["question"] == "Test question?"
+        assert dict_data["difficulty"] == "easy"
+
+    def test_question_result_creation(self) -> None:
+        """Test QuestionResult creation with all fields."""
+        result = QuestionResult(
+            question_id=1,
+            user_answer="A",
+            correct_answer="A",
+            time_taken=2.5,
+            status=AnswerStatus.CORRECT,
+            category="Politics",
+            has_images=True,
+            selected_language="de",
+        )
+
+        assert result.question_id == 1
+        assert result.user_answer == "A"
+        assert result.correct_answer == "A"
+        assert result.time_taken == 2.5
+        assert result.status == AnswerStatus.CORRECT
+        assert result.category == "Politics"
+        assert result.has_images is True
+        assert result.selected_language == "de"
+
+    def test_session_stats_calculations(self) -> None:
+        """Test SessionStats calculations and properties."""
+        stats = SessionStats(
+            total_questions=10,
+            correct_answers=8,
+            incorrect_answers=2,
+            skipped=0,
+            accuracy=80.0,
+            average_time=3.5,
+            categories_practiced=["Politik", "Geschichte"],
+        )
+
+        assert stats.total_questions == 10
+        assert stats.correct_answers == 8
+        assert stats.incorrect_answers == 2
+        assert stats.accuracy == 80.0
+        assert len(stats.categories_practiced) == 2
+        assert "Politik" in stats.categories_practiced
+
+    def test_question_model_with_all_fields(self) -> None:
+        """Test Question model with all optional fields."""
+        import json
+
+        from src.domain.content.models.question_models import Question
+
+        # Use actual Question model fields
+        question = Question(
+            id=1,
+            question="Test question?",
+            options=json.dumps(["A", "B", "C", "D"]),
+            correct="A",
+            category="Test Category",
+            difficulty="medium",
+            question_type="general",
+            state="Bayern",
+            page_number=42,
+            is_image_question=1,
+            images_data=json.dumps([{"path": "test.jpg", "description": "test image"}]),
+            multilingual_answers=json.dumps(
+                {"en": {"explanation": "Test explanation"}}
+            ),
+            rag_sources=json.dumps(["source1", "source2"]),
+        )
+
+        assert question.id == 1
+        assert question.question == "Test question?"
+        assert json.loads(question.options) == ["A", "B", "C", "D"]
+        assert question.correct == "A"
+        assert question.category == "Test Category"
+        assert question.difficulty == "medium"
+        assert question.question_type == "general"
+        assert question.state == "Bayern"
+        assert question.page_number == 42
+        assert question.is_image_question == 1
+        assert json.loads(question.images_data)[0]["path"] == "test.jpg"
+        assert "en" in json.loads(question.multilingual_answers)
+        assert json.loads(question.rag_sources) == ["source1", "source2"]

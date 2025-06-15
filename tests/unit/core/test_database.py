@@ -10,19 +10,19 @@ from pathlib import Path
 import pytest
 from sqlalchemy import inspect
 
-from src.core.database import DatabaseManager
-from src.core.models import (
-    AnswerStatus,
+from src.domain.analytics.models.analytics_models import (
     CategoryProgress,
+    UserProgress,
+)
+from src.domain.content.models.question_models import Question, QuestionAttempt
+from src.domain.learning.models.learning_models import (
     FSRSCard,
     LearningData,
     LearningSession,
-    PracticeMode,
-    Question,
-    QuestionAttempt,
     ReviewHistory,
-    UserProgress,
 )
+from src.domain.shared.models import AnswerStatus, PracticeMode
+from src.infrastructure.database.database import DatabaseManager
 
 
 @pytest.fixture
@@ -413,7 +413,7 @@ class TestDatabaseManager:
 
         # Verify categories were populated
         with db_manager.get_session() as session:
-            from src.core.models import Category
+            from src.domain.analytics.models.analytics_models import Category
 
             categories = session.query(Category).all()
             assert len(categories) >= 3  # Geography, History, Language
