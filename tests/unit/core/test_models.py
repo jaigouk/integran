@@ -232,7 +232,7 @@ class TestAdditionalModelFeatures:
         """Test enum string representations."""
         assert str(Difficulty.EASY) == "Difficulty.EASY"
         assert str(PracticeMode.RANDOM) == "PracticeMode.RANDOM"
-        assert str(AnswerStatus.CORRECT) == "AnswerStatus.CORRECT"
+        assert str(AnswerStatus.CORRECT) == "correct"
 
     def test_enum_equality(self) -> None:
         """Test enum equality comparisons."""

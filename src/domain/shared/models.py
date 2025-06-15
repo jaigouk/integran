@@ -37,6 +37,10 @@ class AnswerStatus(str, Enum):
     INCORRECT = "incorrect"
     SKIPPED = "skipped"
 
+    def __str__(self) -> str:
+        """Return the string value."""
+        return self.value
+
 
 class FSRSState(int, Enum):
     """FSRS card learning states."""
