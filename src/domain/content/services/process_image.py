@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from pathlib import Path
+from typing import Any
 
 from src.domain.content.events.content_events import (
     ContentGenerationFailedEvent,
@@ -40,17 +41,27 @@ class ProcessImage(DomainService[ImageProcessingRequest, ImageProcessingResult])
         """Initialize the image processing service."""
         super().__init__(event_bus)
 
-        if not GENAI_AVAILABLE:
-            raise ImportError(
-                "google-genai package is required for image processing. "
-                "Install with: pip install google-genai"
-            )
-
         settings = get_settings()
         self.project_id = settings.gcp_project_id
         self.region = settings.gcp_region
         self.model_id = settings.gemini_model
         self.use_vertex_ai = settings.use_vertex_ai
+        self.client: Any | None = None  # Initialize lazily when needed
+
+        logger.debug(
+            "ProcessImage service initialized (credentials will be checked when used)"
+        )
+
+    def _ensure_client_initialized(self) -> None:
+        """Initialize the Gemini client if not already done."""
+        if self.client is not None:
+            return
+
+        if not GENAI_AVAILABLE:
+            raise ImportError(
+                "google-genai package is required for image processing. "
+                "Install with: pip install google-genai"
+            )
 
         # Initialize Gemini client
         if self.use_vertex_ai:
@@ -63,6 +74,7 @@ class ProcessImage(DomainService[ImageProcessingRequest, ImageProcessingResult])
                 location="global",
             )
         else:
+            settings = get_settings()
             self.api_key = settings.gemini_api_key
             if not self.api_key:
                 raise ValueError("GEMINI_API_KEY is required")
@@ -176,6 +188,8 @@ Focus on details that would help someone answer exam questions about German symb
 
     async def _simulate_async_vision_call(self, image_data: bytes, prompt: str) -> str:
         """Simulate async vision API call."""
+        self._ensure_client_initialized()
+
         # Prepare the request
         image_part = types.Part.from_bytes(data=image_data, mime_type="image/png")
         text_part = types.Part.from_text(text=prompt)
@@ -189,9 +203,12 @@ Focus on details that would help someone answer exam questions about German symb
         )
 
         # Make API call
+        assert (
+            self.client is not None
+        )  # Type guard: _ensure_client_initialized guarantees this
         response = self.client.models.generate_content(
             model=self.model_id,
-            contents=contents,  # type: ignore[arg-type]
+            contents=contents,
             config=generate_config,
         )
 

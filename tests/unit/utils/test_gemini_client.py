@@ -32,17 +32,26 @@ class TestGeminiClient:
 
         assert client.project_id == "test-project"
         assert client.use_vertex_ai is True
+
+        # Client should be lazily initialized, not during __init__
+        mock_genai.Client.assert_not_called()
+
+        # Now trigger client initialization
+        client._ensure_client_initialized()
+
         mock_genai.Client.assert_called_once_with(
             vertexai=True, project="test-project", location="global"
         )
 
     def test_init_genai_not_available(self):
         """Test initialization fails when genai is not available."""
-        with (
-            patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", False),
-            pytest.raises(ImportError, match="google-genai package is required"),
-        ):
-            GeminiClient()
+        with patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", False):
+            # Client initialization should succeed
+            client = GeminiClient()
+
+            # But attempting to use it should raise ImportError
+            with pytest.raises(ImportError, match="google-genai package is required"):
+                client._ensure_client_initialized()
 
     @patch("src.infrastructure.external.gemini_client.GENAI_AVAILABLE", True)
     @patch("src.infrastructure.external.gemini_client.time.sleep")

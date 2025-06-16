@@ -80,7 +80,7 @@ class TestSettings:
             os.environ,
             {
                 "USE_VERTEX_AI": "true",
-                "GCP_PROJECT_ID": "test-project",
+                "GCP_PROJECT_ID": "my-gcp-project-123",
                 "GOOGLE_APPLICATION_CREDENTIALS": "/path/to/creds.json",
             },
         ):
@@ -92,8 +92,8 @@ class TestSettings:
             os.environ,
             {
                 "USE_VERTEX_AI": "false",
-                "GCP_PROJECT_ID": "test-project",
-                "GEMINI_API_KEY": "test-key",
+                "GCP_PROJECT_ID": "my-gcp-project-123",
+                "GEMINI_API_KEY": "sk-actual-api-key-123",
             },
         ):
             assert has_gemini_config() is True
@@ -326,7 +326,7 @@ class TestAdvancedGeminiConfig:
     def test_vertex_ai_with_default_credentials(self):
         """Test Vertex AI with default application credentials."""
         env_vars = {
-            "GCP_PROJECT_ID": "test-project",
+            "GCP_PROJECT_ID": "my-real-project-456",
             "USE_VERTEX_AI": "true",
             # No GOOGLE_APPLICATION_CREDENTIALS set
         }
@@ -407,7 +407,7 @@ class TestAdvancedGeminiConfig:
         """Test that whitespace-only values are treated as valid."""
         env_vars = {
             "GEMINI_API_KEY": "   ",  # Whitespace only
-            "GCP_PROJECT_ID": "test-project",
+            "GCP_PROJECT_ID": "my-valid-project-789",
             "USE_VERTEX_AI": "false",
         }
 

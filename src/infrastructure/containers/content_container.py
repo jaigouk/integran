@@ -24,19 +24,12 @@ class ContentContainer:
         # Initialize repository
         self._repository = ContentRepository()
 
-        # Initialize domain services
-        self._generate_answer = GenerateAnswer(event_bus=self._event_bus)
-        self._process_image = ProcessImage(event_bus=self._event_bus)
-        self._create_image_mapping = CreateImageMapping(event_bus=self._event_bus)
-        self._build_dataset = BuildDataset(
-            event_bus=self._event_bus,
-            repository=self._repository,
-        )
-
-        # Initialize application service (thin coordinator)
-        self._content_builder = DatasetBuildWorkflow(
-            build_dataset_service=self._build_dataset,
-        )
+        # Lazy initialization for Gemini-dependent services
+        self._generate_answer: GenerateAnswer | None = None
+        self._process_image: ProcessImage | None = None
+        self._create_image_mapping: CreateImageMapping | None = None
+        self._build_dataset: BuildDataset | None = None
+        self._content_builder: DatasetBuildWorkflow | None = None
 
     def get_event_bus(self) -> EventBus:
         """Get the event bus instance."""
@@ -47,17 +40,43 @@ class ContentContainer:
         return self._repository
 
     def get_generate_answer_service(self) -> GenerateAnswer:
-        """Get the GenerateAnswer domain service."""
+        """Get the GenerateAnswer domain service (lazy initialization)."""
+        if self._generate_answer is None:
+            self._generate_answer = GenerateAnswer(event_bus=self._event_bus)
         return self._generate_answer
 
     def get_process_image_service(self) -> ProcessImage:
-        """Get the ProcessImage domain service."""
+        """Get the ProcessImage domain service (lazy initialization)."""
+        if self._process_image is None:
+            self._process_image = ProcessImage(event_bus=self._event_bus)
         return self._process_image
 
     def get_create_image_mapping_service(self) -> CreateImageMapping:
-        """Get the CreateImageMapping domain service."""
+        """Get the CreateImageMapping domain service (lazy initialization)."""
+        if self._create_image_mapping is None:
+            self._create_image_mapping = CreateImageMapping(event_bus=self._event_bus)
         return self._create_image_mapping
 
+    def get_build_dataset_service(self) -> BuildDataset:
+        """Get the BuildDataset domain service (lazy initialization)."""
+        if self._build_dataset is None:
+            # Don't instantiate the Gemini services here - let BuildDataset do lazy initialization
+            self._build_dataset = BuildDataset(
+                event_bus=self._event_bus,
+                repository=self._repository,
+                # Pass None for Gemini services to enable lazy initialization
+                generate_answer=None,
+                process_image=None,
+                create_mapping=None,
+            )
+        return self._build_dataset
+
     def get_content_builder_service(self) -> DatasetBuildWorkflow:
-        """Get the ContentBuilderService application service."""
+        """Get the ContentBuilderService application service (lazy initialization)."""
+        if self._content_builder is None:
+            # Use the getter method to ensure proper lazy initialization
+            build_dataset_service = self.get_build_dataset_service()
+            self._content_builder = DatasetBuildWorkflow(
+                build_dataset_service=build_dataset_service,
+            )
         return self._content_builder

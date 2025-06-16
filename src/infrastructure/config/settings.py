@@ -85,20 +85,44 @@ def get_settings() -> Settings:
 
 
 def has_gemini_config() -> bool:
-    """Check if Gemini API configuration is available."""
+    """Check if Gemini API configuration is available and valid."""
     settings = get_settings()
+
+    # Check for test/placeholder values that shouldn't be considered valid
+    test_values = {
+        "test-project",
+        "test-api-key",
+        "fake-project",
+        "fake-api-key",
+        "placeholder",
+        "your-project-id",
+        "your-api-key",
+    }
+
     if settings.use_vertex_ai:
         # For Vertex AI, we need project ID and either credentials file or default auth
+        project_id = settings.gcp_project_id
+        credentials_file = settings.google_application_credentials or os.getenv(
+            "GOOGLE_APPLICATION_CREDENTIALS"
+        )
+
         return bool(
-            settings.gcp_project_id
-            and (
-                settings.google_application_credentials
-                or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-            )
+            project_id
+            and project_id not in test_values
+            and credentials_file
+            and credentials_file not in test_values
         )
     else:
         # For API key auth, we need API key and project ID
-        return bool(settings.gemini_api_key and settings.gcp_project_id)
+        project_id = settings.gcp_project_id
+        api_key = settings.gemini_api_key
+
+        return bool(
+            project_id
+            and project_id not in test_values
+            and api_key
+            and api_key not in test_values
+        )
 
 
 # has_rag_config function removed as RAG was not used in final dataset generation

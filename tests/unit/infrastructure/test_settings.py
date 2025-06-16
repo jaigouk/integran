@@ -60,7 +60,7 @@ class TestSettings:
     @patch.dict(
         os.environ,
         {
-            "GCP_PROJECT_ID": "test-project",
+            "GCP_PROJECT_ID": "my-actual-project-123",
             "GOOGLE_APPLICATION_CREDENTIALS": "/path/to/creds.json",
             "USE_VERTEX_AI": "true",
         },
@@ -89,8 +89,8 @@ class TestSettings:
     @patch.dict(
         os.environ,
         {
-            "GEMINI_API_KEY": "test-key",
-            "GCP_PROJECT_ID": "test-project",
+            "GEMINI_API_KEY": "valid-api-key-123",
+            "GCP_PROJECT_ID": "valid-project-123",
             "USE_VERTEX_AI": "false",
         },
     )

@@ -24,12 +24,6 @@ class GeminiClient:
     """Direct wrapper for Google Gemini AI client."""
 
     def __init__(self, settings: Settings | None = None):
-        if not GENAI_AVAILABLE:
-            raise ImportError(
-                "google-genai package is required for Gemini AI. "
-                "Install with: pip install google-genai"
-            )
-
         if settings is None:
             settings = get_settings()
 
@@ -38,8 +32,22 @@ class GeminiClient:
         self.region = settings.gcp_region
         self.model_id = settings.gemini_model
         self.use_vertex_ai = settings.use_vertex_ai
+        self.client: Any | None = None  # Initialize lazily
 
-        # Initialize client
+        logger.debug(f"Gemini client configured with model: {self.model_id}")
+
+    def _ensure_client_initialized(self) -> None:
+        """Initialize the Gemini client if not already done."""
+        if self.client is not None:
+            return
+
+        if not GENAI_AVAILABLE:
+            raise ImportError(
+                "google-genai package is required for Gemini AI. "
+                "Install with: pip install google-genai"
+            )
+
+        # Initialize client based on auth method
         if self.use_vertex_ai:
             if not self.project_id:
                 raise ValueError("GCP_PROJECT_ID is required for Vertex AI")
@@ -50,7 +58,7 @@ class GeminiClient:
                 location="global",
             )
         else:
-            self.api_key = settings.gemini_api_key
+            self.api_key = self.settings.gemini_api_key
             if not self.api_key:
                 raise ValueError("GEMINI_API_KEY is required")
 
@@ -67,6 +75,7 @@ class GeminiClient:
         retry_delay: int = 30,
     ) -> str:
         """Generate text response from prompt."""
+        self._ensure_client_initialized()
 
         # Prepare content
         text_part = types.Part.from_text(text=prompt)
@@ -123,6 +132,7 @@ class GeminiClient:
         max_retries: int = 3,
     ) -> dict[str, Any]:
         """Generate structured JSON response."""
+        self._ensure_client_initialized()
 
         # Prepare content
         text_part = types.Part.from_text(text=prompt)
@@ -212,6 +222,7 @@ class GeminiClient:
         temperature: float = 0.3,
     ) -> str:
         """Generate response with context (for RAG)."""
+        self._ensure_client_initialized()
 
         # Build the prompt with context
         prompt = f"{system_prompt}\n\n" if system_prompt else ""
@@ -231,6 +242,7 @@ Bitte beantworte die Frage basierend auf dem gegebenen Kontext. Gib eine klare, 
         self, text: str, max_length: int = 500, language: str = "German"
     ) -> str:
         """Summarize a piece of text."""
+        self._ensure_client_initialized()
 
         prompt = f"""Fasse den folgenden Text in {language} zusammen. Die Zusammenfassung sollte maximal {max_length} Zeichen lang sein und die wichtigsten Punkte enthalten.
 
@@ -247,6 +259,7 @@ Zusammenfassung:"""
 
     def extract_key_concepts(self, text: str, max_concepts: int = 10) -> list[str]:
         """Extract key concepts from text."""
+        self._ensure_client_initialized()
 
         prompt = f"""Extrahiere bis zu {max_concepts} wichtige Konzepte oder Schlüsselbegriffe aus dem folgenden Text. Gib sie als Liste zurück, einen Begriff pro Zeile.
 
@@ -274,6 +287,7 @@ Wichtige Konzepte:"""
         self, query: str, document: str, threshold: float = 0.5
     ) -> bool:
         """Check if a document is relevant to a query."""
+        self._ensure_client_initialized()
 
         prompt = f"""Bewerte auf einer Skala von 0.0 bis 1.0, wie relevant das folgende Dokument für die gegebene Frage ist.
 

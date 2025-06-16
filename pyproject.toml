@@ -66,7 +66,7 @@ all = [
 
 [project.scripts]
 integran = "src.main:main"
-integran-setup = "src.application_services.setup.database_setup_service:main"
+integran-setup = "src.application.setup.database_setup_service:main"
 integran-direct-extract = "src.presentation.cli.direct_extract:main"
 
 [project.urls]

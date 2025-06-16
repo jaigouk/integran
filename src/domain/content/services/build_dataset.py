@@ -135,20 +135,47 @@ class BuildDataset(
         self,
         repository: ContentRepository,
         event_bus: EventBus,
+        generate_answer: GenerateAnswer | None = None,
+        process_image: ProcessImage | None = None,
+        create_mapping: CreateImageMapping | None = None,
     ) -> None:
         """Initialize the dataset building domain service.
 
         Args:
             repository: Content repository for data persistence
             event_bus: Event bus for publishing domain events
+            generate_answer: Optional GenerateAnswer service (for dependency injection)
+            process_image: Optional ProcessImage service (for dependency injection)
+            create_mapping: Optional CreateImageMapping service (for dependency injection)
         """
         super().__init__(event_bus)
         self.repository = repository
 
-        # Initialize dependent domain services
-        self.generate_answer = GenerateAnswer(event_bus)
-        self.process_image = ProcessImage(event_bus)
-        self.create_mapping = CreateImageMapping(event_bus)
+        # Use provided services or lazy initialization
+        self._generate_answer = generate_answer
+        self._process_image = process_image
+        self._create_mapping = create_mapping
+
+    @property
+    def generate_answer(self) -> GenerateAnswer:
+        """Get GenerateAnswer service with lazy initialization."""
+        if self._generate_answer is None:
+            self._generate_answer = GenerateAnswer(self.event_bus)
+        return self._generate_answer
+
+    @property
+    def process_image(self) -> ProcessImage:
+        """Get ProcessImage service with lazy initialization."""
+        if self._process_image is None:
+            self._process_image = ProcessImage(self.event_bus)
+        return self._process_image
+
+    @property
+    def create_mapping(self) -> CreateImageMapping:
+        """Get CreateImageMapping service with lazy initialization."""
+        if self._create_mapping is None:
+            self._create_mapping = CreateImageMapping(self.event_bus)
+        return self._create_mapping
 
     @log_domain_operation
     async def call(
