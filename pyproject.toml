@@ -143,6 +143,7 @@ module = [
     "pymupdf.*",
     "textual.*",
     "rich.*",
+    "yaml",
 ]
 ignore_missing_imports = true
 
