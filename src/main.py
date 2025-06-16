@@ -79,10 +79,10 @@ def main(
             return
 
         # Check if questions are loaded
-        questions_file = Path("data/questions.json")
+        questions_file = Path("data/final_dataset.json")
         if not questions_file.exists():
             console.print(
-                "[red]Error: Questions file not found at data/questions.json[/red]"
+                "[red]Error: Questions file not found at data/final_dataset.json[/red]"
             )
             console.print(
                 "[yellow]Please run 'integran-setup' first to initialize the database.[/yellow]"

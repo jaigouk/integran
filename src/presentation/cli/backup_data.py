@@ -46,8 +46,7 @@ def backup(suffix: str | None, include_explanations: bool) -> None:
     console.print(f"[blue]Creating backups with suffix: {suffix}[/blue]")
 
     files_to_backup = [
-        Path("data/questions.csv"),
-        Path("data/questions.json"),
+        Path("data/final_dataset.json"),
     ]
 
     if include_explanations:
@@ -91,8 +90,7 @@ def restore(suffix: str, dry_run: bool) -> None:
     console.print(f"[blue]Looking for backups with suffix: {suffix}[/blue]")
 
     files_to_restore = [
-        ("questions.csv", Path("data/questions.csv")),
-        ("questions.json", Path("data/questions.json")),
+        ("final_dataset.json", Path("data/final_dataset.json")),
         ("explanations.json", Path("data/explanations.json")),
     ]
 

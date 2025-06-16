@@ -22,7 +22,7 @@ def ensure_questions_available() -> Path:
 
     # Check for fallback files in order of preference
     fallback_paths = [
-        Path("data/questions.json"),  # Legacy format
+        Path("data/final_dataset.json"),  # Current format
         Path("data/direct_extraction_checkpoint.json"),  # Raw extraction
     ]
 

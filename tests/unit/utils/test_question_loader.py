@@ -74,12 +74,18 @@ class TestQuestionLoader:
             assert "Using existing questions file" in log_message
 
     @patch("src.utils.question_loader.get_settings")
-    def test_path_construction(self, mock_get_settings):
+    @patch("src.utils.question_loader.Path")
+    def test_path_construction(self, mock_path_class, mock_get_settings):
         """Test that Path objects are constructed correctly."""
         # Mock settings
         mock_settings = Mock()
         mock_settings.questions_json_path = "test/path/questions.json"
         mock_get_settings.return_value = mock_settings
+
+        # Mock all paths to not exist
+        mock_path = Mock()
+        mock_path.exists.return_value = False
+        mock_path_class.return_value = mock_path
 
         # This will fail because files don't exist, but we can verify Path construction
         with pytest.raises(FileNotFoundError):

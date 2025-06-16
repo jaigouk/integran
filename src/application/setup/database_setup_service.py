@@ -77,7 +77,7 @@ async def main_async(force: bool, questions_file: Path | None, language: str) ->
                 console.print(str(e))
 
                 if click.confirm("Do you want to create a sample questions file?"):
-                    questions_file = Path("data/questions.json")
+                    questions_file = Path("data/sample_questions.json")
                     _create_sample_questions(questions_file)
                     console.print(
                         f"[green]✅ Sample questions created at {questions_file}[/green]"

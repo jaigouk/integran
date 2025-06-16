@@ -54,12 +54,16 @@ class TestQuestionLoader:
         # Mock Path behavior
         mock_json_path = MagicMock()
         mock_json_path.exists.return_value = False
+        mock_final_dataset_path = MagicMock()
+        mock_final_dataset_path.exists.return_value = False
         mock_checkpoint_path = MagicMock()
         mock_checkpoint_path.exists.return_value = False
 
         def path_side_effect(path_str):
             if "questions.json" in str(path_str):
                 return mock_json_path
+            elif "final_dataset.json" in str(path_str):
+                return mock_final_dataset_path
             elif "checkpoint" in str(path_str):
                 return mock_checkpoint_path
             return MagicMock()

@@ -238,7 +238,6 @@ class TestAdvancedSettings:
             USE_VERTEX_AI=False,
             INTEGRAN_DATABASE_PATH="test.db",
             INTEGRAN_QUESTIONS_JSON_PATH="test.json",
-            INTEGRAN_QUESTIONS_CSV_PATH="test.csv",
             INTEGRAN_PDF_PATH="test.pdf",
             INTEGRAN_MAX_DAILY_QUESTIONS=25,
             INTEGRAN_SHOW_EXPLANATIONS=False,
@@ -260,7 +259,6 @@ class TestAdvancedSettings:
         assert settings.use_vertex_ai is False
         assert settings.database_path == "test.db"
         assert settings.questions_json_path == "test.json"
-        assert settings.questions_csv_path == "test.csv"
         assert settings.pdf_path == "test.pdf"
         assert settings.max_daily_questions == 25
         assert settings.show_explanations is False

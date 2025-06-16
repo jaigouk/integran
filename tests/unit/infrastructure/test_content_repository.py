@@ -35,7 +35,7 @@ class TestContentRepository:
         assert repo.data_dir == Path("data")
         assert repo.checkpoint_file == Path("data/dataset_checkpoint.json")
         assert repo.extraction_file == Path("data/extraction_checkpoint.json")
-        assert repo.questions_file == Path("data/questions.json")
+        assert repo.questions_file == Path("data/final_dataset.json")
         assert repo.final_dataset_file == Path("data/final_dataset.json")
 
     def test_initialization_with_custom_dir(self, temp_data_dir: Path) -> None:
@@ -155,7 +155,7 @@ class TestContentRepository:
         await repository.save_final_dataset(questions)
 
         # Verify file was created
-        questions_file = temp_data_dir / "questions.json"
+        questions_file = temp_data_dir / "final_dataset.json"
         assert questions_file.exists()
 
         with open(questions_file, encoding="utf-8") as f:

@@ -23,7 +23,7 @@ class ContentRepository:
         self.data_dir = data_dir or Path("data")
         self.checkpoint_file = self.data_dir / "dataset_checkpoint.json"
         self.extraction_file = self.data_dir / "extraction_checkpoint.json"
-        self.questions_file = self.data_dir / "questions.json"
+        self.questions_file = self.data_dir / "final_dataset.json"
         self.final_dataset_file = self.data_dir / "final_dataset.json"
 
     async def load_extraction_questions(self) -> list[dict[str, Any]]:
