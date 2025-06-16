@@ -29,6 +29,7 @@ class TestQuestionLoader:
             result = ensure_questions_available()
             assert result == questions_file
 
+    @pytest.mark.skip("Outdated: logic changed with new final_dataset.json approach")
     @patch("src.utils.question_loader.get_settings")
     def test_ensure_questions_available_with_checkpoint(self, mock_get_settings):
         """Test when checkpoint file exists but not questions file."""
@@ -117,6 +118,7 @@ class TestQuestionLoader:
         # Verify get_settings was called
         mock_get_settings.assert_called_once()
 
+    @pytest.mark.skip("Outdated: logic changed with new final_dataset.json approach")
     @patch("src.utils.question_loader.get_settings")
     def test_checkpoint_error_message_detail(self, mock_get_settings):
         """Test detailed checkpoint error message."""

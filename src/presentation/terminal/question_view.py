@@ -1,4 +1,4 @@
-"""Question display component with FSRS rating support."""
+"""Enhanced question display component with rich multilingual content support."""
 
 from __future__ import annotations
 
@@ -10,30 +10,59 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 from textual.screen import Screen
-from textual.widgets import Button, Static
+from textual.widgets import Button, Collapsible, Static
 
 from src.domain.content.models.question_models import Question
+from src.domain.content.services.enhanced_question_display import (
+    EnhancedQuestionData,
+    EnhancedQuestionDisplay,
+    EnhancedQuestionDisplayRequest,
+)
+from src.domain.user.models.user_models import Language
+from src.domain.user.services.load_user_settings import (
+    LoadUserSettings,
+    LoadUserSettingsRequest,
+)
 from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
 
 logger = logging.getLogger(__name__)
 
 
 class QuestionWidget(EventAwareWidget):
-    """Widget for displaying a single question with answer options."""
+    """Widget for displaying a single question with enhanced multilingual content."""
 
-    def __init__(self, question: Question, event_bus: EventBus, **kwargs: Any):
+    def __init__(
+        self,
+        question: Question,
+        event_bus: EventBus,
+        user_repository: UserSettingsRepository,
+        preferred_language: Language = Language.ENGLISH,
+        **kwargs: Any,
+    ):
         super().__init__(event_bus=event_bus, **kwargs)
         self.question = question
+        self.user_repository = user_repository
+        self.preferred_language = preferred_language
         self.selected_answer: str | None = None
         self.answer_revealed = False
+        self.enhanced_data: EnhancedQuestionData | None = None
+        self.enhanced_service = EnhancedQuestionDisplay(event_bus)
+        self.load_user_settings_service = LoadUserSettings(event_bus, user_repository)
+        self.user_preferences = None  # Will be loaded from user settings
 
     def compose(self) -> ComposeResult:
-        """Compose the question widget."""
+        """Compose the enhanced question widget with rich content."""
         with Container(classes="question-container"):
+            # Question header
             yield Static(f"Question {self.question.id}", classes="question-number")
+            yield Static(
+                f"Category: {self.question.category}", classes="question-category"
+            )
             yield Static(self.question.question, classes="question-text")
 
+            # Answer options
             with Vertical(classes="answer-options"):
                 for i, option in enumerate(self.question.options, 1):
                     yield Button(
@@ -47,8 +76,47 @@ class QuestionWidget(EventAwareWidget):
             yield Container(
                 Static("", id="result-text", classes="result-text"),
                 Static("", id="correct-answer", classes="correct-answer"),
-                Static("", id="explanation", classes="explanation"),
                 classes="answer-result hidden",
+            )
+
+            # Enhanced content - shown after answer reveal
+            yield Container(
+                # Rich explanation with multilingual support
+                Collapsible(
+                    Static("", id="detailed-explanation", classes="rich-explanation"),
+                    title="📝 Detailed Explanation",
+                    collapsed=False,
+                    classes="content-section",
+                ),
+                # Key concept for educational understanding
+                Collapsible(
+                    Static("", id="key-concept", classes="key-concept"),
+                    title="🎯 Key Concept",
+                    collapsed=False,
+                    classes="content-section",
+                ),
+                # Memory technique
+                Collapsible(
+                    Static("", id="mnemonic", classes="mnemonic"),
+                    title="🧠 Memory Technique",
+                    collapsed=True,
+                    classes="content-section",
+                ),
+                # Wrong answer analysis
+                Collapsible(
+                    Container(id="wrong-analysis", classes="wrong-analysis"),
+                    title="❌ Why Other Options Are Wrong",
+                    collapsed=True,
+                    classes="content-section",
+                ),
+                # Image descriptions (for image questions)
+                Collapsible(
+                    Container(id="image-descriptions", classes="image-descriptions"),
+                    title="🖼️ Image Descriptions",
+                    collapsed=True,
+                    classes="content-section hidden",
+                ),
+                classes="enhanced-content hidden",
             )
 
             # FSRS rating buttons - shown after answer reveal
@@ -83,8 +151,76 @@ class QuestionWidget(EventAwareWidget):
 
     async def setup_event_subscriptions(self) -> None:
         """Setup event subscriptions for this widget."""
-        # No domain event subscriptions needed for this widget
-        pass
+        # Load user preferred language on startup
+        await self._load_user_preferred_language()
+
+    async def _load_user_preferred_language(self) -> None:
+        """Load user's preferred language and progressive disclosure settings."""
+        try:
+            request = LoadUserSettingsRequest(user_id=1)
+            result = await self.load_user_settings_service.call(request)
+
+            if result.success and result.user_settings:
+                # Update preferred language from user settings
+                self.preferred_language = result.user_settings.language
+
+                # Load progressive disclosure preferences from custom settings
+                self.user_preferences = result.user_settings.preferences
+                logger.info(
+                    f"Loaded user preferred language: {self.preferred_language.value}"
+                )
+            else:
+                logger.warning(
+                    f"Could not load user settings, using default language: {self.preferred_language.value}"
+                )
+
+        except Exception as e:
+            logger.error(f"Error loading user preferred language: {e}")
+            # Keep default language
+
+    def _should_expand_explanation(self) -> bool:
+        """Determine if explanation section should be expanded by default."""
+        if self.user_preferences:
+            # Check if user wants explanations shown
+            if not self.user_preferences.show_explanations:
+                return False
+            # Check custom setting for auto-expansion
+            return self.user_preferences.custom_settings.get(
+                "auto_expand_explanation", True
+            )
+        return True  # Default: expanded
+
+    def _should_expand_key_concepts(self) -> bool:
+        """Determine if key concepts section should be expanded by default."""
+        if self.user_preferences:
+            return self.user_preferences.custom_settings.get(
+                "auto_expand_key_concepts", True
+            )
+        return True  # Default: expanded
+
+    def _should_expand_mnemonics(self) -> bool:
+        """Determine if mnemonics section should be expanded by default."""
+        if self.user_preferences:
+            return self.user_preferences.custom_settings.get(
+                "auto_expand_mnemonics", False
+            )
+        return False  # Default: collapsed
+
+    def _should_expand_wrong_analysis(self) -> bool:
+        """Determine if wrong answer analysis should be expanded by default."""
+        if self.user_preferences:
+            return self.user_preferences.custom_settings.get(
+                "auto_expand_wrong_analysis", False
+            )
+        return False  # Default: collapsed
+
+    def _should_expand_image_descriptions(self) -> bool:
+        """Determine if image descriptions should be expanded by default."""
+        if self.user_preferences:
+            return self.user_preferences.custom_settings.get(
+                "auto_expand_images", False
+            )
+        return False  # Default: collapsed
 
     @on(Button.Pressed, ".answer-option")
     async def on_answer_selected(self, event: Button.Pressed) -> None:
@@ -120,10 +256,13 @@ class QuestionWidget(EventAwareWidget):
         self.post_message(self.QuestionCompleted(rating))
 
     async def reveal_answer(self) -> None:
-        """Reveal the correct answer and explanation."""
+        """Reveal the correct answer and enhanced multilingual content."""
         self.answer_revealed = True
 
-        # Show result
+        # Load enhanced content
+        await self._load_enhanced_content()
+
+        # Show basic result
         result_container = self.query_one(".answer-result")
         result_container.remove_class("hidden")
 
@@ -135,18 +274,174 @@ class QuestionWidget(EventAwareWidget):
         else:
             result_text.update("[red]✗ Incorrect[/red]")
 
-        # Show correct answer
+        # Show correct answer with enhanced info
         correct_answer = self.query_one("#correct-answer", Static)
-        correct_answer.update(f"Correct answer: [bold]{self.question.correct}[/bold]")
+        if self.enhanced_data:
+            correct_answer.update(
+                f"Correct answer: [bold]{self.enhanced_data.correct_answer_letter}. {self.enhanced_data.correct_answer}[/bold]"
+            )
+        else:
+            correct_answer.update(
+                f"Correct answer: [bold]{self.question.correct}[/bold]"
+            )
 
-        # Show explanation if available
-        if hasattr(self.question, "explanation") and self.question.explanation:
-            explanation = self.query_one("#explanation", Static)
-            explanation.update(f"Explanation: {self.question.explanation}")
+        # Show enhanced content
+        await self._display_enhanced_content()
 
         # Show FSRS rating buttons
         rating_container = self.query_one(".fsrs-rating")
         rating_container.remove_class("hidden")
+
+    async def _load_enhanced_content(self) -> None:
+        """Load enhanced content from the enhanced question display service."""
+        try:
+            request = EnhancedQuestionDisplayRequest(
+                question_id=self.question.id,
+                preferred_language=self.preferred_language,
+                include_wrong_analysis=True,
+                include_key_concepts=True,
+                include_mnemonics=True,
+                include_image_descriptions=True,
+            )
+
+            result = await self.enhanced_service.call(request)
+
+            if result.success and result.question_data:
+                self.enhanced_data = result.question_data
+                logger.info(f"Loaded enhanced content for question {self.question.id}")
+            else:
+                logger.warning(
+                    f"Failed to load enhanced content: {result.error_message}"
+                )
+
+        except Exception as e:
+            logger.error(f"Error loading enhanced content: {e}")
+
+    async def _display_enhanced_content(self) -> None:
+        """Display the enhanced multilingual content."""
+        if not self.enhanced_data:
+            return
+
+        # Show enhanced content container
+        enhanced_container = self.query_one(".enhanced-content")
+        enhanced_container.remove_class("hidden")
+
+        # Apply progressive disclosure preferences
+        await self._apply_progressive_disclosure()
+
+        # Display detailed explanation
+        explanation_widget = self.query_one("#detailed-explanation", Static)
+        explanation_widget.update(self.enhanced_data.multilingual_content.explanation)
+
+        # Display key concept
+        key_concept_widget = self.query_one("#key-concept", Static)
+        key_concept_widget.update(self.enhanced_data.multilingual_content.key_concept)
+
+        # Display mnemonic (if available)
+        if self.enhanced_data.multilingual_content.mnemonic:
+            mnemonic_widget = self.query_one("#mnemonic", Static)
+            mnemonic_widget.update(self.enhanced_data.multilingual_content.mnemonic)
+        else:
+            # Hide mnemonic section if not available
+            mnemonic_section = self.query_one("Collapsible:has(#mnemonic)")
+            mnemonic_section.add_class("hidden")
+
+        # Display wrong answer analysis
+        await self._display_wrong_answer_analysis()
+
+        # Display image descriptions (if image question)
+        if self.enhanced_data.is_image_question and self.enhanced_data.images:
+            await self._display_image_descriptions()
+        else:
+            # Hide image section for non-image questions
+            image_section = self.query_one("Collapsible:has(#image-descriptions)")
+            image_section.add_class("hidden")
+
+    async def _apply_progressive_disclosure(self) -> None:
+        """Apply progressive disclosure preferences to collapsible sections."""
+        try:
+            # Get all collapsible sections
+            collapsibles = self.query("Collapsible")
+
+            for collapsible in collapsibles:
+                section_id = None
+                # Determine which section this is based on its content
+                if collapsible.query_one(
+                    "#detailed-explanation", Static, fallback=None
+                ):
+                    section_id = "explanation"
+                elif collapsible.query_one("#key-concept", Static, fallback=None):
+                    section_id = "key_concepts"
+                elif collapsible.query_one("#mnemonic", Static, fallback=None):
+                    section_id = "mnemonics"
+                elif collapsible.query_one("#wrong-analysis", fallback=None):
+                    section_id = "wrong_analysis"
+                elif collapsible.query_one("#image-descriptions", fallback=None):
+                    section_id = "image_descriptions"
+
+                # Apply preference based on section
+                if section_id == "explanation":
+                    collapsible.collapsed = not self._should_expand_explanation()
+                elif section_id == "key_concepts":
+                    collapsible.collapsed = not self._should_expand_key_concepts()
+                elif section_id == "mnemonics":
+                    collapsible.collapsed = not self._should_expand_mnemonics()
+                elif section_id == "wrong_analysis":
+                    collapsible.collapsed = not self._should_expand_wrong_analysis()
+                elif section_id == "image_descriptions":
+                    collapsible.collapsed = not self._should_expand_image_descriptions()
+
+        except Exception as e:
+            logger.warning(f"Error applying progressive disclosure: {e}")
+            # Continue with default behavior
+
+    async def _display_wrong_answer_analysis(self) -> None:
+        """Display analysis of why wrong answers are incorrect."""
+        if not self.enhanced_data or not self.enhanced_data.wrong_answer_analysis:
+            return
+
+        wrong_analysis_container = self.query_one("#wrong-analysis")
+
+        # Clear existing content
+        await wrong_analysis_container.remove_children()
+
+        # Add analysis for each wrong option
+        for analysis in self.enhanced_data.wrong_answer_analysis:
+            wrong_item = Container(
+                Static(
+                    f"[bold]{analysis.option_letter}. {analysis.option_text}[/bold]",
+                    classes="wrong-option",
+                ),
+                Static(analysis.explanation, classes="wrong-explanation"),
+                classes="wrong-item",
+            )
+            await wrong_analysis_container.mount(wrong_item)
+
+    async def _display_image_descriptions(self) -> None:
+        """Display descriptions for image-based questions."""
+        if not self.enhanced_data or not self.enhanced_data.images:
+            return
+
+        # Show image descriptions section
+        image_section = self.query_one("Collapsible:has(#image-descriptions)")
+        image_section.remove_class("hidden")
+
+        image_container = self.query_one("#image-descriptions")
+
+        # Clear existing content
+        await image_container.remove_children()
+
+        # Add description for each image
+        for i, image in enumerate(self.enhanced_data.images, 1):
+            image_item = Container(
+                Static(
+                    f"[bold]Image {i}: {image.context}[/bold]", classes="image-title"
+                ),
+                Static(image.description, classes="image-description"),
+                Static(f"[dim]Path: {image.path}[/dim]", classes="image-path"),
+                classes="image-item",
+            )
+            await image_container.mount(image_item)
 
     async def submit_answer_with_rating(self, rating: int) -> None:
         """Submit the answer with FSRS rating to the domain."""
@@ -172,8 +467,8 @@ class PracticeScreen(Screen):
     CSS = """
     .question-container {
         align: center middle;
-        width: 80%;
-        max-width: 100;
+        width: 90%;
+        max-width: 120;
         background: $surface;
         border: solid $primary;
         padding: 2;
@@ -187,10 +482,20 @@ class PracticeScreen(Screen):
         margin-bottom: 1;
     }
 
+    .question-category {
+        text-align: center;
+        color: $accent;
+        text-style: italic;
+        margin-bottom: 1;
+    }
+
     .question-text {
         text-align: left;
         margin-bottom: 2;
         word-wrap: break-word;
+        padding: 1;
+        background: $panel;
+        border-left: solid $accent;
     }
 
     .answer-options {
@@ -227,9 +532,88 @@ class PracticeScreen(Screen):
         margin-bottom: 1;
     }
 
-    .explanation {
-        text-align: left;
+    /* Enhanced content styles */
+    .enhanced-content {
+        margin-top: 2;
+        spacing: 1;
+    }
+
+    .content-section {
+        margin-bottom: 1;
+        border: solid $muted;
+        background: $panel;
+    }
+
+    .rich-explanation {
+        padding: 1;
+        color: $text;
+        line-height: 1.4;
+    }
+
+    .key-concept {
+        padding: 1;
+        color: $warning;
+        text-style: italic;
+        background: $warning-alpha;
+        border-left: solid $warning;
+    }
+
+    .mnemonic {
+        padding: 1;
+        color: $success;
+        text-style: bold;
+        background: $success-alpha;
+        border-left: solid $success;
+    }
+
+    .wrong-analysis {
+        padding: 1;
+        spacing: 1;
+    }
+
+    .wrong-item {
+        margin-bottom: 1;
+        padding: 1;
+        background: $error-alpha;
+        border-left: solid $error;
+    }
+
+    .wrong-option {
+        color: $error;
+        margin-bottom: 0.5;
+    }
+
+    .wrong-explanation {
         color: $text-muted;
+        line-height: 1.3;
+    }
+
+    .image-descriptions {
+        padding: 1;
+        spacing: 1;
+    }
+
+    .image-item {
+        margin-bottom: 1;
+        padding: 1;
+        background: $primary-alpha;
+        border-left: solid $primary;
+    }
+
+    .image-title {
+        color: $primary;
+        margin-bottom: 0.5;
+    }
+
+    .image-description {
+        color: $text;
+        line-height: 1.3;
+        margin-bottom: 0.5;
+    }
+
+    .image-path {
+        color: $text-muted;
+        text-style: italic;
     }
 
     .fsrs-rating {
@@ -259,6 +643,19 @@ class PracticeScreen(Screen):
     .hidden {
         display: none;
     }
+
+    /* Responsive layout for smaller screens */
+    @media (max-width: 80) {
+        .question-container {
+            width: 95%;
+        }
+
+        .rating-buttons {
+            layout: grid;
+            grid-size: 2 2;
+            grid-gutter: 1;
+        }
+    }
     """
 
     BINDINGS = [
@@ -269,9 +666,15 @@ class PracticeScreen(Screen):
         ("escape", "back_to_menu", "Back to Menu"),
     ]
 
-    def __init__(self, practice_mode: str = "random", **kwargs: Any):
+    def __init__(
+        self,
+        practice_mode: str = "random",
+        user_repository: UserSettingsRepository | None = None,
+        **kwargs: Any,
+    ):
         super().__init__(**kwargs)
         self.practice_mode = practice_mode
+        self.user_repository = user_repository
         self.current_question: Question | None = None
         self.questions_answered = 0
         self.correct_answers = 0
@@ -303,11 +706,27 @@ class PracticeScreen(Screen):
             difficulty="easy",
         )
 
-        # Create question widget
-        question_widget = QuestionWidget(
-            question=self.current_question,
-            event_bus=self.app.event_bus,
-        )
+        # Create enhanced question widget with language support
+        if self.user_repository:
+            question_widget = QuestionWidget(
+                question=self.current_question,
+                event_bus=self.app.event_bus,
+                user_repository=self.user_repository,
+                preferred_language=Language.ENGLISH,  # Will be updated from user settings
+            )
+        else:
+            # Fallback: create a temporary repository
+            from src.infrastructure.database.database import DatabaseManager
+
+            db_manager = DatabaseManager()
+            temp_repository = UserSettingsRepository(db_manager)
+
+            question_widget = QuestionWidget(
+                question=self.current_question,
+                event_bus=self.app.event_bus,
+                user_repository=temp_repository,
+                preferred_language=Language.ENGLISH,
+            )
 
         # Replace the loading text with the question widget
         container = self.query_one("#question-container")

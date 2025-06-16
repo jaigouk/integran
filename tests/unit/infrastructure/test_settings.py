@@ -27,7 +27,7 @@ class TestSettings:
         assert settings.gemini_model == "gemini-1.5-pro"
         assert settings.use_vertex_ai is True
         assert settings.database_path == "data/trainer.db"
-        assert settings.questions_json_path == "data/questions.json"
+        assert settings.questions_json_path == "data/final_dataset.json"
         assert settings.max_daily_questions == 50
         assert settings.show_explanations is True
         assert settings.log_level == "INFO"

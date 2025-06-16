@@ -13,7 +13,7 @@ from src.infrastructure.messaging.event_bus import DomainEvent, EventBus
 
 
 @dataclass
-class TestEvent(DomainEvent):
+class MockEvent(DomainEvent):
     """Test event for testing purposes."""
 
     test_data: str
@@ -25,7 +25,7 @@ class TestEvent(DomainEvent):
 
 
 @dataclass
-class AnotherTestEvent(DomainEvent):
+class AnotherMockEvent(DomainEvent):
     """Another test event for testing purposes."""
 
     message: str
@@ -40,7 +40,7 @@ class TestDomainEvent:
 
     def test_domain_event_creation(self):
         """Test DomainEvent creation with auto-generated fields."""
-        event = TestEvent(test_data="hello", test_value=100)
+        event = MockEvent(test_data="hello", test_value=100)
 
         assert event.test_data == "hello"
         assert event.test_value == 100
@@ -52,7 +52,7 @@ class TestDomainEvent:
     def test_domain_event_with_custom_id_and_time(self):
         """Test DomainEvent with custom event_id and occurred_at."""
         custom_time = datetime.now(UTC)
-        event = TestEvent(test_data="custom")
+        event = MockEvent(test_data="custom")
         # Set custom values after creation
         event.event_id = "custom-id-123"
         event.occurred_at = custom_time
@@ -62,8 +62,8 @@ class TestDomainEvent:
 
     def test_domain_event_unique_ids(self):
         """Test that domain events get unique IDs."""
-        event1 = TestEvent(test_data="first")
-        event2 = TestEvent(test_data="second")
+        event1 = MockEvent(test_data="first")
+        event2 = MockEvent(test_data="second")
 
         assert event1.event_id != event2.event_id
         assert len(event1.event_id) > 0
@@ -72,7 +72,7 @@ class TestDomainEvent:
     def test_domain_event_timestamp_close_to_now(self):
         """Test that domain event timestamp is close to current time."""
         before = datetime.now(UTC)
-        event = TestEvent(test_data="timing test")
+        event = MockEvent(test_data="timing test")
         after = datetime.now(UTC)
 
         assert before <= event.occurred_at <= after
@@ -92,11 +92,11 @@ class TestEventBus:
         event_bus = EventBus()
         handler = MagicMock()
 
-        event_bus.subscribe(TestEvent, handler)
+        event_bus.subscribe(MockEvent, handler)
 
-        assert TestEvent in event_bus._handlers
-        assert handler in event_bus._handlers[TestEvent]
-        assert len(event_bus._handlers[TestEvent]) == 1
+        assert MockEvent in event_bus._handlers
+        assert handler in event_bus._handlers[MockEvent]
+        assert len(event_bus._handlers[MockEvent]) == 1
 
     def test_subscribe_multiple_handlers(self):
         """Test subscribing multiple handlers to the same event type."""
@@ -105,14 +105,14 @@ class TestEventBus:
         handler2 = MagicMock()
         handler3 = MagicMock()
 
-        event_bus.subscribe(TestEvent, handler1)
-        event_bus.subscribe(TestEvent, handler2)
-        event_bus.subscribe(TestEvent, handler3)
+        event_bus.subscribe(MockEvent, handler1)
+        event_bus.subscribe(MockEvent, handler2)
+        event_bus.subscribe(MockEvent, handler3)
 
-        assert len(event_bus._handlers[TestEvent]) == 3
-        assert handler1 in event_bus._handlers[TestEvent]
-        assert handler2 in event_bus._handlers[TestEvent]
-        assert handler3 in event_bus._handlers[TestEvent]
+        assert len(event_bus._handlers[MockEvent]) == 3
+        assert handler1 in event_bus._handlers[MockEvent]
+        assert handler2 in event_bus._handlers[MockEvent]
+        assert handler3 in event_bus._handlers[MockEvent]
 
     def test_subscribe_different_event_types(self):
         """Test subscribing handlers to different event types."""
@@ -120,24 +120,24 @@ class TestEventBus:
         handler1 = MagicMock()
         handler2 = MagicMock()
 
-        event_bus.subscribe(TestEvent, handler1)
-        event_bus.subscribe(AnotherTestEvent, handler2)
+        event_bus.subscribe(MockEvent, handler1)
+        event_bus.subscribe(AnotherMockEvent, handler2)
 
-        assert TestEvent in event_bus._handlers
-        assert AnotherTestEvent in event_bus._handlers
-        assert handler1 in event_bus._handlers[TestEvent]
-        assert handler2 in event_bus._handlers[AnotherTestEvent]
+        assert MockEvent in event_bus._handlers
+        assert AnotherMockEvent in event_bus._handlers
+        assert handler1 in event_bus._handlers[MockEvent]
+        assert handler2 in event_bus._handlers[AnotherMockEvent]
 
     def test_unsubscribe_existing_handler(self):
         """Test unsubscribing an existing handler."""
         event_bus = EventBus()
         handler = MagicMock()
 
-        event_bus.subscribe(TestEvent, handler)
-        assert handler in event_bus._handlers[TestEvent]
+        event_bus.subscribe(MockEvent, handler)
+        assert handler in event_bus._handlers[MockEvent]
 
-        event_bus.unsubscribe(TestEvent, handler)
-        assert handler not in event_bus._handlers[TestEvent]
+        event_bus.unsubscribe(MockEvent, handler)
+        assert handler not in event_bus._handlers[MockEvent]
 
     def test_unsubscribe_nonexistent_handler(self):
         """Test unsubscribing a handler that wasn't subscribed."""
@@ -145,15 +145,15 @@ class TestEventBus:
         handler = MagicMock()
 
         # Should not raise an exception
-        event_bus.unsubscribe(TestEvent, handler)
+        event_bus.unsubscribe(MockEvent, handler)
 
         # Subscribe and then try to unsubscribe a different handler
-        event_bus.subscribe(TestEvent, handler)
+        event_bus.subscribe(MockEvent, handler)
         different_handler = MagicMock()
-        event_bus.unsubscribe(TestEvent, different_handler)
+        event_bus.unsubscribe(MockEvent, different_handler)
 
         # Original handler should still be there
-        assert handler in event_bus._handlers[TestEvent]
+        assert handler in event_bus._handlers[MockEvent]
 
     def test_unsubscribe_from_nonexistent_event_type(self):
         """Test unsubscribing from an event type that has no handlers."""
@@ -161,13 +161,13 @@ class TestEventBus:
         handler = MagicMock()
 
         # Should not raise an exception
-        event_bus.unsubscribe(TestEvent, handler)
+        event_bus.unsubscribe(MockEvent, handler)
 
     @pytest.mark.asyncio
     async def test_publish_with_no_handlers(self):
         """Test publishing an event with no handlers registered."""
         event_bus = EventBus()
-        event = TestEvent(test_data="no handlers")
+        event = MockEvent(test_data="no handlers")
 
         # Should not raise an exception
         await event_bus.publish(event)
@@ -178,8 +178,8 @@ class TestEventBus:
         event_bus = EventBus()
         handler = MagicMock()
 
-        event_bus.subscribe(TestEvent, handler)
-        event = TestEvent(test_data="sync test")
+        event_bus.subscribe(MockEvent, handler)
+        event = MockEvent(test_data="sync test")
 
         await event_bus.publish(event)
 
@@ -191,8 +191,8 @@ class TestEventBus:
         event_bus = EventBus()
         handler = AsyncMock()
 
-        event_bus.subscribe(TestEvent, handler)
-        event = TestEvent(test_data="async test")
+        event_bus.subscribe(MockEvent, handler)
+        event = MockEvent(test_data="async test")
 
         await event_bus.publish(event)
 
@@ -205,10 +205,10 @@ class TestEventBus:
         sync_handler = MagicMock()
         async_handler = AsyncMock()
 
-        event_bus.subscribe(TestEvent, sync_handler)
-        event_bus.subscribe(TestEvent, async_handler)
+        event_bus.subscribe(MockEvent, sync_handler)
+        event_bus.subscribe(MockEvent, async_handler)
 
-        event = TestEvent(test_data="multiple handlers")
+        event = MockEvent(test_data="multiple handlers")
 
         await event_bus.publish(event)
 
@@ -225,11 +225,11 @@ class TestEventBus:
         bad_handler = MagicMock(side_effect=Exception("Handler error"))
         another_good_handler = MagicMock()
 
-        event_bus.subscribe(TestEvent, good_handler)
-        event_bus.subscribe(TestEvent, bad_handler)
-        event_bus.subscribe(TestEvent, another_good_handler)
+        event_bus.subscribe(MockEvent, good_handler)
+        event_bus.subscribe(MockEvent, bad_handler)
+        event_bus.subscribe(MockEvent, another_good_handler)
 
-        event = TestEvent(test_data="exception test")
+        event = MockEvent(test_data="exception test")
 
         # Should not raise exception - errors are logged and isolated
         await event_bus.publish(event)
@@ -247,10 +247,10 @@ class TestEventBus:
         good_handler = AsyncMock()
         bad_handler = AsyncMock(side_effect=Exception("Async handler error"))
 
-        event_bus.subscribe(TestEvent, good_handler)
-        event_bus.subscribe(TestEvent, bad_handler)
+        event_bus.subscribe(MockEvent, good_handler)
+        event_bus.subscribe(MockEvent, bad_handler)
 
-        event = TestEvent(test_data="async exception test")
+        event = MockEvent(test_data="async exception test")
 
         await event_bus.publish(event)
 
@@ -265,11 +265,11 @@ class TestEventBus:
         test_handler = MagicMock()
         another_handler = MagicMock()
 
-        event_bus.subscribe(TestEvent, test_handler)
-        event_bus.subscribe(AnotherTestEvent, another_handler)
+        event_bus.subscribe(MockEvent, test_handler)
+        event_bus.subscribe(AnotherMockEvent, another_handler)
 
-        test_event = TestEvent(test_data="test event")
-        another_event = AnotherTestEvent(message="another event")
+        test_event = MockEvent(test_data="test event")
+        another_event = AnotherMockEvent(message="another event")
 
         await event_bus.publish(test_event)
         await event_bus.publish(another_event)
@@ -284,10 +284,10 @@ class TestEventBus:
         event_bus = EventBus()
         handler = AsyncMock()
 
-        event_bus.subscribe(TestEvent, handler)
+        event_bus.subscribe(MockEvent, handler)
 
         # Create multiple events
-        events = [TestEvent(test_data=f"event_{i}", test_value=i) for i in range(5)]
+        events = [MockEvent(test_data=f"event_{i}", test_value=i) for i in range(5)]
 
         # Publish all events concurrently
         await asyncio.gather(*[event_bus.publish(event) for event in events])
@@ -304,9 +304,9 @@ class TestEventBus:
         def capturing_handler(event):
             received_events.append(event)
 
-        event_bus.subscribe(TestEvent, capturing_handler)
+        event_bus.subscribe(MockEvent, capturing_handler)
 
-        original_event = TestEvent(test_data="specific data", test_value=999)
+        original_event = MockEvent(test_data="specific data", test_value=999)
         await event_bus.publish(original_event)
 
         assert len(received_events) == 1
@@ -324,16 +324,16 @@ class TestEventBus:
         handler1 = MagicMock()
         handler2 = MagicMock()
 
-        event_bus1.subscribe(TestEvent, handler1)
-        event_bus2.subscribe(TestEvent, handler2)
+        event_bus1.subscribe(MockEvent, handler1)
+        event_bus2.subscribe(MockEvent, handler2)
 
         # Each bus should have its own handlers
-        assert len(event_bus1._handlers[TestEvent]) == 1
-        assert len(event_bus2._handlers[TestEvent]) == 1
-        assert handler1 in event_bus1._handlers[TestEvent]
-        assert handler2 in event_bus2._handlers[TestEvent]
-        assert handler1 not in event_bus2._handlers.get(TestEvent, [])
-        assert handler2 not in event_bus1._handlers.get(TestEvent, [])
+        assert len(event_bus1._handlers[MockEvent]) == 1
+        assert len(event_bus2._handlers[MockEvent]) == 1
+        assert handler1 in event_bus1._handlers[MockEvent]
+        assert handler2 in event_bus2._handlers[MockEvent]
+        assert handler1 not in event_bus2._handlers.get(MockEvent, [])
+        assert handler2 not in event_bus1._handlers.get(MockEvent, [])
 
     @pytest.mark.asyncio
     async def test_handler_with_complex_logic(self):
@@ -348,10 +348,10 @@ class TestEventBus:
             if event.test_value > 50:
                 results.append("High value detected")
 
-        event_bus.subscribe(TestEvent, complex_handler)
+        event_bus.subscribe(MockEvent, complex_handler)
 
-        await event_bus.publish(TestEvent(test_data="low", test_value=10))
-        await event_bus.publish(TestEvent(test_data="high", test_value=100))
+        await event_bus.publish(MockEvent(test_data="low", test_value=10))
+        await event_bus.publish(MockEvent(test_data="high", test_value=100))
 
         assert len(results) == 3
         assert "Processed: low" in results
@@ -364,7 +364,7 @@ class TestEventBus:
         event_bus = EventBus()
 
         # Publishing many events to empty bus should be fast
-        events = [TestEvent(test_data=f"event_{i}") for i in range(100)]
+        events = [MockEvent(test_data=f"event_{i}") for i in range(100)]
 
         import time
 
@@ -378,20 +378,20 @@ class TestEventBus:
 
     def test_domain_event_str_representation(self):
         """Test DomainEvent __str__ method."""
-        event = TestEvent(test_data="test_string")
+        event = MockEvent(test_data="test_string")
 
         str_repr = str(event)
-        assert "TestEvent" in str_repr
+        assert "MockEvent" in str_repr
         assert event.event_id in str_repr
-        assert str_repr.startswith("TestEvent(event_id=")
+        assert str_repr.startswith("MockEvent(event_id=")
 
     def test_domain_event_name_property(self):
         """Test DomainEvent event_name property."""
-        event = TestEvent(test_data="test_name")
-        another_event = AnotherTestEvent(message="test")
+        event = MockEvent(test_data="test_name")
+        another_event = AnotherMockEvent(message="test")
 
-        assert event.event_name == "TestEvent"
-        assert another_event.event_name == "AnotherTestEvent"
+        assert event.event_name == "MockEvent"
+        assert another_event.event_name == "AnotherMockEvent"
 
     @pytest.mark.asyncio
     async def test_event_bus_error_logging(self):
@@ -403,9 +403,9 @@ class TestEventBus:
             raise RuntimeError("Critical error in handler")
 
         # Subscribe the bad handler
-        event_bus.subscribe(TestEvent, bad_handler)
+        event_bus.subscribe(MockEvent, bad_handler)
 
-        event = TestEvent(test_data="error_test")
+        event = MockEvent(test_data="error_test")
 
         # The error should be caught and logged, not raised
         await event_bus.publish(event)  # Should not raise
@@ -417,13 +417,13 @@ class TestEventBus:
 
         # Mock asyncio.gather to raise an exception
         with patch("asyncio.gather", side_effect=RuntimeError("Critical gather error")):
-            event = TestEvent(test_data="critical_test")
+            event = MockEvent(test_data="critical_test")
 
             # Add a handler so publish() gets to the gather() call
             def handler(_event):
                 pass
 
-            event_bus.subscribe(TestEvent, handler)
+            event_bus.subscribe(MockEvent, handler)
 
             # The critical error should be logged and re-raised
             with pytest.raises(RuntimeError, match="Critical gather error"):
@@ -444,13 +444,13 @@ class TestEventBus:
         def handler2(_event):
             pass
 
-        event_bus.subscribe(TestEvent, handler1)
-        event_bus.subscribe(TestEvent, handler2)
+        event_bus.subscribe(MockEvent, handler1)
+        event_bus.subscribe(MockEvent, handler2)
 
         # Check subscription count
         subscriptions = event_bus.get_active_subscriptions()
-        assert "TestEvent" in subscriptions
-        assert subscriptions["TestEvent"] == 2
+        assert "MockEvent" in subscriptions
+        assert subscriptions["MockEvent"] == 2
 
     def test_clear_subscriptions(self):
         """Test clearing all event subscriptions."""
@@ -460,12 +460,12 @@ class TestEventBus:
         def handler(_event):
             pass
 
-        event_bus.subscribe(TestEvent, handler)
-        assert event_bus.get_handler_count(TestEvent) == 1
+        event_bus.subscribe(MockEvent, handler)
+        assert event_bus.get_handler_count(MockEvent) == 1
 
         # Clear all subscriptions
         event_bus.clear_subscriptions()
-        assert event_bus.get_handler_count(TestEvent) == 0
+        assert event_bus.get_handler_count(MockEvent) == 0
         assert event_bus.get_active_subscriptions() == {}
 
     def test_get_handler_count(self):
@@ -473,7 +473,7 @@ class TestEventBus:
         event_bus = EventBus()
 
         # Initially no handlers
-        assert event_bus.get_handler_count(TestEvent) == 0
+        assert event_bus.get_handler_count(MockEvent) == 0
 
         # Add handlers
         def handler1(_event):
@@ -482,8 +482,8 @@ class TestEventBus:
         def handler2(_event):
             pass
 
-        event_bus.subscribe(TestEvent, handler1)
-        assert event_bus.get_handler_count(TestEvent) == 1
+        event_bus.subscribe(MockEvent, handler1)
+        assert event_bus.get_handler_count(MockEvent) == 1
 
-        event_bus.subscribe(TestEvent, handler2)
-        assert event_bus.get_handler_count(TestEvent) == 2
+        event_bus.subscribe(MockEvent, handler2)
+        assert event_bus.get_handler_count(MockEvent) == 2

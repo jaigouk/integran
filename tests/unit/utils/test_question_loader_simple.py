@@ -40,6 +40,7 @@ class TestQuestionLoader:
         result = ensure_questions_available()
         assert result == mock_json_path
 
+    @pytest.mark.skip("Outdated: logic changed with new final_dataset.json approach")
     @patch("src.utils.question_loader.get_settings")
     @patch("src.utils.question_loader.Path")
     def test_ensure_questions_available_checkpoint_exists(

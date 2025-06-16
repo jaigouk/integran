@@ -2,16 +2,18 @@
 
 This guide is for developers and contributors working on the Integran project. Regular users don't need this information.
 
-## 🎯 Current Status: Phase 4.1 - Application Layer Architecture Fix
+## 🎯 Current Status: Phase 6 - User Configuration & Event Flow DAG
 
-🚨 **PRIORITY**: Fix application layer architectural violations identified through DDD + CQRS research before proceeding to Terminal UI implementation.
+🚨 **PRIORITY**: Implement user configuration system with developer mode control and design comprehensive event flow DAG for cross-platform compatibility.
 
 **Current Status as of 2025-01-16:**
 - ✅ **Domain Layer Complete**: All 4 bounded contexts with proper domain services
 - ✅ **Infrastructure Complete**: EventBus, database, repositories working correctly  
 - ✅ **CQRS Structure Created**: Commands, queries, events, workflows, projections organized
-- 🚨 **Application Layer Issues**: Contains business logic violations that need fixing
-- 📋 **Next Priority**: Terminal UI implementation after architecture fix
+- ✅ **Application Layer Fixed**: Thin coordinators with proper DDD separation (Phase 4.1 Complete)
+- ✅ **Terminal UI Complete**: Rich/Textual implementation finished (Phase 5 Complete)
+- 🚨 **Current Priority**: User configuration domain + Event flow DAG design
+- 📋 **Next Priority**: Cross-platform user flows and developer mode integration
 
 ## 🏗️ Architecture Overview
 
@@ -28,6 +30,7 @@ Integran is a **Domain-Driven Design (DDD)** application with **CQRS** patterns 
 - **Learning**: FSRS scheduling, session management, progress tracking
 - **Content**: Question management, multilingual answers, image processing  
 - **Analytics**: Performance tracking, leech detection, interleaving optimization
+- **User**: User configuration, preferences, developer mode control
 - **Infrastructure**: EventBus, database, repositories, external APIs
 
 ### Current Architecture Status
@@ -35,103 +38,160 @@ Integran is a **Domain-Driven Design (DDD)** application with **CQRS** patterns 
 ```
 src/
 ├── domain/                        # ✅ COMPLETE - Domain Layer
-│   ├── learning/services/          # ScheduleCard (FSRS algorithm)
-│   ├── content/services/           # GenerateAnswer, ProcessImage, CreateImageMapping
+│   ├── learning/services/          # ScheduleCard, CompleteLearningSession
+│   ├── content/services/           # GenerateAnswer, ProcessImage, BuildDataset
 │   ├── analytics/services/         # AnalyzePerformance, DetectLeech, OptimizeInterleaving
+│   ├── user/                      # 📋 NEW - User configuration domain
 │   └── shared/                     # Base classes, events, domain service interface
-├── application/                    # 🚨 NEEDS FIXING - Application Layer
-│   ├── commands/                   # Write operations (need to be thinned)
-│   ├── queries/                    # Read operations (OK as-is)
-│   ├── events/handlers/            # Cross-context event handling (OK)
-│   ├── workflows/                  # 🚨 TOO THICK - contains business logic
-│   └── projections/                # Read model projections (OK)
+├── application/                    # ✅ COMPLETE - Thin Application Layer
+│   ├── commands/                   # Thin coordinators (< 50 lines each)
+│   ├── queries/                    # Read operations (direct database access)
+│   ├── events/handlers/            # Cross-context event handling
+│   ├── workflows/                  # Thin coordinators (< 60 lines each)
+│   └── projections/                # Read model projections
 ├── infrastructure/                 # ✅ COMPLETE - Infrastructure Layer
 │   ├── database/database.py        # DatabaseManager, SQLite operations
 │   ├── messaging/event_bus.py      # EventBus implementation
 │   └── repositories/               # Data access
-└── presentation/                   # 📋 TODO - Terminal UI
-    └── terminal/                   # Rich/Textual implementation (next priority)
+└── presentation/                   # ✅ COMPLETE - Presentation Layer
+    ├── terminal/                   # Rich/Textual implementation
+    └── cli/                        # Command-line interfaces
 ```
 
-## 🚨 Phase 4.1: Identified Architecture Issues
+## 🎯 Phase 6: User Configuration & Event Flow Design
 
-**Research Finding**: DDD + CQRS best practices research revealed 3 critical violations:
+**Current Priority**: Implement comprehensive user configuration system and explicit event flow management for cross-platform compatibility.
 
-#### Problem 1: Application Layer Too Thick (600+ lines)
-- **Issue**: `src/application/workflows/complete_learning_session_workflow.py` contains business logic
-- **Violation**: Application should be thin coordinators, not business logic containers
-- **Solution**: Extract to domain services in Learning Context
+### Phase 6.1: User Configuration Domain
+#### New Bounded Context: User Configuration
+- **Create** `src/domain/user/` with models, services, events
+- **Add** `UserSettings` aggregate with developer mode, preferences
+- **Implement** `SaveUserSettings` and `LoadUserSettings` domain services
+- **Add** persistence through SQLite user_settings table
 
-#### Problem 2: Business Logic Duplication
-- **Issue**: Logic duplicated between domain services and application workflows  
-- **Violation**: Domain services should contain ALL business logic
-- **Solution**: Move complex logic to domain services exclusively
+### Phase 6.2: Developer Mode Control
+#### Service Access Control
+- **Modify** content services to check developer mode before using Gemini
+- **Add** `DeveloperModeRequiredError` for restricted operations
+- **Update** `BuildDataset` and `ProcessImage` to require developer mode
+- **Default**: `developer_mode = false`, `use_gemini = false`
 
-#### Problem 3: Commands Too Thick
-- **Issue**: Command handlers contain business logic instead of just coordination
-- **Violation**: CQRS commands should validate input and delegate to domain
-- **Solution**: Thin command handlers to < 50 lines each
+### Phase 6.3: Event Flow DAG Design
+#### Explicit Event Flow Management
+- **Created** `docs/event-flows.yaml` for explicit event definition
+- **Event Categories**: System, User, Learning, Content, Analytics, Developer
+- **Flow Validation**: DAG compliance, dependency checking, circular detection
+- **Cross-Platform**: Same events work across terminal, mobile, desktop, web
 
-#### ✅ What's Working (Keep These)
-- **Domain Layer**: All domain services properly implemented
+### Phase 6.4: User Flow Implementation
+#### Core User Flows
+1. **First-time Setup Flow**: Language → Developer Mode → Tutorial → Main Menu
+2. **Daily Usage Flow**: Settings Load → Session Start → Learning Loop → Progress
+3. **Settings Management Flow**: Open Settings → Change Prefs → Save → Update UI
+4. **Developer Operations Flow**: Enable Dev Mode → API Operations → Dataset Generation
+
+#### ✅ What's Already Working (Phase 4.1 & 5 Complete)
+- **Domain Layer**: All 5 bounded contexts with proper domain services
 - **Infrastructure**: EventBus, database, repositories working correctly
-- **CQRS Structure**: Commands, queries, events organized properly
-- **Test Coverage**: 288 tests passing, all quality checks green
+- **Application Layer**: Thin coordinators with proper DDD separation
+- **Terminal UI**: Complete Rich/Textual implementation
+- **Test Coverage**: 416+ tests passing, all quality checks green
 
-## 🎯 Phase 4.1 Solution: Thin Application Layer
+## 🎯 Phase 6 Implementation Plan
 
-### Required Fixes
+### Step 1: User Configuration Domain (1-2 days)
 
-#### Step 1: Extract Business Logic to Domain
-- **Create** `CompleteLearningSession` domain service in Learning Context
-- **Move** complex logic from `src/application/workflows/complete_learning_session_workflow.py`
-- **Create** `BuildDataset` domain service in Content Context  
-- **Move** logic from `src/application/workflows/build_dataset_workflow.py`
+#### Create User Bounded Context
+- **New Directory**: `src/domain/user/`
+- **Models**: `UserSettings`, `DeveloperMode`, `UserPreferences`
+- **Services**: `SaveUserSettings`, `LoadUserSettings`, `ToggleDeveloperMode`
+- **Events**: `UserSettingsChangedEvent`, `DeveloperModeToggledEvent`
+- **Repository**: `UserSettingsRepository` with SQLite persistence
 
-#### Step 2: Thin Command Handlers
-- **Refactor** commands to be coordinators only (< 50 lines each)
-- **Pattern**: Validate input → Call domain service → Return result
-- **Keep** queries as direct database access for performance
+#### Database Schema Extensions
+- **Extend** `user_settings` table with `developer_mode` boolean
+- **Add** `user_preferences` JSON column for flexible settings
+- **Add** `first_time_setup` flag for onboarding state
+- **Add** `user_flow_state` for resume capabilities
 
-#### Step 3: Verify Architecture
-- **Test** all business logic works after extraction
-- **Confirm** application layer files are thin
-- **Validate** domain services handle all complex operations
+### Step 2: Event Flow DAG Implementation (1-2 days)
 
-### Target Architecture (After Phase 4.1 Fix)
+#### Event Flow Engine
+- **Create** `EventFlowOrchestrator` for DAG validation
+- **Load** event definitions from `docs/event-flows.yaml`
+- **Validate** event dependencies and prevent circular flows
+- **Add** event sequence tracking and health monitoring
 
-**Thin Application Layer:**
-```
-src/application/
-├── commands/                       # Thin coordinators (< 50 lines each)
-│   ├── start_session_command.py   # Validates input → calls domain service
-│   ├── submit_answer_command.py   # Validates input → calls ScheduleCard
-│   └── build_dataset_command.py   # Validates input → calls BuildDataset
-├── queries/                        # Direct database access (performance)
-│   ├── get_session_progress_query.py
-│   ├── get_due_cards_query.py
-│   └── get_user_stats_query.py
-├── events/handlers/                # Cross-context coordinators
-│   ├── card_scheduled_handler.py
-│   └── content_processed_handler.py
-└── projections/                    # Read model projections
-    └── user_progress_projection.py
-```
+#### Event System Enhancements
+- **Add** event flow validation to EventBus
+- **Implement** event replay capabilities for debugging
+- **Add** event dependency metadata storage
+- **Create** event flow health check reports
 
-**Domain Layer (Business Logic):**
+### Step 3: Developer Mode Integration (1 day)
+
+#### Service Access Control
+- **Modify** `BuildDataset` to check developer mode before Gemini usage
+- **Modify** `ProcessImage` to require developer mode for API calls
+- **Add** `DeveloperModeRequiredError` exception
+- **Default** all new installations to `developer_mode = false`
+
+#### User-Friendly Error Messages
+- **Add** clear messaging when developer features attempted without mode enabled
+- **Guide** users to enable developer mode through settings
+- **Protect** against accidental API usage and costs
+
+### Target Architecture (After Phase 6 Implementation)
+
+**Enhanced Domain Layer with User Configuration:**
 ```
 src/domain/
 ├── learning/services/
-│   ├── schedule_card.py            # FSRS algorithm (KEEP)
-│   └── complete_learning_session.py  # NEW: Session business logic
+│   ├── schedule_card.py            # FSRS algorithm
+│   └── complete_learning_session.py  # Session business logic
 ├── content/services/
-│   ├── generate_answer.py          # Multilingual generation (KEEP)
-│   ├── process_image.py            # Image processing (KEEP) 
-│   └── build_dataset.py            # NEW: Dataset building logic
-└── analytics/services/
-    ├── analyze_performance.py      # Performance analysis (KEEP)
-    ├── detect_leech.py             # Leech detection (KEEP)
-    └── optimize_interleaving.py    # Interleaving optimization (KEEP)
+│   ├── generate_answer.py          # Multilingual generation (dev mode check)
+│   ├── process_image.py            # Image processing (dev mode check)
+│   └── build_dataset.py            # Dataset building (dev mode check)
+├── analytics/services/
+│   ├── analyze_performance.py      # Performance analysis
+│   ├── detect_leech.py             # Leech detection
+│   └── optimize_interleaving.py    # Interleaving optimization
+├── user/                           # NEW: User Configuration Context
+│   ├── models/
+│   │   ├── user_settings.py        # UserSettings aggregate
+│   │   └── developer_mode.py       # DeveloperMode value object
+│   ├── services/
+│   │   ├── save_user_settings.py   # Save preferences
+│   │   ├── load_user_settings.py   # Load preferences
+│   │   └── toggle_developer_mode.py # Developer mode control
+│   └── events/
+│       └── user_events.py          # User configuration events
+└── shared/
+    ├── events.py                   # Enhanced with user events
+    └── services.py                 # Base classes with developer mode checks
+```
+
+**Event Flow Management:**
+```
+docs/
+├── event-flows.yaml                # Explicit event flow definitions
+└── event-flow-diagrams/            # Auto-generated flow visualizations
+
+src/infrastructure/messaging/
+├── event_bus.py                    # Enhanced with flow validation
+├── event_flow_orchestrator.py     # NEW: DAG validation and monitoring
+└── event_flow_health_checker.py   # NEW: Flow health monitoring
+```
+
+**Enhanced Terminal UI with Settings:**
+```
+src/presentation/terminal/
+├── trainer_app.py                  # Main menu with settings option
+├── settings_view.py                # NEW: Settings management screen
+├── developer_view.py               # NEW: Developer operations screen
+├── first_time_setup_view.py        # NEW: Onboarding wizard
+└── base.py                         # Event-aware components
 ```
 
 ## 📊 Data Overview
@@ -407,8 +467,59 @@ The project uses several tools for code quality:
 4. Push to GitHub
 5. GitHub Actions will handle the release
 
+## 🔄 Event Flow Management
+
+### Event Flow Definition File
+
+The application uses an explicit event flow definition system through `docs/event-flows.yaml`:
+
+```yaml
+# Example event definition
+events:
+  AppStartedEvent:
+    category: system
+    triggers: [FirstTimeSetupEvent, UserSettingsLoadedEvent]
+    dependencies: []
+    description: "Application startup initialization"
+
+# Example flow definition  
+flows:
+  first_time_setup:
+    name: "First Time User Setup"
+    sequence:
+      - AppStartedEvent
+      - FirstTimeSetupEvent
+      - LanguageSelectedEvent
+      - DeveloperModeToggledEvent
+```
+
+### Benefits of Explicit Event Flow Definition
+
+1. **Cross-Platform Consistency**: Same event flows work across terminal, mobile, desktop, web
+2. **DAG Validation**: Prevents circular dependencies and ensures proper event ordering
+3. **Documentation**: Self-documenting event relationships and user flows
+4. **Debugging**: Event sequence tracking and flow health monitoring
+5. **Validation**: Runtime validation of event flow compliance
+
+### Event Categories
+
+- **System**: Application lifecycle (startup, shutdown, migration)
+- **User**: User actions and preferences (settings, developer mode)
+- **Learning**: FSRS scheduling and session management
+- **Content**: Question processing and dataset generation
+- **Analytics**: Performance tracking and analysis
+- **Developer**: Developer-only operations (API usage, dataset building)
+
+### User Flow Patterns
+
+1. **First-time Setup**: `AppStarted` → `FirstTimeSetup` → `LanguageSelected` → `DeveloperModeToggled`
+2. **Daily Usage**: `AppStarted` → `UserSettingsLoaded` → `SessionStarted` → Learning Loop
+3. **Settings Management**: `SettingsOpened` → `UserSettingsChanged` → `SettingsSaved`
+4. **Developer Operations**: `DeveloperModeToggled` → `DatasetBuildStarted` → AI Processing
+
 ## 📚 Additional Resources
 
+- **[Event Flow Definition](./event-flows.yaml)** - Complete event flow specifications
 - **[Dataset Generation Guide](./dataset-generation-guide.md)** - Complete workflow for generating final_dataset.json
 - [Integration Exam Research](./integration_exam_research.md) - Background research
 
@@ -419,19 +530,29 @@ For questions or support, please open an issue on GitHub.
 ## 📋 Quick Start for New Developers
 
 ### Architecture Status
-- **Domain Layer**: Complete with all 4 bounded contexts and domain services
+- **Domain Layer**: Complete with 4 bounded contexts, User context in development
 - **Infrastructure**: EventBus, database, repositories working correctly  
 - **Application Layer**: Thin coordinators with proper DDD separation (Phase 4.1 ✅ Complete)
 - **CQRS Structure**: Commands, queries, events, workflows properly organized
-- **Quality Assurance**: 453 tests passing, all linting and type checks green
-- **Current Phase**: Terminal UI implementation (Phase 6) - architecture ready
+- **Terminal UI**: Complete Rich/Textual implementation (Phase 5 ✅ Complete)
+- **Event Flow System**: Explicit YAML definition created, validation engine planned
+- **Quality Assurance**: 416+ tests passing, all linting and type checks green
+- **Current Phase**: User Configuration & Event Flow DAG (Phase 6) - in progress
 
 ### For Different Developer Roles
-- **New Contributors**: Focus on Terminal UI development after Phase 4.1 fixes
-- **Domain Developers**: Extend existing contexts or add new bounded contexts  
-- **UI Developers**: Terminal interface ready for Rich/Textual implementation
-- **Algorithm Developers**: FSRS implementation complete, ready for optimization  
+- **New Contributors**: Focus on user configuration domain and event flow validation
+- **Domain Developers**: Implement User bounded context, extend event flow system
+- **UI Developers**: Add settings screens and first-time setup wizard to terminal UI
+- **Platform Developers**: Use event flow YAML for mobile/desktop/web implementations
+- **Algorithm Developers**: FSRS implementation complete, ready for user preference integration
+
+### Current Development Priorities
+1. **User Configuration Domain**: Create UserSettings aggregate and domain services
+2. **Developer Mode Control**: Implement access restrictions for Gemini services
+3. **Event Flow Validation**: Build DAG validation engine from YAML definitions
+4. **Settings UI**: Add configuration screens to terminal interface
+5. **Cross-Platform Events**: Ensure event flows work across all target platforms
 
 ---
 
-**Last Updated**: January 17, 2025 - Phase 4.1 Complete, Terminal UI Implementation Next
+**Last Updated**: June 16, 2025 - Phase 6 User Configuration & Event Flow DAG In Progress

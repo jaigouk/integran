@@ -40,6 +40,13 @@ def main(force: bool, questions_file: Path | None, language: str) -> None:
     This command sets up the database schema and loads the German Integration
     Exam questions from the questions.json file.
     """
+    import asyncio
+
+    return asyncio.run(main_async(force, questions_file, language))
+
+
+async def main_async(force: bool, questions_file: Path | None, language: str) -> None:
+    """Async implementation of the main setup function."""
     try:
         console.print("[bold blue]🚀 Integran Setup[/bold blue]")
         console.print()
@@ -52,10 +59,19 @@ def main(force: bool, questions_file: Path | None, language: str) -> None:
         if questions_file is None:
             try:
                 console.print("[blue]🔍 Checking for questions data...[/blue]")
-                questions_file = ensure_questions_available()
-                console.print(
-                    f"[green]✅ Questions available at: {questions_file}[/green]"
-                )
+
+                # Check for final dataset first (preferred)
+                final_dataset = Path("data/final_dataset.json")
+                if final_dataset.exists():
+                    questions_file = final_dataset
+                    console.print(
+                        f"[green]✅ Using final dataset: {questions_file}[/green]"
+                    )
+                else:
+                    questions_file = ensure_questions_available()
+                    console.print(
+                        f"[green]✅ Questions available at: {questions_file}[/green]"
+                    )
             except FileNotFoundError as e:
                 console.print("[yellow]⚠️  No questions data found.[/yellow]")
                 console.print(str(e))
@@ -101,12 +117,11 @@ def main(force: bool, questions_file: Path | None, language: str) -> None:
         # Create config file if it doesn't exist
         _create_config_file()
 
-        # Initialize user settings with defaults
-        _initialize_user_settings(db_manager)
-
-        # Set preferred language
-        db_manager.set_user_setting("preferred_language", language)
-        console.print(f"[green]✅ Preferred language set to: {language}[/green]")
+        # Initialize user settings with defaults using new User domain
+        await _initialize_user_configuration(db_manager, language)
+        console.print(
+            f"[green]✅ User configuration initialized with language: {language}[/green]"
+        )
 
         console.print()
         console.print("[bold green]🎉 Setup completed successfully![/bold green]")
@@ -199,20 +214,66 @@ def _create_config_file() -> None:
     console.print(f"[green]✅ Configuration file created at {config_file}[/green]")
 
 
-def _initialize_user_settings(db_manager: DatabaseManager) -> None:
-    """Initialize default user settings in the database."""
-    default_settings = {
-        "preferred_language": "en",
-        "show_explanations": True,
-        "multilingual_mode": True,
-        "image_descriptions": True,
-    }
+async def _initialize_user_configuration(
+    db_manager: DatabaseManager, language: str = "en"
+) -> None:
+    """Initialize user configuration using new User domain."""
+    try:
+        from src.domain.user.models.user_models import Language, UserSettings
+        from src.domain.user.services.load_user_settings import LoadUserSettings
+        from src.domain.user.services.save_user_settings import SaveUserSettings
+        from src.infrastructure.messaging.event_bus import EventBus
+        from src.infrastructure.repositories.user_repository import (
+            UserSettingsRepository,
+        )
 
-    for key, value in default_settings.items():
-        # Only set if not already exists
-        existing = db_manager.get_user_setting(key)
-        if existing is None:
-            db_manager.set_user_setting(key, value)
+        # Initialize User domain services
+        event_bus = EventBus()
+        user_repo = UserSettingsRepository(db_manager)
+        load_service = LoadUserSettings(event_bus, user_repo)
+        save_service = SaveUserSettings(event_bus, user_repo)
+
+        # Load or create user settings
+        from src.domain.user.models.user_models import LoadUserSettingsRequest
+
+        load_request = LoadUserSettingsRequest(user_id=1)
+        load_result = await load_service.call(load_request)
+
+        if load_result.success and load_result.user_settings:
+            # Update language if specified
+            if language != "en":
+                try:
+                    lang_enum = Language(language)
+                    updated_settings = load_result.user_settings.update_language(
+                        lang_enum
+                    )
+
+                    # Save updated settings
+                    from src.domain.user.models.user_models import (
+                        SaveUserSettingsRequest,
+                    )
+
+                    save_request = SaveUserSettingsRequest(
+                        user_settings=updated_settings
+                    )
+                    await save_service.call(save_request)
+                except ValueError:
+                    # Invalid language, keep default
+                    pass
+        else:
+            # Create default settings if load failed
+            default_settings = UserSettings.create_default(user_id=1)
+            from src.domain.user.models.user_models import SaveUserSettingsRequest
+
+            save_request = SaveUserSettingsRequest(user_settings=default_settings)
+            await save_service.call(save_request)
+
+    except Exception as e:
+        # Fallback for any errors during migration
+        console.print(
+            f"[yellow]⚠️ User configuration initialization skipped: {e}[/yellow]"
+        )
+        console.print("[yellow]User settings will be created on first use.[/yellow]")
 
 
 if __name__ == "__main__":

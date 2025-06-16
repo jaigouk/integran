@@ -204,24 +204,8 @@ class QuestionExplanation(Base):
     __table_args__ = ({"extend_existing": True},)
 
 
-class UserSettings(Base):
-    """User settings and preferences."""
-
-    __tablename__ = "user_settings"
-
-    id = Column(Integer, primary_key=True)
-    setting_key = Column(String(100), unique=True, nullable=False)
-    setting_value = Column(Text, nullable=False)  # JSON serialized value
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
-    )
-    updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(UTC).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
-    )
-
-    __table_args__ = ({"extend_existing": True},)
+# UserSettings moved to src/domain/user/models/user_models.py
+# This is now handled by the User bounded context
 
 
 # ============================================================================

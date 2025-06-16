@@ -19,7 +19,7 @@ from src.infrastructure.messaging.event_bus import DomainEvent, EventBus
 
 
 @dataclass
-class TestRequest:
+class MockRequest:
     """Test request for domain service testing."""
 
     user_id: int
@@ -28,7 +28,7 @@ class TestRequest:
 
 
 @dataclass
-class TestResponse:
+class MockResponse:
     """Test response for domain service testing."""
 
     success: bool
@@ -37,7 +37,7 @@ class TestResponse:
 
 
 @dataclass
-class TestEvent(DomainEvent):
+class MockEvent(DomainEvent):
     """Test event for domain service testing."""
 
     user_id: int
@@ -48,10 +48,10 @@ class TestEvent(DomainEvent):
         DomainEvent.__init__(self)
 
 
-class ConcreteDomainService(DomainService[TestRequest, TestResponse]):
+class ConcreteDomainService(DomainService[MockRequest, MockResponse]):
     """Concrete implementation for testing."""
 
-    async def call(self, request: TestRequest) -> TestResponse:
+    async def call(self, request: MockRequest) -> MockResponse:
         """Test implementation of call method."""
         if not request.valid:
             raise ValidationError("Invalid request", field="valid")
@@ -60,20 +60,20 @@ class ConcreteDomainService(DomainService[TestRequest, TestResponse]):
         processed_data = f"processed_{request.data}"
 
         # Publish event
-        event = TestEvent(user_id=request.user_id, message="Test operation completed")
+        event = MockEvent(user_id=request.user_id, message="Test operation completed")
         await self._publish_event(event)
 
-        return TestResponse(
+        return MockResponse(
             success=True,
             message="Operation completed successfully",
             processed_data=processed_data,
         )
 
 
-class FailingDomainService(DomainService[TestRequest, TestResponse]):
+class FailingDomainService(DomainService[MockRequest, MockResponse]):
     """Domain service that fails for testing error scenarios."""
 
-    async def call(self, request: TestRequest) -> TestResponse:
+    async def call(self, request: MockRequest) -> MockResponse:
         """Test implementation that raises exceptions."""
         if request.data == "business_error":
             raise BusinessRuleViolationError("Business rule violated", rule="test_rule")
@@ -82,7 +82,7 @@ class FailingDomainService(DomainService[TestRequest, TestResponse]):
         elif request.data == "generic_error":
             raise Exception("Generic error")
 
-        return TestResponse(success=True, message="Success")
+        return MockResponse(success=True, message="Success")
 
 
 @pytest.fixture
@@ -119,7 +119,7 @@ class TestDomainService:
     @pytest.mark.asyncio
     async def test_call_success(self, domain_service, mock_event_bus):
         """Test successful domain service call."""
-        request = TestRequest(user_id=1, data="test_data")
+        request = MockRequest(user_id=1, data="test_data")
 
         result = await domain_service.call(request)
 
@@ -130,14 +130,14 @@ class TestDomainService:
         # Verify event was published
         mock_event_bus.publish.assert_called_once()
         published_event = mock_event_bus.publish.call_args[0][0]
-        assert isinstance(published_event, TestEvent)
+        assert isinstance(published_event, MockEvent)
         assert published_event.user_id == 1
         assert published_event.message == "Test operation completed"
 
     @pytest.mark.asyncio
     async def test_call_validation_error(self, domain_service):
         """Test domain service call with validation error."""
-        request = TestRequest(user_id=1, data="test_data", valid=False)
+        request = MockRequest(user_id=1, data="test_data", valid=False)
 
         with pytest.raises(ValidationError) as exc_info:
             await domain_service.call(request)
@@ -149,7 +149,7 @@ class TestDomainService:
     @pytest.mark.asyncio
     async def test_publish_event_success(self, domain_service, mock_event_bus):
         """Test successful event publishing."""
-        event = TestEvent(user_id=1, message="Test event")
+        event = MockEvent(user_id=1, message="Test event")
 
         await domain_service._publish_event(event)
 
@@ -159,7 +159,7 @@ class TestDomainService:
     async def test_publish_event_failure(self, domain_service, mock_event_bus):
         """Test event publishing failure handling."""
         mock_event_bus.publish.side_effect = Exception("Event bus error")
-        event = TestEvent(user_id=1, message="Test event")
+        event = MockEvent(user_id=1, message="Test event")
 
         # Should not raise exception
         await domain_service._publish_event(event)
@@ -170,14 +170,14 @@ class TestDomainService:
     async def test_publish_event_failure_logging(self, domain_service, mock_event_bus):
         """Test that event publishing failures are logged."""
         mock_event_bus.publish.side_effect = Exception("Event bus error")
-        event = TestEvent(user_id=1, message="Test event")
+        event = MockEvent(user_id=1, message="Test event")
 
         with patch.object(domain_service.logger, "error") as mock_logger:
             await domain_service._publish_event(event)
 
             mock_logger.assert_called_once()
             call_args = mock_logger.call_args[0][0]
-            assert "Failed to publish event TestEvent" in call_args
+            assert "Failed to publish event MockEvent" in call_args
             assert "Event bus error" in call_args
 
 
@@ -255,7 +255,7 @@ class TestFailingDomainService:
     @pytest.mark.asyncio
     async def test_business_rule_violation(self, failing_service):
         """Test business rule violation error."""
-        request = TestRequest(user_id=1, data="business_error")
+        request = MockRequest(user_id=1, data="business_error")
 
         with pytest.raises(BusinessRuleViolationError) as exc_info:
             await failing_service.call(request)
@@ -266,7 +266,7 @@ class TestFailingDomainService:
     @pytest.mark.asyncio
     async def test_domain_service_error(self, failing_service):
         """Test domain service error."""
-        request = TestRequest(user_id=1, data="domain_error")
+        request = MockRequest(user_id=1, data="domain_error")
 
         with pytest.raises(DomainServiceError) as exc_info:
             await failing_service.call(request)
@@ -277,7 +277,7 @@ class TestFailingDomainService:
     @pytest.mark.asyncio
     async def test_generic_error(self, failing_service):
         """Test generic exception handling."""
-        request = TestRequest(user_id=1, data="generic_error")
+        request = MockRequest(user_id=1, data="generic_error")
 
         with pytest.raises(Exception) as exc_info:
             await failing_service.call(request)
@@ -292,13 +292,13 @@ class TestLogDomainOperation:
     async def test_successful_operation_logging(self, mock_event_bus):
         """Test successful operation logging."""
 
-        class LoggedService(DomainService[TestRequest, TestResponse]):
+        class LoggedService(DomainService[MockRequest, MockResponse]):
             @log_domain_operation
-            async def call(self, _request: TestRequest) -> TestResponse:
-                return TestResponse(success=True, message="Success")
+            async def call(self, _request: MockRequest) -> MockResponse:
+                return MockResponse(success=True, message="Success")
 
         service = LoggedService(mock_event_bus)
-        request = TestRequest(user_id=1, data="test")
+        request = MockRequest(user_id=1, data="test")
 
         with patch.object(service.logger, "info") as mock_info:
             result = await service.call(request)
@@ -319,13 +319,13 @@ class TestLogDomainOperation:
     async def test_failed_operation_logging(self, mock_event_bus):
         """Test failed operation logging."""
 
-        class LoggedFailingService(DomainService[TestRequest, TestResponse]):
+        class LoggedFailingService(DomainService[MockRequest, MockResponse]):
             @log_domain_operation
-            async def call(self, _request: TestRequest) -> TestResponse:
+            async def call(self, _request: MockRequest) -> MockResponse:
                 raise Exception("Test error")
 
         service = LoggedFailingService(mock_event_bus)
-        request = TestRequest(user_id=1, data="test")
+        request = MockRequest(user_id=1, data="test")
 
         with (
             patch.object(service.logger, "info") as mock_info,
@@ -352,17 +352,17 @@ class TestValidateRequest:
     def test_successful_validation(self, mock_event_bus):
         """Test successful request validation."""
 
-        def test_validator(request: TestRequest) -> None:
+        def test_validator(request: MockRequest) -> None:
             if not request.valid:
                 raise ValueError("Request is invalid")
 
-        class ValidatedService(DomainService[TestRequest, TestResponse]):
+        class ValidatedService(DomainService[MockRequest, MockResponse]):
             @validate_request(test_validator)
-            async def call(self, _request: TestRequest) -> TestResponse:
-                return TestResponse(success=True, message="Success")
+            async def call(self, _request: MockRequest) -> MockResponse:
+                return MockResponse(success=True, message="Success")
 
         service = ValidatedService(mock_event_bus)
-        request = TestRequest(user_id=1, data="test", valid=True)
+        request = MockRequest(user_id=1, data="test", valid=True)
 
         # Should not raise exception
         import asyncio
@@ -373,17 +373,17 @@ class TestValidateRequest:
     def test_failed_validation(self, mock_event_bus):
         """Test failed request validation."""
 
-        def test_validator(request: TestRequest) -> None:
+        def test_validator(request: MockRequest) -> None:
             if not request.valid:
                 raise ValueError("Request is invalid")
 
-        class ValidatedService(DomainService[TestRequest, TestResponse]):
+        class ValidatedService(DomainService[MockRequest, MockResponse]):
             @validate_request(test_validator)
-            async def call(self, _request: TestRequest) -> TestResponse:
-                return TestResponse(success=True, message="Success")
+            async def call(self, _request: MockRequest) -> MockResponse:
+                return MockResponse(success=True, message="Success")
 
         service = ValidatedService(mock_event_bus)
-        request = TestRequest(user_id=1, data="test", valid=False)
+        request = MockRequest(user_id=1, data="test", valid=False)
 
         import asyncio
 
@@ -401,30 +401,30 @@ class TestDomainServiceIntegration:
     async def test_end_to_end_flow(self, mock_event_bus):
         """Test complete end-to-end domain service flow."""
 
-        def request_validator(request: TestRequest) -> None:
+        def request_validator(request: MockRequest) -> None:
             if request.user_id <= 0:
                 raise ValueError("User ID must be positive")
 
-        class IntegratedService(DomainService[TestRequest, TestResponse]):
+        class IntegratedService(DomainService[MockRequest, MockResponse]):
             @log_domain_operation
             @validate_request(request_validator)
-            async def call(self, request: TestRequest) -> TestResponse:
+            async def call(self, request: MockRequest) -> MockResponse:
                 # Simulate business logic
                 if request.data == "special":
                     raise BusinessRuleViolationError("Special data not allowed")
 
                 # Publish event
-                event = TestEvent(user_id=request.user_id, message="Integration test")
+                event = MockEvent(user_id=request.user_id, message="Integration test")
                 await self._publish_event(event)
 
-                return TestResponse(
+                return MockResponse(
                     success=True,
                     message="Integration successful",
                     processed_data=f"integrated_{request.data}",
                 )
 
         service = IntegratedService(mock_event_bus)
-        request = TestRequest(user_id=1, data="test_data")
+        request = MockRequest(user_id=1, data="test_data")
 
         with patch.object(service.logger, "info") as mock_info:
             result = await service.call(request)
