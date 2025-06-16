@@ -770,6 +770,24 @@ class DatabaseManager:
                 .all()
             )
 
+    def count_due_fsrs_cards(self, user_id: int = 1) -> int:
+        """Count FSRS cards due for review.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Number of due cards
+        """
+        now = datetime.now(UTC).timestamp()
+
+        with self.get_session() as session:
+            return (
+                session.query(FSRSCard)
+                .filter(FSRSCard.user_id == user_id, FSRSCard.next_review_date <= now)
+                .count()
+            )
+
     def update_fsrs_card(
         self,
         card_id: int,

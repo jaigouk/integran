@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 import pytest
 from click.testing import CliRunner
 
-from src.application_services.setup.database_setup_service import (
+from src.application.setup.database_setup_service import (
     _create_config_file,
     _create_sample_questions,
     _initialize_user_settings,
@@ -62,12 +62,10 @@ class TestDatabaseSetupService:
         assert questions_file.exists()
         assert questions_file.parent.exists()
 
-    @patch("src.application_services.setup.database_setup_service.console")
+    @patch("src.application.setup.database_setup_service.console")
     def test_create_config_file_new(self, mock_console, temp_dir: Path) -> None:
         """Test creating new config file."""
-        with patch(
-            "src.application_services.setup.database_setup_service.Path"
-        ) as mock_path:
+        with patch("src.application.setup.database_setup_service.Path") as mock_path:
             config_file = temp_dir / "config.json"
             mock_path.return_value = config_file
 
@@ -88,12 +86,10 @@ class TestDatabaseSetupService:
             # Verify console print was called
             mock_console.print.assert_called_once()
 
-    @patch("src.application_services.setup.database_setup_service.console")
+    @patch("src.application.setup.database_setup_service.console")
     def test_create_config_file_existing(self, mock_console, temp_dir: Path) -> None:
         """Test that existing config file is not overwritten."""
-        with patch(
-            "src.application_services.setup.database_setup_service.Path"
-        ) as mock_path:
+        with patch("src.application.setup.database_setup_service.Path") as mock_path:
             config_file = temp_dir / "config.json"
             mock_path.return_value = config_file
 
@@ -142,15 +138,11 @@ class TestDatabaseSetupService:
         for call in expected_calls:
             mock_db.set_user_setting.assert_any_call(*call[0])
 
-    @patch("src.application_services.setup.database_setup_service.DatabaseManager")
-    @patch(
-        "src.application_services.setup.database_setup_service.ensure_questions_available"
-    )
-    @patch("src.application_services.setup.database_setup_service._create_config_file")
-    @patch(
-        "src.application_services.setup.database_setup_service._initialize_user_settings"
-    )
-    @patch("src.application_services.setup.database_setup_service.Path")
+    @patch("src.application.setup.database_setup_service.DatabaseManager")
+    @patch("src.application.setup.database_setup_service.ensure_questions_available")
+    @patch("src.application.setup.database_setup_service._create_config_file")
+    @patch("src.application.setup.database_setup_service._initialize_user_settings")
+    @patch("src.application.setup.database_setup_service.Path")
     def test_main_success_with_questions(
         self,
         mock_path_class,
@@ -194,14 +186,10 @@ class TestDatabaseSetupService:
         mock_create_config.assert_called_once()
         mock_init_settings.assert_called_once_with(mock_db)
 
-    @patch("src.application_services.setup.database_setup_service.DatabaseManager")
-    @patch(
-        "src.application_services.setup.database_setup_service.ensure_questions_available"
-    )
-    @patch("src.application_services.setup.database_setup_service.click.confirm")
-    @patch(
-        "src.application_services.setup.database_setup_service._create_sample_questions"
-    )
+    @patch("src.application.setup.database_setup_service.DatabaseManager")
+    @patch("src.application.setup.database_setup_service.ensure_questions_available")
+    @patch("src.application.setup.database_setup_service.click.confirm")
+    @patch("src.application.setup.database_setup_service._create_sample_questions")
     def test_main_no_questions_create_sample(
         self,
         mock_create_sample,
@@ -231,11 +219,9 @@ class TestDatabaseSetupService:
         mock_create_sample.assert_called_once()
         mock_db.load_questions.assert_called_once()
 
-    @patch("src.application_services.setup.database_setup_service.DatabaseManager")
-    @patch(
-        "src.application_services.setup.database_setup_service.ensure_questions_available"
-    )
-    @patch("src.application_services.setup.database_setup_service.click.confirm")
+    @patch("src.application.setup.database_setup_service.DatabaseManager")
+    @patch("src.application.setup.database_setup_service.ensure_questions_available")
+    @patch("src.application.setup.database_setup_service.click.confirm")
     def test_main_no_questions_decline_sample(
         self,
         mock_confirm,
@@ -272,13 +258,11 @@ class TestDatabaseSetupService:
 
         with (
             patch(
-                "src.application_services.setup.database_setup_service.DatabaseManager"
+                "src.application.setup.database_setup_service.DatabaseManager"
             ) as mock_db_class,
+            patch("src.application.setup.database_setup_service._create_config_file"),
             patch(
-                "src.application_services.setup.database_setup_service._create_config_file"
-            ),
-            patch(
-                "src.application_services.setup.database_setup_service._initialize_user_settings"
+                "src.application.setup.database_setup_service._initialize_user_settings"
             ),
         ):
             mock_db = Mock()
@@ -299,12 +283,10 @@ class TestDatabaseSetupService:
             assert result.exit_code == 0
             mock_db.load_questions.assert_called_once_with(questions_file)
 
-    @patch("src.application_services.setup.database_setup_service.DatabaseManager")
-    @patch("src.application_services.setup.database_setup_service.Path")
-    @patch("src.application_services.setup.database_setup_service.click.confirm")
-    @patch(
-        "src.application_services.setup.database_setup_service.ensure_questions_available"
-    )
+    @patch("src.application.setup.database_setup_service.DatabaseManager")
+    @patch("src.application.setup.database_setup_service.Path")
+    @patch("src.application.setup.database_setup_service.click.confirm")
+    @patch("src.application.setup.database_setup_service.ensure_questions_available")
     def test_main_database_exists_cancel(
         self,
         mock_ensure_questions,
@@ -356,7 +338,7 @@ class TestDatabaseSetupService:
             json.dump([{"id": 1, "question": "Test"}], f)
 
         with patch(
-            "src.application_services.setup.database_setup_service.DatabaseManager"
+            "src.application.setup.database_setup_service.DatabaseManager"
         ) as mock_db_class:
             mock_db = Mock()
             mock_db.load_questions.return_value = 1
@@ -371,7 +353,7 @@ class TestDatabaseSetupService:
             assert result.exit_code == 0
             assert "🎉 Setup completed successfully!" in result.output
 
-    @patch("src.application_services.setup.database_setup_service.DatabaseManager")
+    @patch("src.application.setup.database_setup_service.DatabaseManager")
     def test_main_keyboard_interrupt(self, mock_db_class, runner: CliRunner) -> None:
         """Test keyboard interrupt handling."""
         mock_db_class.side_effect = KeyboardInterrupt()
@@ -381,7 +363,7 @@ class TestDatabaseSetupService:
         assert result.exit_code == 0
         assert "Setup interrupted." in result.output
 
-    @patch("src.application_services.setup.database_setup_service.DatabaseManager")
+    @patch("src.application.setup.database_setup_service.DatabaseManager")
     def test_main_general_exception(self, mock_db_class, runner: CliRunner) -> None:
         """Test general exception handling."""
         mock_db_class.side_effect = Exception("Test error")
@@ -391,14 +373,10 @@ class TestDatabaseSetupService:
         assert result.exit_code == 1
         assert "Setup failed: Test error" in result.output
 
-    @patch("src.application_services.setup.database_setup_service.DatabaseManager")
-    @patch(
-        "src.application_services.setup.database_setup_service.ensure_questions_available"
-    )
-    @patch("src.application_services.setup.database_setup_service._create_config_file")
-    @patch(
-        "src.application_services.setup.database_setup_service._initialize_user_settings"
-    )
+    @patch("src.application.setup.database_setup_service.DatabaseManager")
+    @patch("src.application.setup.database_setup_service.ensure_questions_available")
+    @patch("src.application.setup.database_setup_service._create_config_file")
+    @patch("src.application.setup.database_setup_service._initialize_user_settings")
     def test_main_questions_load_error(
         self,
         _mock_init_settings,

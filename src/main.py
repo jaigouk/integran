@@ -155,6 +155,18 @@ def _start_trainer(
     review: bool,
 ) -> None:
     """Start the main trainer application."""
+    try:
+        # Try to use the new terminal UI
+        from src.presentation.terminal.main import run
+
+        console.print("[green]Starting modern terminal UI...[/green]")
+        run()
+        return
+    except ImportError:
+        # Fall back to legacy CLI interface
+        console.print("[yellow]Using legacy CLI interface...[/yellow]")
+        pass
+
     # Display welcome message
     _display_welcome()
 

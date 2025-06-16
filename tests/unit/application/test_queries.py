@@ -1,0 +1,200 @@
+"""Tests for application query handlers."""
+
+from __future__ import annotations
+
+from unittest.mock import Mock, patch
+
+import pytest
+
+from src.application.queries.get_session_progress_query import (
+    GetSessionProgressQuery,
+    GetSessionProgressQueryHandler,
+    GetSessionProgressResult,
+    SessionProgressData,
+)
+from src.infrastructure.database.database import DatabaseManager
+
+
+class TestGetSessionProgressQuery:
+    """Test GetSessionProgressQuery DTO."""
+
+    def test_query_creation(self):
+        """Test query creation with valid session ID."""
+        query = GetSessionProgressQuery(session_id=123)
+        assert query.session_id == 123
+
+    def test_validate_valid_session_id(self):
+        """Test validation with valid session ID."""
+        query = GetSessionProgressQuery(session_id=1)
+        assert query.validate() is True
+
+    def test_validate_invalid_session_id_zero(self):
+        """Test validation with zero session ID."""
+        query = GetSessionProgressQuery(session_id=0)
+        assert query.validate() is False
+
+    def test_validate_invalid_session_id_negative(self):
+        """Test validation with negative session ID."""
+        query = GetSessionProgressQuery(session_id=-1)
+        assert query.validate() is False
+
+
+class TestSessionProgressData:
+    """Test SessionProgressData DTO."""
+
+    def test_default_values(self):
+        """Test default values are set correctly."""
+        data = SessionProgressData()
+        assert data.total_questions == 0
+        assert data.questions_answered == 0
+        assert data.correct_answers == 0
+        assert data.current_streak == 0
+
+    def test_custom_values(self):
+        """Test custom values are set correctly."""
+        data = SessionProgressData(
+            total_questions=20,
+            questions_answered=15,
+            correct_answers=12,
+            current_streak=5,
+        )
+        assert data.total_questions == 20
+        assert data.questions_answered == 15
+        assert data.correct_answers == 12
+        assert data.current_streak == 5
+
+
+class TestGetSessionProgressResult:
+    """Test GetSessionProgressResult DTO."""
+
+    def test_default_values(self):
+        """Test default values are set correctly."""
+        result = GetSessionProgressResult()
+        assert result.success is False
+        assert result.error_message is None
+        assert result.progress is None
+
+    def test_success_result_with_progress(self):
+        """Test successful result with progress data."""
+        progress = SessionProgressData(
+            total_questions=10,
+            questions_answered=7,
+            correct_answers=5,
+            current_streak=3,
+        )
+        result = GetSessionProgressResult(success=True, progress=progress)
+        assert result.success is True
+        assert result.error_message is None
+        assert result.progress == progress
+
+    def test_error_result(self):
+        """Test error result with message."""
+        result = GetSessionProgressResult(
+            success=False,
+            error_message="Database connection failed",
+        )
+        assert result.success is False
+        assert result.error_message == "Database connection failed"
+        assert result.progress is None
+
+    def test_get_result_data_with_progress(self):
+        """Test get_result_data with progress data."""
+        progress = SessionProgressData(
+            total_questions=15,
+            questions_answered=10,
+            correct_answers=8,
+            current_streak=4,
+        )
+        result = GetSessionProgressResult(success=True, progress=progress)
+
+        data = result.get_result_data()
+        assert data["total"] == 15
+        assert data["answered"] == 10
+        assert data["correct"] == 8
+        assert data["streak"] == 4
+
+    def test_get_result_data_without_progress(self):
+        """Test get_result_data without progress data."""
+        result = GetSessionProgressResult(success=False)
+        data = result.get_result_data()
+        assert data == {}
+
+
+class TestGetSessionProgressQueryHandler:
+    """Test GetSessionProgressQueryHandler."""
+
+    @pytest.fixture
+    def mock_db_manager(self):
+        """Mock DatabaseManager."""
+        return Mock(spec=DatabaseManager)
+
+    @pytest.fixture
+    def handler(self, mock_db_manager):
+        """Create handler instance."""
+        return GetSessionProgressQueryHandler(db_manager=mock_db_manager)
+
+    @pytest.mark.asyncio
+    async def test_handle_success(self, handler):
+        """Test successful query handling."""
+        # Arrange
+        query = GetSessionProgressQuery(session_id=123)
+
+        # Act
+        result = await handler.handle(query)
+
+        # Assert
+        assert isinstance(result, GetSessionProgressResult)
+        assert result.success is True
+        assert result.error_message is None
+        assert result.progress is not None
+        assert isinstance(result.progress, SessionProgressData)
+
+        # Check placeholder data
+        assert result.progress.total_questions == 20
+        assert result.progress.questions_answered == 0
+        assert result.progress.correct_answers == 0
+        assert result.progress.current_streak == 0
+
+    @pytest.mark.asyncio
+    async def test_handle_with_exception(self, handler):
+        """Test query handling with database exception."""
+        # Arrange
+        query = GetSessionProgressQuery(session_id=123)
+
+        # Mock an exception in the handler's execution
+        with patch.object(handler, "db_manager") as mock_db:
+            mock_db.side_effect = Exception("Database error")
+
+            # Force an exception by patching the handler method
+            with patch.object(
+                SessionProgressData, "__init__", side_effect=Exception("Database error")
+            ):
+                # Act
+                result = await handler.handle(query)
+
+                # Assert
+                assert isinstance(result, GetSessionProgressResult)
+                assert result.success is False
+                assert "Failed to get session progress" in result.error_message
+                assert "Database error" in result.error_message
+                assert result.progress is None
+
+    @pytest.mark.asyncio
+    async def test_handler_initialization(self, mock_db_manager):
+        """Test handler initialization."""
+        handler = GetSessionProgressQueryHandler(db_manager=mock_db_manager)
+        assert handler.db_manager == mock_db_manager
+
+    def test_result_data_structure(self):
+        """Test that result data has expected structure."""
+        progress = SessionProgressData(
+            total_questions=25,
+            questions_answered=15,
+            correct_answers=12,
+            current_streak=6,
+        )
+        result = GetSessionProgressResult(success=True, progress=progress)
+
+        data = result.get_result_data()
+        expected_keys = {"total", "answered", "correct", "streak"}
+        assert set(data.keys()) == expected_keys

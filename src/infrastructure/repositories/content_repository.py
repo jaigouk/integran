@@ -57,11 +57,12 @@ class ContentRepository:
         with open(self.checkpoint_file, "w") as f:
             json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
 
-    async def save_final_dataset(self, questions: list[dict[str, Any]]) -> None:
+    async def save_final_dataset(self, questions: list[dict[str, Any]]) -> str:
         """Save the final dataset."""
         with open(self.questions_file, "w", encoding="utf-8") as f:
             json.dump(questions, f, ensure_ascii=False, indent=2)
         logger.info(f"Saved {len(questions)} questions to {self.questions_file}")
+        return str(self.questions_file)
 
     async def get_available_images(self) -> dict[int, list[str]]:
         """Get all available images organized by page number."""

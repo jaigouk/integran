@@ -58,3 +58,35 @@ class BatchContentProcessedEvent(DomainEvent):
     successful_count: int
     failed_count: int
     processing_time_ms: int
+
+
+@dataclass
+class DatasetBuildStartedEvent(DomainEvent):
+    """Event raised when dataset building process starts."""
+
+    total_questions: int
+    multilingual_enabled: bool
+    batch_size: int
+    force_rebuild: bool
+
+
+@dataclass
+class DatasetBuildCompletedEvent(DomainEvent):
+    """Event raised when dataset building process completes."""
+
+    total_questions: int
+    questions_with_answers: int
+    questions_with_images: int
+    build_duration_seconds: int
+    completion_rate: float
+    final_dataset_path: str
+
+
+@dataclass
+class DatasetBuildFailedEvent(DomainEvent):
+    """Event raised when dataset building process fails."""
+
+    error_message: str
+    failed_at_stage: str  # "images_processing", "answers_generating", "finalizing"
+    questions_processed: int
+    total_questions: int

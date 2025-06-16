@@ -4,7 +4,7 @@ This guide explains how non-technical contributors can review and verify the ans
 
 ## Overview
 
-The Integran project contains 310+ questions for the German Integration Exam (Leben in Deutschland Test). Each question includes:
+The Integran project contains 460 questions for the German Integration Exam (Leben in Deutschland Test). Each question includes:
 - Question text and multiple choice options
 - Correct answer and explanations in 5 languages (English, German, Turkish, Ukrainian, Arabic)
 - Explanations for why incorrect options are wrong

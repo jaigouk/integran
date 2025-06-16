@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from src.application_services.content.content_builder_service import (
-    ContentBuilderService,
+from src.application.workflows.build_dataset_workflow import (
+    DatasetBuildWorkflow,
 )
+from src.domain.content.services.build_dataset import BuildDataset
 from src.domain.content.services.create_image_mapping import CreateImageMapping
 from src.domain.content.services.generate_answer import GenerateAnswer
 from src.domain.content.services.process_image import ProcessImage
@@ -27,11 +28,14 @@ class ContentContainer:
         self._generate_answer = GenerateAnswer(event_bus=self._event_bus)
         self._process_image = ProcessImage(event_bus=self._event_bus)
         self._create_image_mapping = CreateImageMapping(event_bus=self._event_bus)
-
-        # Initialize application service
-        self._content_builder = ContentBuilderService(
+        self._build_dataset = BuildDataset(
             event_bus=self._event_bus,
             repository=self._repository,
+        )
+
+        # Initialize application service (thin coordinator)
+        self._content_builder = DatasetBuildWorkflow(
+            build_dataset_service=self._build_dataset,
         )
 
     def get_event_bus(self) -> EventBus:
@@ -54,6 +58,6 @@ class ContentContainer:
         """Get the CreateImageMapping domain service."""
         return self._create_image_mapping
 
-    def get_content_builder_service(self) -> ContentBuilderService:
+    def get_content_builder_service(self) -> DatasetBuildWorkflow:
         """Get the ContentBuilderService application service."""
         return self._content_builder

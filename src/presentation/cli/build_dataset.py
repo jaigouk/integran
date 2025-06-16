@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import sys
 from pathlib import Path
 
-from src.application_services.content.legacy_data_builder import DataBuilder
+from src.domain.content.services.build_dataset import (
+    BuildDataset,
+    BuildDatasetRequest,
+    GetBuildStatusRequest,
+)
 from src.infrastructure.config.settings import has_gemini_config
+from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.repositories.content_repository import ContentRepository
 
 logger = logging.getLogger(__name__)
 
@@ -94,12 +101,22 @@ Examples:
     setup_logging(args.verbose)
 
     try:
-        builder = DataBuilder()
+        # Initialize domain service
+        event_bus = EventBus()
+        repository = ContentRepository()
+        build_service = BuildDataset(repository=repository, event_bus=event_bus)
 
         # Show status if requested
         if args.status:
-            status = builder.get_build_status()
-            print_build_status(status)
+            status_request = GetBuildStatusRequest(include_detailed_progress=True)
+            status_result = asyncio.run(build_service.call(status_request))
+            if status_result.success:
+                print_build_status(status_result.detailed_status)
+            else:
+                logger.error(
+                    f"Failed to get build status: {status_result.error_message}"
+                )
+                sys.exit(1)
             return
 
         # Check prerequisites
@@ -126,30 +143,57 @@ Examples:
         logger.info("🚀 Starting dataset build...")
         logger.info("Settings:")
         logger.info(f"  - Force rebuild: {args.force_rebuild}")
-        logger.info(f"  - Use RAG: {not args.no_rag}")
+        logger.info(f"  - Use RAG: {not args.no_rag} (Note: RAG has been removed)")
         logger.info(f"  - Multilingual: {not args.no_multilingual}")
         logger.info(f"  - Batch size: {args.batch_size}")
 
-        success = builder.build_complete_dataset(
+        # Create build request
+        build_request = BuildDatasetRequest(
             force_rebuild=args.force_rebuild,
-            use_rag=not args.no_rag,
             multilingual=not args.no_multilingual,
             batch_size=args.batch_size,
+            enable_image_processing=True,
+            include_rag_sources=False,  # RAG has been removed
         )
 
-        if success:
+        # Execute build
+        build_result = asyncio.run(build_service.call(build_request))
+
+        if build_result.success:
             logger.info("✅ Dataset build completed successfully!")
 
-            # Show final status
-            status = builder.get_build_status()
-            print_build_status(status)
+            # Show final statistics
+            stats = build_result.statistics
+            logger.info("📊 Build Statistics:")
+            logger.info(f"  - Total questions: {stats.get('total_questions', 0)}")
+            logger.info(
+                f"  - Questions with answers: {stats.get('questions_with_answers', 0)}"
+            )
+            logger.info(
+                f"  - Questions with images: {stats.get('questions_with_images', 0)}"
+            )
+            logger.info(
+                f"  - Build duration: {stats.get('build_duration_minutes', 0):.1f} minutes"
+            )
+            logger.info(f"  - Completion rate: {stats.get('completion_rate', 0):.1f}%")
+
+            # Show final status using the new status system
+            status_request = GetBuildStatusRequest(include_detailed_progress=True)
+            status_result = asyncio.run(build_service.call(status_request))
+            if status_result.success:
+                print_build_status(status_result.detailed_status)
 
             logger.info("📁 Output files:")
-            logger.info("  - data/questions.json (Complete multilingual dataset)")
+            if build_result.final_dataset_path:
+                logger.info(
+                    f"  - {build_result.final_dataset_path} (Complete multilingual dataset)"
+                )
             logger.info("  - data/dataset_checkpoint.json (Build progress)")
 
         else:
             logger.error("❌ Dataset build failed")
+            if build_result.error_message:
+                logger.error(f"Error: {build_result.error_message}")
             logger.error("Check logs above for details")
             sys.exit(1)
 
