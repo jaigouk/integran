@@ -607,16 +607,3 @@ class TestScheduleCardService:
 @pytest.mark.integration
 class TestScheduleCardIntegration:
     """Integration tests for ScheduleCard service with real dependencies."""
-
-    @pytest.mark.asyncio
-    async def test_complete_workflow_integration(self) -> None:
-        """Test complete workflow with minimal mocking."""
-        # This would be an integration test with real database
-        # Skipping for unit test suite, but structure is here
-        pytest.skip("Integration test - requires real database setup")
-
-    @pytest.mark.asyncio
-    async def test_event_bus_integration(self) -> None:
-        """Test integration with real event bus."""
-        # This would test with real EventBus instance
-        pytest.skip("Integration test - requires event bus setup")

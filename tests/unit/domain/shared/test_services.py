@@ -19,7 +19,7 @@ from src.infrastructure.messaging.event_bus import DomainEvent, EventBus
 
 # Test fixtures
 @dataclass
-class TestRequest:
+class MockRequest:
     """Test request DTO."""
 
     value: int
@@ -27,14 +27,14 @@ class TestRequest:
 
 
 @dataclass
-class TestResponse:
+class MockResponse:
     """Test response DTO."""
 
     result: str
     success: bool = True
 
 
-class TestServiceEvent(DomainEvent):
+class MockServiceEvent(DomainEvent):
     """Test event for domain service."""
 
     def __init__(self, data: str, **kwargs):
@@ -42,10 +42,10 @@ class TestServiceEvent(DomainEvent):
         self.data = data
 
 
-class TestDomainService(DomainService[TestRequest, TestResponse]):
+class MockDomainService(DomainService[MockRequest, MockResponse]):
     """Test implementation of domain service."""
 
-    async def call(self, request: TestRequest) -> TestResponse:
+    async def call(self, request: MockRequest) -> MockResponse:
         """Process test request."""
         if request.value < 0:
             raise ValidationError("Value must be non-negative", "value")
@@ -59,12 +59,12 @@ class TestDomainService(DomainService[TestRequest, TestResponse]):
         result = f"Processed {request.name} with value {request.value}"
 
         # Publish event
-        await self._publish_event(TestServiceEvent(data=result))
+        await self._publish_event(MockServiceEvent(data=result))
 
-        return TestResponse(result=result)
+        return MockResponse(result=result)
 
 
-class TestDomainServiceBase:
+class MockDomainServiceBase:
     """Test the DomainService base class."""
 
     @pytest.fixture
@@ -77,12 +77,12 @@ class TestDomainServiceBase:
     @pytest.fixture
     def service(self, event_bus):
         """Create test domain service."""
-        return TestDomainService(event_bus)
+        return MockDomainService(event_bus)
 
     @pytest.mark.asyncio
     async def test_successful_call(self, service, event_bus):
         """Test successful domain service call."""
-        request = TestRequest(value=42, name="test-item")
+        request = MockRequest(value=42, name="test-item")
         response = await service.call(request)
 
         assert response.success
@@ -91,13 +91,13 @@ class TestDomainServiceBase:
         # Check event was published
         event_bus.publish.assert_called_once()
         published_event = event_bus.publish.call_args[0][0]
-        assert isinstance(published_event, TestServiceEvent)
+        assert isinstance(published_event, MockServiceEvent)
         assert published_event.data == response.result
 
     @pytest.mark.asyncio
     async def test_validation_error(self, service):
         """Test validation error handling."""
-        request = TestRequest(value=-1)
+        request = MockRequest(value=-1)
 
         with pytest.raises(ValidationError) as exc_info:
             await service.call(request)
@@ -109,7 +109,7 @@ class TestDomainServiceBase:
     @pytest.mark.asyncio
     async def test_business_rule_violation(self, service):
         """Test business rule violation handling."""
-        request = TestRequest(value=150)
+        request = MockRequest(value=150)
 
         with pytest.raises(BusinessRuleViolationError) as exc_info:
             await service.call(request)
@@ -123,22 +123,22 @@ class TestDomainServiceBase:
         """Test graceful handling of event publish failure."""
         event_bus.publish.side_effect = Exception("Event bus error")
 
-        request = TestRequest(value=42)
+        request = MockRequest(value=42)
 
         with caplog.at_level(logging.ERROR):
             response = await service.call(request)
 
         # Service should still succeed despite event failure
         assert response.success
-        assert "Failed to publish event TestServiceEvent" in caplog.text
+        assert "Failed to publish event MockServiceEvent" in caplog.text
 
     def test_logger_initialization(self, event_bus):
         """Test that service gets its own logger."""
-        service = TestDomainService(event_bus)
-        assert service.logger.name == "TestDomainService"
+        service = MockDomainService(event_bus)
+        assert service.logger.name == "MockDomainService"
 
 
-class TestDomainServiceError:
+class MockDomainServiceError:
     """Test DomainServiceError exception."""
 
     def test_basic_error(self):

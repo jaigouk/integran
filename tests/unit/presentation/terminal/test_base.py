@@ -15,7 +15,7 @@ from src.presentation.terminal.base import (
 
 
 # Test event for testing
-class TestEvent(DomainEvent):
+class MockEvent(DomainEvent):
     """Test domain event."""
 
     def __init__(
@@ -255,17 +255,17 @@ class TestEventBusIntegration:
             # Test that we can use the event bus alongside UI updates
             handler_called = False
 
-            async def test_handler(_event: TestEvent) -> None:
+            async def test_handler(_event: MockEvent) -> None:
                 nonlocal handler_called
                 handler_called = True
 
                 # Schedule UI update from event handler
                 updater.schedule_update(lambda: None)
 
-            event_bus.subscribe(TestEvent, test_handler)
+            event_bus.subscribe(MockEvent, test_handler)
 
             # Publish event
-            test_event = TestEvent(event_id="test", occurred_at=None, test_data="test")
+            test_event = MockEvent(event_id="test", occurred_at=None, test_data="test")
             await event_bus.publish(test_event)
 
             # Give time for processing

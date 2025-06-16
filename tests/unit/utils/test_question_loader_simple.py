@@ -40,39 +40,6 @@ class TestQuestionLoader:
         result = ensure_questions_available()
         assert result == mock_json_path
 
-    @pytest.mark.skip("Outdated: logic changed with new final_dataset.json approach")
-    @patch("src.utils.question_loader.get_settings")
-    @patch("src.utils.question_loader.Path")
-    def test_ensure_questions_available_checkpoint_exists(
-        self, mock_path_class, mock_get_settings
-    ):
-        """Test when checkpoint file exists but JSON doesn't."""
-        # Mock settings
-        mock_settings = MagicMock()
-        mock_settings.questions_json_path = "data/questions.json"
-        mock_get_settings.return_value = mock_settings
-
-        # Mock Path behavior
-        mock_json_path = MagicMock()
-        mock_json_path.exists.return_value = False
-        mock_checkpoint_path = MagicMock()
-        mock_checkpoint_path.exists.return_value = True
-
-        def path_side_effect(path_str):
-            if "questions.json" in str(path_str):
-                return mock_json_path
-            elif "checkpoint" in str(path_str):
-                return mock_checkpoint_path
-            return MagicMock()
-
-        mock_path_class.side_effect = path_side_effect
-
-        with pytest.raises(FileNotFoundError) as exc_info:
-            ensure_questions_available()
-
-        assert "extraction checkpoint exists" in str(exc_info.value)
-        assert "integran-build-dataset" in str(exc_info.value)
-
     @patch("src.utils.question_loader.get_settings")
     @patch("src.utils.question_loader.Path")
     def test_ensure_questions_available_no_files(

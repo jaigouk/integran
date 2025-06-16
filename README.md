@@ -16,7 +16,21 @@ A comprehensive, terminal-based training application for the German Integration 
 
 ## 🎯 Purpose
 
-The "Leben in Deutschland" test consists of 460 questions (300 general + 160 state-specific) covering German society, laws, culture, and history. This trainer helps you master all questions through:
+
+The "Leben in Deutschland" (LiD) exam, also known as the Einbürgerungstest, is primarily a multiple-choice test focused on knowledge about German society, law, history, and culture. It does **not** include dedicated reading or writing sections in the sense of language proficiency exams.
+
+- The LiD test consists of 33 multiple-choice questions: 30 general questions from a pool of 300, and 3 specific to the federal state where you live[3].
+- The questions are presented in written German, so basic reading comprehension is necessary to understand and answer them, but there is no separate reading comprehension section as found in language exams[3][9].
+- There is **no writing task**: you do not have to compose sentences, essays, or letters. You simply select the correct answer from the options provided[3][9].
+
+**Comparison with Other Exams:**
+
+- The **Deutsch-Test für Zuwanderer (DTZ)**, which is often taken alongside the LiD as part of integration courses, does include explicit reading and writing components, such as reading comprehension tasks and a written letter or email[1][6].
+- The **LiD** is not a language proficiency test but a knowledge test, so it does not assess your writing skills[3][9].
+
+
+
+The "Leben in Deutschland" test example pdf consists of 460 questions (300 general + 160 state-specific) covering German society, laws, culture, and history. This trainer helps you master all questions through:
 
 - **🧠 Smart Learning System**: Uses scientifically-proven spaced repetition to review questions at the perfect time when you're about to forget them
 - **📊 Personalized Scheduling**: The system learns from your performance and adapts to your memory patterns
@@ -25,6 +39,7 @@ The "Leben in Deutschland" test consists of 460 questions (300 general + 160 sta
 - **🤖 AI-Powered Explanations**: Comprehensive explanations for all questions with memory aids
 - **📈 Progress Tracking**: See your learning progress and retention rates in real-time
 - **🎯 Intelligent Review**: Focus more time on difficult questions, less on easy ones
+
 
 ## 🧠 How the Smart Learning System Works
 
