@@ -11,7 +11,7 @@ from src.domain.content.models.answer_models import (
     QuestionImageMappingResult,
 )
 from src.domain.shared.services import DomainService
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 

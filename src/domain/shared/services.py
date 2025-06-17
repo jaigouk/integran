@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar
 
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 

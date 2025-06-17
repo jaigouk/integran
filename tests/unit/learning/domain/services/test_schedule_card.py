@@ -30,7 +30,7 @@ from src.domain.learning.services.schedule_card import (
 from src.domain.shared.models import FSRSRating, FSRSState
 from src.domain.shared.services import ValidationError
 from src.infrastructure.database.database import DatabaseManager
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 
 class TestScheduleCardRequest:

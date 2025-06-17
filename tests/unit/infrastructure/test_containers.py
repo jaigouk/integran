@@ -13,7 +13,7 @@ from src.application.workflows.complete_learning_session_workflow import Session
 from src.infrastructure.containers.content_container import ContentContainer
 from src.infrastructure.containers.main_container import MainContainer
 from src.infrastructure.database.database import DatabaseManager
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
 
 
 @pytest.fixture(autouse=True)
@@ -28,7 +28,7 @@ def disable_vertex_ai(monkeypatch):
 class TestMainContainer:
     """Test MainContainer dependency injection."""
 
-    @patch("src.infrastructure.containers.main_container.EventBus")
+    @patch("src.infrastructure.containers.main_container.EnhancedEventBus")
     @patch("src.infrastructure.containers.main_container.DatabaseManager")
     @patch("src.infrastructure.containers.main_container.ContentContainer")
     @patch("src.infrastructure.containers.main_container.ScheduleCard")
@@ -49,16 +49,16 @@ class TestMainContainer:
     ):
         """Test that container initializes all dependencies correctly."""
         # Arrange
-        mock_event_bus = Mock(spec=EventBus)
+        mock_event_bus = Mock(spec=EnhancedEventBus)
         mock_db_manager = Mock(spec=DatabaseManager)
-        mock_event_bus_class.return_value = mock_event_bus
+        mock_event_bus_class.create_basic.return_value = mock_event_bus
         mock_db_manager_class.return_value = mock_db_manager
 
         # Act
         MainContainer()
 
         # Assert - Core infrastructure
-        mock_event_bus_class.assert_called_once()
+        mock_event_bus_class.create_basic.assert_called_once()
         mock_db_manager_class.assert_called_once()
 
         # Assert - Sub-containers
@@ -85,7 +85,7 @@ class TestMainContainer:
             db_manager=mock_db_manager,
         )
 
-    @patch("src.infrastructure.containers.main_container.EventBus")
+    @patch("src.infrastructure.containers.main_container.EnhancedEventBus")
     @patch("src.infrastructure.containers.main_container.DatabaseManager")
     @patch("src.infrastructure.containers.main_container.ContentContainer")
     @patch("src.infrastructure.containers.main_container.ScheduleCard")
@@ -105,15 +105,15 @@ class TestMainContainer:
         mock_event_bus_class,
     ):
         """Test getting event bus instance."""
-        mock_event_bus = Mock(spec=EventBus)
-        mock_event_bus_class.return_value = mock_event_bus
+        mock_event_bus = Mock(spec=EnhancedEventBus)
+        mock_event_bus_class.create_basic.return_value = mock_event_bus
 
         container = MainContainer()
         result = container.get_event_bus()
 
         assert result == mock_event_bus
 
-    @patch("src.infrastructure.containers.main_container.EventBus")
+    @patch("src.infrastructure.containers.main_container.EnhancedEventBus")
     @patch("src.infrastructure.containers.main_container.DatabaseManager")
     @patch("src.infrastructure.containers.main_container.ContentContainer")
     @patch("src.infrastructure.containers.main_container.ScheduleCard")
@@ -141,7 +141,7 @@ class TestMainContainer:
 
         assert result == mock_db
 
-    @patch("src.infrastructure.containers.main_container.EventBus")
+    @patch("src.infrastructure.containers.main_container.EnhancedEventBus")
     @patch("src.infrastructure.containers.main_container.DatabaseManager")
     @patch("src.infrastructure.containers.main_container.ContentContainer")
     @patch("src.infrastructure.containers.main_container.ScheduleCard")
@@ -169,7 +169,7 @@ class TestMainContainer:
 
         assert result == mock_content
 
-    @patch("src.infrastructure.containers.main_container.EventBus")
+    @patch("src.infrastructure.containers.main_container.EnhancedEventBus")
     @patch("src.infrastructure.containers.main_container.DatabaseManager")
     @patch("src.infrastructure.containers.main_container.ContentContainer")
     @patch("src.infrastructure.containers.main_container.ScheduleCard")
@@ -197,7 +197,7 @@ class TestMainContainer:
 
         assert result == mock_workflow
 
-    @patch("src.infrastructure.containers.main_container.EventBus")
+    @patch("src.infrastructure.containers.main_container.EnhancedEventBus")
     @patch("src.infrastructure.containers.main_container.DatabaseManager")
     @patch("src.infrastructure.containers.main_container.ContentContainer")
     @patch("src.infrastructure.containers.main_container.ScheduleCard")
@@ -229,7 +229,7 @@ class TestMainContainer:
 class TestContentContainer:
     """Test ContentContainer dependency injection."""
 
-    @patch("src.infrastructure.containers.content_container.EventBus")
+    @patch("src.infrastructure.containers.content_container.EnhancedEventBus")
     @patch("src.infrastructure.containers.content_container.ContentRepository")
     def test_container_initialization_with_provided_event_bus(
         self,
@@ -238,7 +238,7 @@ class TestContentContainer:
     ):
         """Test container initialization with provided event bus (lazy initialization)."""
         # Arrange
-        provided_event_bus = Mock(spec=EventBus)
+        provided_event_bus = Mock(spec=EnhancedEventBus)
 
         # Act
         container = ContentContainer(event_bus=provided_event_bus)
@@ -261,7 +261,7 @@ class TestContentContainer:
     def test_lazy_initialization_of_services(self):
         """Test that services are only initialized when accessed."""
         # Arrange
-        provided_event_bus = Mock(spec=EventBus)
+        provided_event_bus = Mock(spec=EnhancedEventBus)
 
         with (
             patch(
@@ -296,22 +296,22 @@ class TestContentContainer:
             container.get_create_image_mapping_service()
             mock_create_mapping.assert_called_once_with(event_bus=provided_event_bus)
 
-    @patch("src.infrastructure.containers.content_container.EventBus")
+    @patch("src.infrastructure.containers.content_container.EnhancedEventBus")
     def test_container_initialization_without_event_bus(self, mock_event_bus_class):
         """Test container initialization without provided event bus."""
         # Arrange
-        mock_event_bus = Mock(spec=EventBus)
-        mock_event_bus_class.return_value = mock_event_bus
+        mock_event_bus = Mock(spec=EnhancedEventBus)
+        mock_event_bus_class.create_basic.return_value = mock_event_bus
 
         # Act
         ContentContainer()
 
         # Assert - Creates new event bus
-        mock_event_bus_class.assert_called_once()
+        mock_event_bus_class.create_basic.assert_called_once()
 
     def test_get_event_bus(self):
         """Test getting event bus instance."""
-        provided_event_bus = Mock(spec=EventBus)
+        provided_event_bus = Mock(spec=EnhancedEventBus)
         container = ContentContainer(event_bus=provided_event_bus)
 
         result = container.get_event_bus()
@@ -333,7 +333,7 @@ class TestContentContainer:
         """Test getting generate answer service with lazy initialization."""
         mock_service = Mock()
         mock_generate_answer.return_value = mock_service
-        provided_event_bus = Mock(spec=EventBus)
+        provided_event_bus = Mock(spec=EnhancedEventBus)
 
         container = ContentContainer(event_bus=provided_event_bus)
         result = container.get_generate_answer_service()
@@ -352,7 +352,7 @@ class TestContentContainer:
         """Test getting process image service with lazy initialization."""
         mock_service = Mock()
         mock_process_image.return_value = mock_service
-        provided_event_bus = Mock(spec=EventBus)
+        provided_event_bus = Mock(spec=EnhancedEventBus)
 
         container = ContentContainer(event_bus=provided_event_bus)
         result = container.get_process_image_service()
@@ -365,7 +365,7 @@ class TestContentContainer:
         """Test getting create image mapping service with lazy initialization."""
         mock_service = Mock()
         mock_create_mapping.return_value = mock_service
-        provided_event_bus = Mock(spec=EventBus)
+        provided_event_bus = Mock(spec=EnhancedEventBus)
 
         container = ContentContainer(event_bus=provided_event_bus)
         result = container.get_create_image_mapping_service()
@@ -381,7 +381,7 @@ class TestContentContainer:
         mock_workflow_service = Mock()
         mock_build_dataset.return_value = mock_build_service
         mock_workflow.return_value = mock_workflow_service
-        provided_event_bus = Mock(spec=EventBus)
+        provided_event_bus = Mock(spec=EnhancedEventBus)
 
         with patch(
             "src.infrastructure.containers.content_container.ContentRepository"

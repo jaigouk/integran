@@ -15,7 +15,7 @@ from src.domain.shared.services import (
     log_domain_operation,
     validate_request,
 )
-from src.infrastructure.messaging.event_bus import DomainEvent, EventBus
+from src.infrastructure.messaging.enhanced_event_bus import DomainEvent, EventBus
 
 
 @dataclass

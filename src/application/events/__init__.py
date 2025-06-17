@@ -9,7 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
-from src.infrastructure.messaging.event_bus import DomainEvent
+from src.infrastructure.messaging.enhanced_event_bus import DomainEvent
 
 # Event type variable
 T = TypeVar("T", bound=DomainEvent)

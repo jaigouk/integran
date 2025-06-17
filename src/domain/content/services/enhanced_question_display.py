@@ -14,7 +14,7 @@ from src.domain.shared.services import (
     log_domain_operation,
 )
 from src.domain.user.models.user_models import Language
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 

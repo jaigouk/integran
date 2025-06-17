@@ -14,7 +14,7 @@ from src.domain.content.services.build_dataset import (
     GetBuildStatusRequest,
 )
 from src.infrastructure.config.settings import has_gemini_config
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
 from src.infrastructure.repositories.content_repository import ContentRepository
 
 logger = logging.getLogger(__name__)
@@ -102,7 +102,7 @@ Examples:
 
     try:
         # Initialize domain service
-        event_bus = EventBus()
+        event_bus = EnhancedEventBus.create_basic()
         repository = ContentRepository()
         build_service = BuildDataset(repository=repository, event_bus=event_bus)
 

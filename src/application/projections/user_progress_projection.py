@@ -10,7 +10,7 @@ from typing import Any
 from src.application.projections import ReadModelProjection
 from src.domain.learning.events.card_events import CardScheduledEvent
 from src.infrastructure.database.database import DatabaseManager
-from src.infrastructure.messaging.event_bus import DomainEvent
+from src.infrastructure.messaging.enhanced_event_bus import DomainEvent
 
 logger = logging.getLogger(__name__)
 

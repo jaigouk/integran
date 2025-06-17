@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.infrastructure.messaging.event_bus import DomainEvent
+from src.infrastructure.messaging.enhanced_event_bus import DomainEvent
 
 
 @dataclass

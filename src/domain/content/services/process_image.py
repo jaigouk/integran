@@ -19,7 +19,7 @@ from src.domain.content.models.answer_models import (
 )
 from src.domain.shared.services import DomainService
 from src.infrastructure.config.settings import get_settings, has_gemini_config
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 try:
     from google import genai

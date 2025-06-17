@@ -23,7 +23,7 @@ from src.domain.user.services.load_user_settings import (
     LoadUserSettings,
     LoadUserSettingsRequest,
 )
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
 

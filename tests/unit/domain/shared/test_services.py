@@ -14,7 +14,7 @@ from src.domain.shared.services import (
     DomainServiceError,
     ValidationError,
 )
-from src.infrastructure.messaging.event_bus import DomainEvent, EventBus
+from src.infrastructure.messaging.enhanced_event_bus import DomainEvent, EventBus
 
 
 # Test fixtures

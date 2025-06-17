@@ -19,7 +19,7 @@ from src.domain.user.models.user_models import (
     SaveUserSettingsResult,
     UserSettings,
 )
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.infrastructure.repositories.user_repository import (
     RepositoryError,
     UserSettingsRepository,

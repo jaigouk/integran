@@ -130,7 +130,7 @@ class TestDatabaseSetupService:
                 "src.domain.user.services.save_user_settings.SaveUserSettings"
             ) as mock_save_class,
             patch(
-                "src.infrastructure.messaging.event_bus.EventBus"
+                "src.infrastructure.messaging.enhanced_event_bus.EventBus"
             ) as mock_event_bus_class,
             patch(
                 "src.infrastructure.repositories.user_repository.UserSettingsRepository"

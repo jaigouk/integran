@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.infrastructure.messaging.event_bus import DomainEvent, EventBus
+from src.infrastructure.messaging.enhanced_event_bus import DomainEvent, EventBus
 
 
 class MockEvent(DomainEvent):

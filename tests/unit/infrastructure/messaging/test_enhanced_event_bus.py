@@ -7,8 +7,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
-from src.infrastructure.messaging.event_bus import DomainEvent
+from src.infrastructure.messaging.enhanced_event_bus import (
+    DomainEvent,
+    EnhancedEventBus,
+)
 
 
 class TestEvent(DomainEvent):

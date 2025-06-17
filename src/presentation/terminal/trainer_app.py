@@ -15,7 +15,7 @@ from src.application.queries.get_session_progress_query import (
     GetSessionProgressQueryHandler,
 )
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareApp
 from src.presentation.terminal.progress_view import ProgressScreen
 from src.presentation.terminal.question_view import PracticeScreen

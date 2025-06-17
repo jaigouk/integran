@@ -8,8 +8,10 @@ the EventFlowOrchestrator and EnhancedEventBus functionality.
 import asyncio
 import logging
 
-from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
-from src.infrastructure.messaging.event_bus import DomainEvent
+from src.infrastructure.messaging.enhanced_event_bus import (
+    DomainEvent,
+    EnhancedEventBus,
+)
 
 # Setup logging
 logger = logging.getLogger(__name__)

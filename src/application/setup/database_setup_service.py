@@ -222,13 +222,13 @@ async def _initialize_user_configuration(
         from src.domain.user.models.user_models import Language, UserSettings
         from src.domain.user.services.load_user_settings import LoadUserSettings
         from src.domain.user.services.save_user_settings import SaveUserSettings
-        from src.infrastructure.messaging.event_bus import EventBus
+        from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
         from src.infrastructure.repositories.user_repository import (
             UserSettingsRepository,
         )
 
         # Initialize User domain services
-        event_bus = EventBus()
+        event_bus = EnhancedEventBus.create_basic()
         user_repo = UserSettingsRepository(db_manager)
         load_service = LoadUserSettings(event_bus, user_repo)
         save_service = SaveUserSettings(event_bus, user_repo)

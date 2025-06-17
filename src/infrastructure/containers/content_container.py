@@ -9,17 +9,17 @@ from src.domain.content.services.build_dataset import BuildDataset
 from src.domain.content.services.create_image_mapping import CreateImageMapping
 from src.domain.content.services.generate_answer import GenerateAnswer
 from src.domain.content.services.process_image import ProcessImage
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
 from src.infrastructure.repositories.content_repository import ContentRepository
 
 
 class ContentContainer:
     """Container for Content Context dependencies."""
 
-    def __init__(self, event_bus: EventBus | None = None):
+    def __init__(self, event_bus: EnhancedEventBus | None = None):
         """Initialize the content container."""
         # Use provided event bus or create new one
-        self._event_bus = event_bus or EventBus()
+        self._event_bus = event_bus or EnhancedEventBus.create_basic()
 
         # Initialize repository
         self._repository = ContentRepository()
@@ -31,7 +31,7 @@ class ContentContainer:
         self._build_dataset: BuildDataset | None = None
         self._content_builder: DatasetBuildWorkflow | None = None
 
-    def get_event_bus(self) -> EventBus:
+    def get_event_bus(self) -> EnhancedEventBus:
         """Get the event bus instance."""
         return self._event_bus
 

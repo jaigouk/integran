@@ -18,7 +18,7 @@ from src.domain.content.services.enhanced_question_display import (
     EnhancedQuestionDisplayRequest,
 )
 from src.domain.user.models.user_models import Language
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent.parent

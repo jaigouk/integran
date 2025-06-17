@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from src.domain.shared.events import DomainEvent
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 
 @dataclass

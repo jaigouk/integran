@@ -69,7 +69,7 @@ class TestAnalyticsEvents:
 
     def test_event_inheritance(self):
         """Test that events properly inherit from DomainEvent."""
-        from src.infrastructure.messaging.event_bus import DomainEvent
+        from src.infrastructure.messaging.enhanced_event_bus import DomainEvent
 
         interleaving_event = InterleavingOptimizedEvent(
             user_id=1,

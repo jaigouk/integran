@@ -13,7 +13,7 @@ from rich.console import Console
 from textual.app import App
 from textual.widget import Widget
 
-from src.infrastructure.messaging.event_bus import DomainEvent, EventBus
+from src.infrastructure.messaging.enhanced_event_bus import DomainEvent, EventBus
 
 logger = logging.getLogger(__name__)
 

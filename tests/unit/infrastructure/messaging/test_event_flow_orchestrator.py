@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.infrastructure.messaging.event_bus import DomainEvent, EventBus
+from src.infrastructure.messaging.enhanced_event_bus import DomainEvent, EventBus
 from src.infrastructure.messaging.event_flow_orchestrator import (
     EventFlowDefinition,
     EventFlowOrchestrator,

@@ -7,7 +7,7 @@ from datetime import datetime
 
 import pytest
 
-from src.infrastructure.messaging.event_bus import DomainEvent, EventBus
+from src.infrastructure.messaging.enhanced_event_bus import DomainEvent, EventBus
 from src.presentation.terminal.base import (
     AsyncUIUpdater,
     ComponentRegistry,

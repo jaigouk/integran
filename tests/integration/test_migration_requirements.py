@@ -27,7 +27,7 @@ from src.domain.user.services.load_user_settings import LoadUserSettings
 from src.domain.user.services.save_user_settings import SaveUserSettings
 from src.domain.user.services.toggle_developer_mode import ToggleDeveloperMode
 from src.infrastructure.database.database import DatabaseManager
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.infrastructure.repositories.user_repository import UserSettingsRepository
 
 # Add the project root to the Python path

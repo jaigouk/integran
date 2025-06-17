@@ -36,7 +36,7 @@ from src.domain.shared.services import (
     ValidationError,
     log_domain_operation,
 )
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 

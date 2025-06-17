@@ -12,7 +12,7 @@ from src.domain.learning.services.complete_learning_session import (
 from src.domain.learning.services.schedule_card import ScheduleCard
 from src.infrastructure.containers.content_container import ContentContainer
 from src.infrastructure.database.database import DatabaseManager
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
 
 
 class MainContainer:
@@ -21,7 +21,7 @@ class MainContainer:
     def __init__(self) -> None:
         """Initialize the main container with all dependencies."""
         # Core infrastructure
-        self._event_bus = EventBus()
+        self._event_bus = EnhancedEventBus.create_basic()
         self._db_manager = DatabaseManager()
 
         # Sub-containers
@@ -48,7 +48,7 @@ class MainContainer:
             db_manager=self._db_manager,
         )
 
-    def get_event_bus(self) -> EventBus:
+    def get_event_bus(self) -> EnhancedEventBus:
         """Get the event bus instance."""
         return self._event_bus
 

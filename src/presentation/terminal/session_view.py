@@ -11,7 +11,7 @@ from textual.screen import Screen
 from textual.widgets import Button, ProgressBar, Static
 
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareWidget
 
 logger = logging.getLogger(__name__)

@@ -14,7 +14,7 @@ from textual.widgets import Button, Static
 from src.application.queries.get_session_progress_query import (
     GetSessionProgressQueryHandler,
 )
-from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import format_percentage, get_progress_color
 
