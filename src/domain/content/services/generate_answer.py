@@ -24,6 +24,14 @@ try:
     from google import genai
     from google.genai import types
 
+    from src.domain.user.models.user_models import LoadUserSettingsRequest
+
+    # User domain imports for developer mode validation
+    from src.domain.user.services.load_user_settings import LoadUserSettings
+    from src.infrastructure.repositories.user_repository import (
+        UserSettingsRepository,
+    )
+
     GENAI_AVAILABLE = True
 except ImportError:
     GENAI_AVAILABLE = False
@@ -36,7 +44,9 @@ logger = logging.getLogger(__name__)
 class GenerateAnswer(DomainService[AnswerGenerationRequest, AnswerGenerationResult]):
     """Domain service for generating multilingual answers with explanations."""
 
-    def __init__(self, event_bus: EventBus):
+    def __init__(
+        self, event_bus: EventBus, user_repository: UserSettingsRepository | None = None
+    ):
         """Initialize the answer generation service."""
         super().__init__(event_bus)
 
@@ -46,6 +56,10 @@ class GenerateAnswer(DomainService[AnswerGenerationRequest, AnswerGenerationResu
         self.model_id = settings.gemini_model
         self.use_vertex_ai = settings.use_vertex_ai
         self.client: Any | None = None  # Initialize lazily when needed
+
+        # User settings repository for developer mode validation
+        self.user_repository = user_repository
+        self._load_user_settings: LoadUserSettings | None = None
 
         logger.debug(
             "GenerateAnswer service initialized (credentials will be checked when used)"
@@ -87,6 +101,15 @@ class GenerateAnswer(DomainService[AnswerGenerationRequest, AnswerGenerationResu
                 success=False,
                 answer=None,
                 error_message="Gemini API not configured. Please set up authentication.",
+            )
+
+        # Check developer mode before using Gemini API
+        developer_mode_result = await self._check_developer_mode()
+        if not developer_mode_result.success:
+            return AnswerGenerationResult(
+                success=False,
+                answer=None,
+                error_message=developer_mode_result.error_message,
             )
 
         start_time = time.time()
@@ -142,6 +165,60 @@ class GenerateAnswer(DomainService[AnswerGenerationRequest, AnswerGenerationResu
                 success=False,
                 answer=None,
                 error_message=str(e),
+            )
+
+    async def _check_developer_mode(self) -> AnswerGenerationResult:
+        """Check if developer mode is enabled for API usage.
+
+        Returns:
+            AnswerGenerationResult with success=True if developer mode enabled,
+            otherwise error result with user-friendly message.
+        """
+        try:
+            # Initialize LoadUserSettings service if needed
+            if self._load_user_settings is None:
+                if self.user_repository is None:
+                    return AnswerGenerationResult(
+                        success=False,
+                        answer=None,
+                        error_message="User settings not available. Cannot verify developer mode permissions.",
+                    )
+                self._load_user_settings = LoadUserSettings(
+                    self.event_bus, self.user_repository
+                )
+
+            # Load user settings to check developer mode
+            load_request = LoadUserSettingsRequest(user_id=1)  # Default user ID
+            load_result = await self._load_user_settings.call(load_request)
+
+            if not load_result.success or not load_result.user_settings:
+                return AnswerGenerationResult(
+                    success=False,
+                    answer=None,
+                    error_message="Unable to load user settings. Cannot verify developer mode permissions.",
+                )
+
+            # Check if developer mode is enabled
+            if not load_result.user_settings.developer_mode.enabled:
+                return AnswerGenerationResult(
+                    success=False,
+                    answer=None,
+                    error_message=(
+                        "Developer mode is required for AI-powered answer generation. "
+                        "Please enable developer mode in settings to use this feature. "
+                        "Note: This feature uses external APIs and may incur costs."
+                    ),
+                )
+
+            # Developer mode is enabled
+            return AnswerGenerationResult(success=True, answer=None)
+
+        except Exception as e:
+            logger.error(f"Error checking developer mode: {e}")
+            return AnswerGenerationResult(
+                success=False,
+                answer=None,
+                error_message=f"Error verifying developer mode permissions: {e}",
             )
 
     def _create_multilingual_prompt(self, request: AnswerGenerationRequest) -> str:

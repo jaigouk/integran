@@ -36,7 +36,12 @@ from src.domain.shared.services import (
     ValidationError,
     log_domain_operation,
 )
+from src.domain.user.models.user_models import LoadUserSettingsRequest
+
+# User domain imports for developer mode validation
+from src.domain.user.services.load_user_settings import LoadUserSettings
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.infrastructure.repositories.user_repository import UserSettingsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -138,15 +143,17 @@ class BuildDataset(
         generate_answer: GenerateAnswer | None = None,
         process_image: ProcessImage | None = None,
         create_mapping: CreateImageMapping | None = None,
+        user_repository: UserSettingsRepository | None = None,
     ) -> None:
         """Initialize the dataset building domain service.
 
         Args:
-            repository: Content repository for data persistence
-            event_bus: Event bus for publishing domain events
-            generate_answer: Optional GenerateAnswer service (for dependency injection)
-            process_image: Optional ProcessImage service (for dependency injection)
-            create_mapping: Optional CreateImageMapping service (for dependency injection)
+                repository: Content repository for data persistence
+                event_bus: Event bus for publishing domain events
+                generate_answer: Optional GenerateAnswer service (for dependency injection)
+                process_image: Optional ProcessImage service (for dependency injection)
+                create_mapping: Optional CreateImageMapping service (for dependency injection)
+                user_repository: Optional user settings repository for developer mode validation
         """
         super().__init__(event_bus)
         self.repository = repository
@@ -155,6 +162,10 @@ class BuildDataset(
         self._generate_answer = generate_answer
         self._process_image = process_image
         self._create_mapping = create_mapping
+
+        # User settings repository for developer mode validation
+        self.user_repository = user_repository
+        self._load_user_settings: LoadUserSettings | None = None
 
     @property
     def generate_answer(self) -> GenerateAnswer:
@@ -222,6 +233,22 @@ class BuildDataset(
 
     async def _build_dataset(self, request: BuildDatasetRequest) -> BuildDatasetResult:
         """Build a complete multilingual dataset with all components."""
+
+        # Check developer mode for multilingual generation
+        if request.multilingual:
+            developer_mode_result = await self._check_developer_mode()
+            if not developer_mode_result.success:
+                return BuildDatasetResult(
+                    success=False,
+                    final_dataset_path=None,
+                    build_progress=self._create_error_progress(
+                        developer_mode_result.error_message
+                        or "Developer mode validation failed"
+                    ),
+                    statistics={},
+                    error_message=developer_mode_result.error_message,
+                )
+
         logger.info(
             f"Starting dataset build: multilingual={request.multilingual}, "
             f"batch_size={request.batch_size}, force_rebuild={request.force_rebuild}"
@@ -760,3 +787,77 @@ class BuildDataset(
             estimated_completion_time=None,
             error_message=error_message,
         )
+
+    async def _check_developer_mode(self) -> BuildDatasetResult:
+        """Check if developer mode is enabled for multilingual dataset building.
+
+        Returns:
+            BuildDatasetResult with success=True if developer mode enabled,
+            otherwise error result with user-friendly message.
+        """
+        try:
+            # Initialize LoadUserSettings service if needed
+            if self._load_user_settings is None:
+                if self.user_repository is None:
+                    return BuildDatasetResult(
+                        success=False,
+                        final_dataset_path=None,
+                        build_progress=self._create_error_progress(
+                            "User settings not available"
+                        ),
+                        statistics={},
+                        error_message="User settings not available. Cannot verify developer mode permissions.",
+                    )
+                self._load_user_settings = LoadUserSettings(
+                    self.event_bus, self.user_repository
+                )
+
+            # Load user settings to check developer mode
+            load_request = LoadUserSettingsRequest(user_id=1)  # Default user ID
+            load_result = await self._load_user_settings.call(load_request)
+
+            if not load_result.success or not load_result.user_settings:
+                return BuildDatasetResult(
+                    success=False,
+                    final_dataset_path=None,
+                    build_progress=self._create_error_progress(
+                        "Unable to load user settings"
+                    ),
+                    statistics={},
+                    error_message="Unable to load user settings. Cannot verify developer mode permissions.",
+                )
+
+            # Check if developer mode is enabled
+            if not load_result.user_settings.developer_mode.enabled:
+                error_msg = (
+                    "Developer mode is required for multilingual dataset generation. "
+                    "Please enable developer mode in settings to use this feature. "
+                    "Note: This feature uses external APIs and may incur significant costs (~$50-80). "
+                    "Alternatively, use the existing final_dataset.json which is complete with all 460 questions."
+                )
+                return BuildDatasetResult(
+                    success=False,
+                    final_dataset_path=None,
+                    build_progress=self._create_error_progress(error_msg),
+                    statistics={},
+                    error_message=error_msg,
+                )
+
+            # Developer mode is enabled
+            return BuildDatasetResult(
+                success=True,
+                final_dataset_path=None,
+                build_progress=self._create_error_progress("Developer mode validated"),
+                statistics={},
+            )
+
+        except Exception as e:
+            logger.error(f"Error checking developer mode: {e}")
+            error_msg = f"Error verifying developer mode permissions: {e}"
+            return BuildDatasetResult(
+                success=False,
+                final_dataset_path=None,
+                build_progress=self._create_error_progress(error_msg),
+                statistics={},
+                error_message=error_msg,
+            )
