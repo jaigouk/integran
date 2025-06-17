@@ -1,7 +1,8 @@
-"""Main entry point for the Integran German Integration Exam trainer (Phase 1.8)."""
+"""Main entry point for the Integran German Integration Exam trainer."""
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 from typing import Any
@@ -156,17 +157,46 @@ def _start_trainer(
 ) -> None:
     """Start the main trainer application."""
     try:
-        # Try to use the new terminal UI
-        from src.presentation.terminal.main import run
+        # Launch the terminal UI
+        from src.infrastructure.containers.main_container import MainContainer
+        from src.presentation.terminal.trainer_app import TrainerApp
 
-        console.print("[green]Starting modern terminal UI...[/green]")
-        run()
+        console.print("[green]🚀 Starting Integran Terminal UI...[/green]")
+
+        # Initialize the main dependency injection container
+        container = MainContainer()
+
+        # Create and run the Textual app
+        app = TrainerApp(
+            event_bus=container.get_event_bus(),
+            session_workflow=container.get_session_workflow(),
+            query_service=container.get_query_service(),
+            analytics_service=container.get_analytics_service(),
+            user_repository=container.get_user_container().get_repository(),
+        )
+
+        # Run the async app
+        asyncio.run(app.run_async())
         return
-    except ImportError:
-        # Fall back to legacy CLI interface
-        console.print("[yellow]Using legacy CLI interface...[/yellow]")
-        pass
 
+    except ImportError as e:
+        console.print(f"[red]Terminal UI not available: {e}[/red]")
+        console.print("[yellow]Falling back to legacy CLI interface...[/yellow]")
+    except Exception as e:
+        console.print(f"[red]Error starting terminal UI: {e}[/red]")
+        console.print("[yellow]Falling back to legacy CLI interface...[/yellow]")
+
+    # Fall back to legacy CLI interface
+    _start_legacy_cli(db_manager, mode, category, review)
+
+
+def _start_legacy_cli(
+    db_manager: DatabaseManager,
+    mode: str,
+    category: str | None,
+    review: bool,
+) -> None:
+    """Start the legacy CLI interface as fallback."""
     # Display welcome message
     _display_welcome()
 

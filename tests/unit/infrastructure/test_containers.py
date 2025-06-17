@@ -12,6 +12,7 @@ from src.application.queries.get_session_progress_query import (
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
 from src.infrastructure.containers.content_container import ContentContainer
 from src.infrastructure.containers.main_container import MainContainer
+from src.infrastructure.containers.user_container import UserContainer
 from src.infrastructure.database.database import DatabaseManager
 from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
 
@@ -30,6 +31,7 @@ class TestMainContainer:
 
     @patch("src.infrastructure.containers.main_container.EnhancedEventBus")
     @patch("src.infrastructure.containers.main_container.DatabaseManager")
+    @patch("src.infrastructure.containers.main_container.UserContainer")
     @patch("src.infrastructure.containers.main_container.ContentContainer")
     @patch("src.infrastructure.containers.main_container.ScheduleCard")
     @patch("src.infrastructure.containers.main_container.CompleteLearningSession")
@@ -44,6 +46,7 @@ class TestMainContainer:
         mock_complete_learning_session,
         mock_schedule_card,
         mock_content_container,
+        mock_user_container,
         mock_db_manager_class,
         mock_event_bus_class,
     ):
@@ -51,8 +54,13 @@ class TestMainContainer:
         # Arrange
         mock_event_bus = Mock(spec=EnhancedEventBus)
         mock_db_manager = Mock(spec=DatabaseManager)
+        mock_user_repo = Mock()
+        mock_user_container_instance = Mock(spec=UserContainer)
+        mock_user_container_instance.get_repository.return_value = mock_user_repo
+
         mock_event_bus_class.create_basic.return_value = mock_event_bus
         mock_db_manager_class.return_value = mock_db_manager
+        mock_user_container.return_value = mock_user_container_instance
 
         # Act
         MainContainer()
@@ -62,7 +70,14 @@ class TestMainContainer:
         mock_db_manager_class.assert_called_once()
 
         # Assert - Sub-containers
-        mock_content_container.assert_called_once_with(event_bus=mock_event_bus)
+        mock_user_container.assert_called_once_with(
+            event_bus=mock_event_bus,
+            database_manager=mock_db_manager,
+        )
+        mock_content_container.assert_called_once_with(
+            event_bus=mock_event_bus,
+            user_repository=mock_user_repo,
+        )
 
         # Assert - Domain services
         mock_schedule_card.assert_called_once_with(
@@ -225,6 +240,37 @@ class TestMainContainer:
 
         assert result == mock_query
 
+    @patch("src.infrastructure.containers.main_container.EnhancedEventBus")
+    @patch("src.infrastructure.containers.main_container.DatabaseManager")
+    @patch("src.infrastructure.containers.main_container.UserContainer")
+    @patch("src.infrastructure.containers.main_container.ContentContainer")
+    @patch("src.infrastructure.containers.main_container.ScheduleCard")
+    @patch("src.infrastructure.containers.main_container.CompleteLearningSession")
+    @patch("src.infrastructure.containers.main_container.SessionWorkflow")
+    @patch(
+        "src.infrastructure.containers.main_container.GetSessionProgressQueryHandler"
+    )
+    def test_get_user_container(
+        self,
+        _mock_query_handler,
+        _mock_session_workflow,
+        _mock_complete_learning_session,
+        _mock_schedule_card,
+        _mock_content_container,
+        mock_user_container,
+        _mock_db_manager_class,
+        _mock_event_bus_class,
+    ):
+        """Test getting user container instance."""
+        mock_user = Mock(spec=UserContainer)
+        mock_user_container.return_value = mock_user
+        mock_user.get_repository.return_value = Mock()  # Mock user repo
+
+        container = MainContainer()
+        result = container.get_user_container()
+
+        assert result == mock_user
+
 
 class TestContentContainer:
     """Test ContentContainer dependency injection."""
@@ -288,10 +334,16 @@ class TestContentContainer:
 
             # Access services to trigger lazy initialization
             container.get_generate_answer_service()
-            mock_generate_answer.assert_called_once_with(event_bus=provided_event_bus)
+            mock_generate_answer.assert_called_once_with(
+                event_bus=provided_event_bus,
+                user_repository=container._user_repository,
+            )
 
             container.get_process_image_service()
-            mock_process_image.assert_called_once_with(event_bus=provided_event_bus)
+            mock_process_image.assert_called_once_with(
+                event_bus=provided_event_bus,
+                user_repository=container._user_repository,
+            )
 
             container.get_create_image_mapping_service()
             mock_create_mapping.assert_called_once_with(event_bus=provided_event_bus)
@@ -339,7 +391,10 @@ class TestContentContainer:
         result = container.get_generate_answer_service()
 
         # Service should be created on first access
-        mock_generate_answer.assert_called_once_with(event_bus=provided_event_bus)
+        mock_generate_answer.assert_called_once_with(
+            event_bus=provided_event_bus,
+            user_repository=container._user_repository,
+        )
         assert result == mock_service
 
         # Subsequent calls should return the same instance without creating new one
@@ -357,7 +412,10 @@ class TestContentContainer:
         container = ContentContainer(event_bus=provided_event_bus)
         result = container.get_process_image_service()
 
-        mock_process_image.assert_called_once_with(event_bus=provided_event_bus)
+        mock_process_image.assert_called_once_with(
+            event_bus=provided_event_bus,
+            user_repository=container._user_repository,
+        )
         assert result == mock_service
 
     @patch("src.infrastructure.containers.content_container.CreateImageMapping")
@@ -375,13 +433,31 @@ class TestContentContainer:
 
     @patch("src.infrastructure.containers.content_container.DatasetBuildWorkflow")
     @patch("src.infrastructure.containers.content_container.BuildDataset")
-    def test_get_content_builder_service(self, mock_build_dataset, mock_workflow):
+    @patch("src.infrastructure.containers.content_container.GenerateAnswer")
+    @patch("src.infrastructure.containers.content_container.ProcessImage")
+    @patch("src.infrastructure.containers.content_container.CreateImageMapping")
+    def test_get_content_builder_service(
+        self,
+        mock_create_mapping,
+        mock_process_image,
+        mock_generate_answer,
+        mock_build_dataset,
+        mock_workflow,
+    ):
         """Test getting content builder service with lazy initialization."""
         mock_build_service = Mock()
         mock_workflow_service = Mock()
         mock_build_dataset.return_value = mock_build_service
         mock_workflow.return_value = mock_workflow_service
         provided_event_bus = Mock(spec=EnhancedEventBus)
+
+        # Mock the service instances
+        mock_generate_service = Mock()
+        mock_process_service = Mock()
+        mock_mapping_service = Mock()
+        mock_generate_answer.return_value = mock_generate_service
+        mock_process_image.return_value = mock_process_service
+        mock_create_mapping.return_value = mock_mapping_service
 
         with patch(
             "src.infrastructure.containers.content_container.ContentRepository"
@@ -396,9 +472,10 @@ class TestContentContainer:
             mock_build_dataset.assert_called_once_with(
                 event_bus=provided_event_bus,
                 repository=mock_repo,
-                generate_answer=None,
-                process_image=None,
-                create_mapping=None,
+                generate_answer=mock_generate_service,
+                process_image=mock_process_service,
+                create_mapping=mock_mapping_service,
+                user_repository=container._user_repository,
             )
             # Then DatasetBuildWorkflow should be created
             mock_workflow.assert_called_once_with(

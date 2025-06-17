@@ -14,6 +14,7 @@ from textual.widgets import Button, Static
 from src.application.queries.get_session_progress_query import (
     GetSessionProgressQueryHandler,
 )
+from src.domain.analytics.services.analyze_performance import ProgressAnalytics
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import format_percentage, get_progress_color
@@ -27,11 +28,13 @@ class StatsWidget(EventAwareWidget):
     def __init__(
         self,
         query_service: GetSessionProgressQueryHandler,
+        analytics_service: ProgressAnalytics,
         event_bus: EventBus,
         **kwargs: Any,
     ):
         super().__init__(event_bus=event_bus, **kwargs)
         self.query_service = query_service
+        self.analytics_service = analytics_service
 
     def compose(self) -> ComposeResult:
         """Compose the statistics widget."""
@@ -74,17 +77,24 @@ class StatsWidget(EventAwareWidget):
     async def refresh_stats(self) -> None:
         """Refresh statistics display."""
         try:
-            # TODO: Get actual stats from query service
-            # For now, use dummy data
+            # Get actual stats from analytics service
+            insights = self.analytics_service.get_learning_insights(user_id=1)
+
+            # Get study forecast for due cards
+            forecast = insights.study_forecast
+
             stats = {
-                "mastered": 45,
-                "learning": 23,
-                "new": 392,
-                "due": 12,
-                "accuracy": 78.5,
-                "streak": 7,
-                "sessions": 15,
-                "total_time": 450,  # minutes
+                "mastered": insights.cards_mastered,
+                "learning": insights.cards_learning,
+                "new": insights.cards_new,
+                "due": forecast.reviews_due_today,
+                "accuracy": insights.retention_analysis.overall_retention
+                * 100,  # Convert to percentage
+                "streak": insights.learning_streak.current_streak,
+                "sessions": self._get_total_sessions_count(),  # Total sessions count
+                "total_time": int(
+                    insights.total_study_time_hours * 60
+                ),  # Convert hours to minutes
             }
 
             # Update overview cards
@@ -115,12 +125,28 @@ class StatsWidget(EventAwareWidget):
         except Exception as e:
             logger.error(f"Failed to refresh stats: {e}")
 
+    def _get_total_sessions_count(self) -> int:
+        """Get total number of learning sessions."""
+        try:
+            from src.domain.learning.models.learning_models import LearningSession
+
+            # Access database manager from analytics service
+            with self.analytics_service.db_manager.get_session() as session:
+                count = session.query(LearningSession).filter_by(user_id=1).count()
+                return count
+        except Exception as e:
+            logger.error(f"Failed to get sessions count: {e}")
+            return 0
+
 
 class CategoryProgressWidget(EventAwareWidget):
     """Widget for displaying category-specific progress."""
 
-    def __init__(self, event_bus: EventBus, **kwargs: Any):
+    def __init__(
+        self, analytics_service: ProgressAnalytics, event_bus: EventBus, **kwargs: Any
+    ):
         super().__init__(event_bus=event_bus, **kwargs)
+        self.analytics_service = analytics_service
 
     def compose(self) -> ComposeResult:
         """Compose the category progress widget."""
@@ -135,14 +161,33 @@ class CategoryProgressWidget(EventAwareWidget):
     async def refresh_categories(self) -> None:
         """Refresh category progress display."""
         try:
-            # TODO: Get actual category data
-            categories = [
-                {"name": "Grundrechte", "mastered": 8, "total": 15, "accuracy": 85.2},
-                {"name": "Geschichte", "mastered": 12, "total": 20, "accuracy": 76.3},
-                {"name": "Föderalismus", "mastered": 6, "total": 18, "accuracy": 68.1},
-                {"name": "Rechtssystem", "mastered": 9, "total": 16, "accuracy": 82.5},
-                {"name": "Geografie", "mastered": 10, "total": 14, "accuracy": 91.2},
-            ]
+            # Get actual category data from analytics service
+            category_data = self.analytics_service.get_category_progress_detailed(
+                user_id=1
+            )
+
+            categories = []
+            for category_name, data in category_data.items():
+                categories.append(
+                    {
+                        "name": category_name,
+                        "mastered": data["mastered"],
+                        "total": data["total_cards"],
+                        "accuracy": data["retention_rate"]
+                        * 100,  # Convert to percentage
+                    }
+                )
+
+            # If no data, show empty state
+            if not categories:
+                categories = [
+                    {
+                        "name": "No data available",
+                        "mastered": 0,
+                        "total": 0,
+                        "accuracy": 0.0,
+                    }
+                ]
 
             # Create Rich table
             table = Table(show_header=True, header_style="bold blue")
@@ -180,7 +225,7 @@ class ProgressScreen(Screen):
         width: 90%;
         max-width: 120;
         background: $surface;
-        border: solid $primary;
+        border: solid white;
         padding: 2;
         margin: 1;
     }
@@ -188,7 +233,7 @@ class ProgressScreen(Screen):
     .stats-container {
         width: 100%;
         background: $background;
-        border: solid $muted;
+        border: solid white;
         padding: 2;
         margin-bottom: 2;
     }
@@ -203,7 +248,7 @@ class ProgressScreen(Screen):
     .stats-overview {
         align: center middle;
         width: 100%;
-        spacing: 1;
+        margin: 1;
         margin-bottom: 2;
     }
 
@@ -215,29 +260,29 @@ class ProgressScreen(Screen):
     }
 
     .stat-card.mastered {
-        border-color: $success;
-        background: $success-alpha;
+        border: solid $success;
+        background: $success 20%;
     }
 
     .stat-card.learning {
-        border-color: $warning;
-        background: $warning-alpha;
+        border: solid $warning;
+        background: $warning 20%;
     }
 
     .stat-card.new {
-        border-color: $info;
-        background: $info-alpha;
+        border: solid $accent;
+        background: $accent 20%;
     }
 
     .stat-card.due {
-        border-color: $error;
-        background: $error-alpha;
+        border: solid $error;
+        background: $error 20%;
     }
 
     .stat-number {
         text-style: bold;
-        font-size: 2;
         text-align: center;
+        padding: 1;
     }
 
     .stat-label {
@@ -247,20 +292,20 @@ class ProgressScreen(Screen):
 
     .detailed-stats {
         width: 100%;
-        spacing: 1;
+        margin: 1;
     }
 
     .detail-stat {
         text-align: left;
         padding: 1;
-        background: $accent-alpha;
-        border: solid $accent;
+        background: $accent 20%;
+        border: solid white;
     }
 
     .category-container {
         width: 100%;
         background: $background;
-        border: solid $muted;
+        border: solid white;
         padding: 2;
         margin-bottom: 2;
     }
@@ -280,7 +325,7 @@ class ProgressScreen(Screen):
     .progress-actions {
         align: center middle;
         width: 100%;
-        spacing: 1;
+        margin: 1;
     }
 
     .progress-actions Button {
@@ -295,19 +340,27 @@ class ProgressScreen(Screen):
         ("escape", "back_to_menu", "Back to Menu"),
     ]
 
-    def __init__(self, query_service: GetSessionProgressQueryHandler, **kwargs: Any):
+    def __init__(
+        self,
+        query_service: GetSessionProgressQueryHandler,
+        analytics_service: ProgressAnalytics,
+        **kwargs: Any,
+    ):
         super().__init__(**kwargs)
         self.query_service = query_service
+        self.analytics_service = analytics_service
 
     def compose(self) -> ComposeResult:
         """Compose the progress screen."""
         yield Container(
             StatsWidget(
                 query_service=self.query_service,
+                analytics_service=self.analytics_service,
                 event_bus=self.app.event_bus,
                 id="stats-widget",
             ),
             CategoryProgressWidget(
+                analytics_service=self.analytics_service,
                 event_bus=self.app.event_bus,
                 id="category-widget",
             ),

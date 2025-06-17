@@ -65,6 +65,48 @@ events:
     triggers: [MainMenuDisplayedEvent]
     dependencies: [DeveloperModeToggledEvent]
     description: "Initial setup workflow completed"
+    
+  MainMenuDisplayedEvent:
+    category: system
+    triggers: []
+    dependencies: [UserSettingsLoadedEvent, FirstTimeSetupCompletedEvent]
+    description: "Main menu screen displayed to user"
+    
+  SettingsOpenedEvent:
+    category: user
+    triggers: [UserSettingsChangedEvent]
+    dependencies: [MainMenuDisplayedEvent]
+    description: "Settings screen opened"
+    
+  SettingsSavedEvent:
+    category: user
+    triggers: []
+    dependencies: [UserSettingsChangedEvent]
+    description: "User settings saved to database"
+    
+  ServiceAvailabilityChangedEvent:
+    category: system
+    triggers: []
+    dependencies: [DeveloperModeToggledEvent]
+    description: "Service availability changed due to developer mode"
+    
+  DeveloperMenuDisplayedEvent:
+    category: developer
+    triggers: [DatasetBuildStartedEvent]
+    dependencies: [DeveloperModeToggledEvent]
+    description: "Developer operations menu displayed"
+    
+  DeveloperOperationFinishedEvent:
+    category: developer
+    triggers: []
+    dependencies: [DatasetBuildCompletedEvent]
+    description: "Developer operation completed"
+    
+  InterleavingOptimizedEvent:
+    category: analytics
+    triggers: []
+    dependencies: [LeechDetectedEvent, PerformanceAnalyzedEvent]
+    description: "Question interleaving strategy optimized"
 
   # Learning Events
   SessionStartedEvent:
@@ -87,7 +129,7 @@ events:
     
   CardScheduledEvent:
     category: learning
-    triggers: [ProgressTrackedEvent, QuestionLoadedEvent, SessionCompletedEvent]
+    triggers: [ProgressTrackedEvent, SessionCompletedEvent]
     dependencies: [AnswerSubmittedEvent]
     description: "FSRS algorithm scheduled next review"
     

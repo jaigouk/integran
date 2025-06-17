@@ -343,8 +343,14 @@ class QuestionWidget(EventAwareWidget):
             mnemonic_widget.update(self.enhanced_data.multilingual_content.mnemonic)
         else:
             # Hide mnemonic section if not available
-            mnemonic_section = self.query_one("Collapsible:has(#mnemonic)")
-            mnemonic_section.add_class("hidden")
+            try:
+                # Find the Collapsible that contains the mnemonic
+                for collapsible in self.query("Collapsible").results():
+                    if collapsible.query_one("#mnemonic", Static, fallback=None):
+                        collapsible.add_class("hidden")
+                        break
+            except Exception as e:
+                logger.debug(f"Could not hide mnemonic section: {e}")
 
         # Display wrong answer analysis
         await self._display_wrong_answer_analysis()
@@ -354,8 +360,16 @@ class QuestionWidget(EventAwareWidget):
             await self._display_image_descriptions()
         else:
             # Hide image section for non-image questions
-            image_section = self.query_one("Collapsible:has(#image-descriptions)")
-            image_section.add_class("hidden")
+            try:
+                # Find the Collapsible that contains the image descriptions
+                for collapsible in self.query("Collapsible").results():
+                    if collapsible.query_one(
+                        "#image-descriptions", Container, fallback=None
+                    ):
+                        collapsible.add_class("hidden")
+                        break
+            except Exception as e:
+                logger.debug(f"Could not hide image descriptions: {e}")
 
     async def _apply_progressive_disclosure(self) -> None:
         """Apply progressive disclosure preferences to collapsible sections."""
@@ -423,8 +437,16 @@ class QuestionWidget(EventAwareWidget):
             return
 
         # Show image descriptions section
-        image_section = self.query_one("Collapsible:has(#image-descriptions)")
-        image_section.remove_class("hidden")
+        try:
+            # Find the Collapsible that contains the image descriptions
+            for collapsible in self.query("Collapsible").results():
+                if collapsible.query_one(
+                    "#image-descriptions", Container, fallback=None
+                ):
+                    collapsible.remove_class("hidden")
+                    break
+        except Exception as e:
+            logger.debug(f"Could not show image descriptions: {e}")
 
         image_container = self.query_one("#image-descriptions")
 
@@ -470,7 +492,7 @@ class PracticeScreen(Screen):
         width: 90%;
         max-width: 120;
         background: $surface;
-        border: solid $primary;
+        border: solid white;
         padding: 2;
         margin: 1;
     }
@@ -492,14 +514,13 @@ class PracticeScreen(Screen):
     .question-text {
         text-align: left;
         margin-bottom: 2;
-        word-wrap: break-word;
         padding: 1;
         background: $panel;
-        border-left: solid $accent;
+        border-left: solid white;
     }
 
     .answer-options {
-        spacing: 1;
+        margin: 1;
         margin-bottom: 2;
     }
 
@@ -510,7 +531,7 @@ class PracticeScreen(Screen):
     }
 
     .answer-option.selected {
-        border: solid $primary;
+        border: solid white;
         text-style: bold;
     }
 
@@ -518,7 +539,7 @@ class PracticeScreen(Screen):
         margin: 2 0;
         padding: 1;
         background: $background;
-        border: solid $muted;
+        border: solid white;
     }
 
     .result-text {
@@ -535,80 +556,77 @@ class PracticeScreen(Screen):
     /* Enhanced content styles */
     .enhanced-content {
         margin-top: 2;
-        spacing: 1;
+        margin: 1;
     }
 
     .content-section {
         margin-bottom: 1;
-        border: solid $muted;
+        border: solid white;
         background: $panel;
     }
 
     .rich-explanation {
         padding: 1;
         color: $text;
-        line-height: 1.4;
     }
 
     .key-concept {
         padding: 1;
         color: $warning;
         text-style: italic;
-        background: $warning-alpha;
-        border-left: solid $warning;
+        background: $warning 20%;
+        border-left: solid white;
     }
 
     .mnemonic {
         padding: 1;
         color: $success;
         text-style: bold;
-        background: $success-alpha;
-        border-left: solid $success;
+        background: $success 20%;
+        border-left: solid white;
     }
 
     .wrong-analysis {
         padding: 1;
-        spacing: 1;
+        margin: 1;
     }
 
     .wrong-item {
         margin-bottom: 1;
         padding: 1;
-        background: $error-alpha;
-        border-left: solid $error;
+        background: $error 20%;
+        border-left: solid white;
     }
 
     .wrong-option {
         color: $error;
-        margin-bottom: 0.5;
+        margin-bottom: 1;
     }
 
     .wrong-explanation {
         color: $text-muted;
-        line-height: 1.3;
     }
 
     .image-descriptions {
         padding: 1;
-        spacing: 1;
+        margin: 1;
     }
 
     .image-item {
         margin-bottom: 1;
         padding: 1;
-        background: $primary-alpha;
-        border-left: solid $primary;
+        background: $primary 20%;
+        border-left: solid white;
     }
 
     .image-title {
         color: $primary;
-        margin-bottom: 0.5;
+        margin-bottom: 1;
     }
 
     .image-description {
         color: $text;
-        line-height: 1.3;
-        margin-bottom: 0.5;
+        margin-bottom: 1;
     }
 
     .image-path {
@@ -619,8 +637,8 @@ class PracticeScreen(Screen):
     .fsrs-rating {
         margin-top: 2;
         padding: 1;
-        background: $accent-alpha;
-        border: solid $accent;
+        background: $accent 20%;
+        border: solid white;
     }
 
     .rating-prompt {
@@ -632,7 +650,7 @@ class PracticeScreen(Screen):
     .rating-buttons {
         align: center middle;
         width: 100%;
-        spacing: 1;
+        margin: 1;
     }
 
     .rating-btn {
@@ -644,18 +662,6 @@ class PracticeScreen(Screen):
         display: none;
     }
 
-    /* Responsive layout for smaller screens */
-    @media (max-width: 80) {
-        .question-container {
-            width: 95%;
-        }
-
-        .rating-buttons {
-            layout: grid;
-            grid-size: 2 2;
-            grid-gutter: 1;
-        }
-    }
     """
 
     BINDINGS = [
@@ -696,15 +702,39 @@ class PracticeScreen(Screen):
     async def load_next_question(self) -> None:
         """Load the next question for practice."""
         # TODO: Get question from session workflow
-        # For now, create a dummy question
-        self.current_question = Question(
-            id=1,
-            question="Was ist die Hauptstadt von Deutschland?",
-            options=["Berlin", "München", "Hamburg", "Köln"],
-            correct="Berlin",
-            category="Geschichte",
-            difficulty="easy",
-        )
+        # For now, create different dummy questions
+        question_pool = [
+            Question(
+                id=1,
+                question="Was ist die Hauptstadt von Deutschland?",
+                options=["Berlin", "München", "Hamburg", "Köln"],
+                correct="Berlin",
+                category="Geschichte",
+                difficulty="easy",
+            ),
+            Question(
+                id=2,
+                question="Wann wurde das Grundgesetz verkündet?",
+                options=["1945", "1949", "1950", "1952"],
+                correct="1949",
+                category="Geschichte",
+                difficulty="medium",
+            ),
+            Question(
+                id=3,
+                question="Wie viele Bundesländer hat Deutschland?",
+                options=["14", "15", "16", "17"],
+                correct="16",
+                category="Politik",
+                difficulty="easy",
+            ),
+        ]
+
+        # Cycle through questions
+        current_index = getattr(self, "_question_index", -1)
+        current_index = (current_index + 1) % len(question_pool)
+        self._question_index = current_index
+        self.current_question = question_pool[current_index]
 
         # Create enhanced question widget with language support
         if self.user_repository:
@@ -728,9 +758,24 @@ class PracticeScreen(Screen):
                 preferred_language=Language.ENGLISH,
             )
 
-        # Replace the loading text with the question widget
-        container = self.query_one("#question-container")
-        await container.remove()
+        # Remove all existing question widgets first
+        try:
+            # Find and remove any existing QuestionWidget
+            existing_widgets = self.query("QuestionWidget")
+            for widget in existing_widgets:
+                await widget.remove()
+        except Exception as e:
+            logger.debug(f"Could not remove existing question widgets: {e}")
+
+        # Also try to remove the initial container if it exists
+        try:
+            container = self.query_one("#question-container", fallback=None)
+            if container:
+                await container.remove()
+        except Exception as e:
+            logger.debug(f"Could not remove question container: {e}")
+
+        # Mount the new question widget
         await self.mount(question_widget)
 
     def action_select_option_1(self) -> None:
@@ -751,6 +796,19 @@ class PracticeScreen(Screen):
 
     def _select_option(self, option_num: int) -> None:
         """Select an option by number."""
+        # First check if we should be selecting a rating button instead
+        try:
+            # Check if the rating container is visible
+            rating_container = self.query_one(".fsrs-rating", fallback=None)
+            if rating_container and not rating_container.has_class("hidden"):
+                # Select rating button instead
+                rating_btn = self.query_one(f"#rating_{option_num}", Button)
+                rating_btn.press()
+                return
+        except Exception as e:
+            logger.debug(f"Could not press rating button: {e}")
+
+        # Otherwise select answer option
         try:
             btn = self.query_one(f"#option_{option_num}", Button)
             btn.press()
@@ -772,5 +830,6 @@ class PracticeScreen(Screen):
         if self.current_question and event.rating in [3, 4]:  # Good or Easy
             self.correct_answers += 1
 
-        # TODO: Load next question or end session
+        # Load next question
         logger.info(f"Question completed with rating {event.rating}")
+        await self.load_next_question()

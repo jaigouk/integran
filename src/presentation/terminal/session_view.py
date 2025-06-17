@@ -96,7 +96,7 @@ class SessionScreen(Screen):
         width: 80%;
         max-width: 100;
         background: $surface;
-        border: solid $primary;
+        border: solid white;
         padding: 2;
         margin: 1;
     }
@@ -104,7 +104,7 @@ class SessionScreen(Screen):
     .session-progress {
         width: 100%;
         background: $background;
-        border: solid $muted;
+        border: solid white;
         padding: 2;
         margin-bottom: 2;
     }
@@ -119,16 +119,16 @@ class SessionScreen(Screen):
     .progress-stats {
         align: center middle;
         width: 100%;
-        spacing: 2;
+        margin: 2;
         margin-bottom: 2;
     }
 
     .stat-item {
         text-align: center;
         width: 1fr;
-        background: $accent-alpha;
+        background: $accent 20%;
         padding: 1;
-        border: solid $accent;
+        border: solid white;
     }
 
     .session-progress-bar {
@@ -139,7 +139,7 @@ class SessionScreen(Screen):
     .session-controls {
         align: center middle;
         width: 100%;
-        spacing: 1;
+        margin: 1;
     }
 
     .session-controls Button {
@@ -156,7 +156,7 @@ class SessionScreen(Screen):
     .session-actions {
         align: center middle;
         width: 100%;
-        spacing: 1;
+        margin: 1;
     }
 
     .session-actions Button {

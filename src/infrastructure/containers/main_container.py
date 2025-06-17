@@ -6,11 +6,13 @@ from src.application.queries.get_session_progress_query import (
     GetSessionProgressQueryHandler,
 )
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
+from src.domain.analytics.services.analyze_performance import ProgressAnalytics
 from src.domain.learning.services.complete_learning_session import (
     CompleteLearningSession,
 )
 from src.domain.learning.services.schedule_card import ScheduleCard
 from src.infrastructure.containers.content_container import ContentContainer
+from src.infrastructure.containers.user_container import UserContainer
 from src.infrastructure.database.database import DatabaseManager
 from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
 
@@ -25,7 +27,14 @@ class MainContainer:
         self._db_manager = DatabaseManager()
 
         # Sub-containers
-        self._content_container = ContentContainer(event_bus=self._event_bus)
+        self._user_container = UserContainer(
+            event_bus=self._event_bus,
+            database_manager=self._db_manager,
+        )
+        self._content_container = ContentContainer(
+            event_bus=self._event_bus,
+            user_repository=self._user_container.get_repository(),
+        )
 
         # Domain services
         self._schedule_card = ScheduleCard(
@@ -48,6 +57,11 @@ class MainContainer:
             db_manager=self._db_manager,
         )
 
+        # Analytics services
+        self._analytics_service = ProgressAnalytics(
+            db_manager=self._db_manager,
+        )
+
     def get_event_bus(self) -> EnhancedEventBus:
         """Get the event bus instance."""
         return self._event_bus
@@ -67,3 +81,11 @@ class MainContainer:
     def get_query_service(self) -> GetSessionProgressQueryHandler:
         """Get the query service."""
         return self._query_service
+
+    def get_user_container(self) -> UserContainer:
+        """Get the user container."""
+        return self._user_container
+
+    def get_analytics_service(self) -> ProgressAnalytics:
+        """Get the analytics service."""
+        return self._analytics_service
