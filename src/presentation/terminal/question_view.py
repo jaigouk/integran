@@ -7,10 +7,10 @@ from typing import Any
 
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import Screen
-from textual.widgets import Button, Collapsible, Static
+from textual.widgets import Button, Collapsible, Static, TabbedContent, TabPane
 
 from src.domain.content.models.question_models import Question
 from src.domain.content.services.enhanced_question_display import (
@@ -53,101 +53,117 @@ class QuestionWidget(EventAwareWidget):
         self.user_preferences = None  # Will be loaded from user settings
 
     def compose(self) -> ComposeResult:
-        """Compose the enhanced question widget with rich content."""
-        with Container(classes="question-container"):
-            # Question header
-            yield Static(f"Question {self.question.id}", classes="question-number")
-            yield Static(
-                f"Category: {self.question.category}", classes="question-category"
-            )
-            yield Static(self.question.question, classes="question-text")
+        """Compose the enhanced question widget with tab-based navigation."""
+        # Tab-based content organization
+        with TabbedContent(initial="question-tab", classes="question-tabs"):
+            # Tab 1: Question and Answer
+            with TabPane("Question", id="question-tab", classes="question-pane"):  # noqa: SIM117
+                with VerticalScroll(classes="question-container"):  # noqa: SIM117
+                    # Question header
+                    yield Static(
+                        f"Question {self.question.id}", classes="question-number"
+                    )
+                    yield Static(
+                        f"Category: {self.question.category}",
+                        classes="question-category",
+                    )
+                    yield Static(self.question.question, classes="question-text")
 
-            # Answer options
-            with Vertical(classes="answer-options"):
-                for i, option in enumerate(self.question.options, 1):
-                    yield Button(
-                        f"{i}. {option}",
-                        id=f"option_{i}",
-                        variant="default",
-                        classes="answer-option",
+                    # Answer options
+                    with Vertical(classes="answer-options"):
+                        for i, option in enumerate(self.question.options_list, 1):
+                            yield Button(
+                                f"{i}. {option}",
+                                id=f"option_{i}",
+                                variant="default",
+                                classes="answer-option",
+                            )
+
+                    # Initially hidden - shown after answer selection
+                    yield Container(
+                        Static("", id="result-text", classes="result-text"),
+                        Static("", id="correct-answer", classes="correct-answer"),
+                        classes="answer-result hidden",
                     )
 
-            # Initially hidden - shown after answer selection
-            yield Container(
-                Static("", id="result-text", classes="result-text"),
-                Static("", id="correct-answer", classes="correct-answer"),
-                classes="answer-result hidden",
-            )
+            # Tab 2: Learning Content
+            with TabPane("Learn More", id="learn-tab", classes="learn-pane"):  # noqa: SIM117
+                with VerticalScroll(classes="learn-container"):  # noqa: SIM117
+                    # Enhanced content - shown after answer reveal
+                    yield Container(
+                        # Rich explanation with multilingual support
+                        Collapsible(
+                            Static(
+                                "",
+                                id="detailed-explanation",
+                                classes="rich-explanation",
+                            ),
+                            title="📝 Detailed Explanation",
+                            collapsed=False,
+                            classes="content-section",
+                        ),
+                        # Key concept for educational understanding
+                        Collapsible(
+                            Static("", id="key-concept", classes="key-concept"),
+                            title="🎯 Key Concept",
+                            collapsed=False,
+                            classes="content-section",
+                        ),
+                        # Memory technique
+                        Collapsible(
+                            Static("", id="mnemonic", classes="mnemonic"),
+                            title="🧠 Memory Technique",
+                            collapsed=True,
+                            classes="content-section",
+                        ),
+                        # Wrong answer analysis
+                        Collapsible(
+                            Container(id="wrong-analysis", classes="wrong-analysis"),
+                            title="❌ Why Other Options Are Wrong",
+                            collapsed=True,
+                            classes="content-section",
+                        ),
+                        # Image descriptions (for image questions)
+                        Collapsible(
+                            Container(
+                                id="image-descriptions", classes="image-descriptions"
+                            ),
+                            title="🖼️ Image Descriptions",
+                            collapsed=True,
+                            classes="content-section hidden",
+                        ),
+                        classes="enhanced-content hidden",
+                    )
 
-            # Enhanced content - shown after answer reveal
-            yield Container(
-                # Rich explanation with multilingual support
-                Collapsible(
-                    Static("", id="detailed-explanation", classes="rich-explanation"),
-                    title="📝 Detailed Explanation",
-                    collapsed=False,
-                    classes="content-section",
+        # Fixed FSRS rating buttons - always visible at bottom
+        yield Container(
+            Static("How well did you know this?", classes="rating-prompt"),
+            Horizontal(
+                Button(
+                    "1. Again", id="rating_1", variant="error", classes="rating-btn"
                 ),
-                # Key concept for educational understanding
-                Collapsible(
-                    Static("", id="key-concept", classes="key-concept"),
-                    title="🎯 Key Concept",
-                    collapsed=False,
-                    classes="content-section",
+                Button(
+                    "2. Hard",
+                    id="rating_2",
+                    variant="warning",
+                    classes="rating-btn",
                 ),
-                # Memory technique
-                Collapsible(
-                    Static("", id="mnemonic", classes="mnemonic"),
-                    title="🧠 Memory Technique",
-                    collapsed=True,
-                    classes="content-section",
+                Button(
+                    "3. Good",
+                    id="rating_3",
+                    variant="success",
+                    classes="rating-btn",
                 ),
-                # Wrong answer analysis
-                Collapsible(
-                    Container(id="wrong-analysis", classes="wrong-analysis"),
-                    title="❌ Why Other Options Are Wrong",
-                    collapsed=True,
-                    classes="content-section",
+                Button(
+                    "4. Easy",
+                    id="rating_4",
+                    variant="primary",
+                    classes="rating-btn",
                 ),
-                # Image descriptions (for image questions)
-                Collapsible(
-                    Container(id="image-descriptions", classes="image-descriptions"),
-                    title="🖼️ Image Descriptions",
-                    collapsed=True,
-                    classes="content-section hidden",
-                ),
-                classes="enhanced-content hidden",
-            )
-
-            # FSRS rating buttons - shown after answer reveal
-            yield Container(
-                Static("How well did you know this?", classes="rating-prompt"),
-                Horizontal(
-                    Button(
-                        "1. Again", id="rating_1", variant="error", classes="rating-btn"
-                    ),
-                    Button(
-                        "2. Hard",
-                        id="rating_2",
-                        variant="warning",
-                        classes="rating-btn",
-                    ),
-                    Button(
-                        "3. Good",
-                        id="rating_3",
-                        variant="success",
-                        classes="rating-btn",
-                    ),
-                    Button(
-                        "4. Easy",
-                        id="rating_4",
-                        variant="primary",
-                        classes="rating-btn",
-                    ),
-                    classes="rating-buttons",
-                ),
-                classes="fsrs-rating hidden",
-            )
+                classes="rating-buttons",
+            ),
+            classes="fsrs-rating hidden",
+        )
 
     async def setup_event_subscriptions(self) -> None:
         """Setup event subscriptions for this widget."""
@@ -230,7 +246,7 @@ class QuestionWidget(EventAwareWidget):
 
         # Extract option number from button ID
         option_num = int(event.button.id.split("_")[1])
-        self.selected_answer = self.question.options[option_num - 1]
+        self.selected_answer = self.question.options_list[option_num - 1]
 
         # Highlight selected option
         for i in range(1, 5):
@@ -287,6 +303,10 @@ class QuestionWidget(EventAwareWidget):
 
         # Show enhanced content
         await self._display_enhanced_content()
+
+        # Enable Learn More tab by showing enhanced content
+        enhanced_container = self.query_one(".enhanced-content")
+        enhanced_container.remove_class("hidden")
 
         # Show FSRS rating buttons
         rating_container = self.query_one(".fsrs-rating")
@@ -467,13 +487,40 @@ class QuestionWidget(EventAwareWidget):
 
     async def submit_answer_with_rating(self, rating: int) -> None:
         """Submit the answer with FSRS rating to the domain."""
-        # TODO: Create and publish AnswerSubmittedEvent
-        logger.info(
-            f"Answer submitted: Q{self.question.id}, "
-            f"Selected: {self.selected_answer}, "
-            f"Correct: {self.question.correct}, "
-            f"Rating: {rating}"
-        )
+        import uuid
+        from datetime import UTC, datetime
+
+        from src.domain.learning.events.card_events import CardScheduledEvent
+
+        try:
+            # Create CardScheduledEvent for FSRS processing
+            event = CardScheduledEvent(
+                event_id=str(uuid.uuid4()),
+                occurred_at=datetime.now(UTC),
+                card_id=self.question.id,  # Use question ID as card ID
+                question_id=self.question.id,
+                new_difficulty=0.0,  # Will be calculated by FSRS
+                new_stability=0.0,  # Will be calculated by FSRS
+                new_retrievability=0.0,  # Will be calculated by FSRS
+                next_review_date=datetime.now(UTC),  # Will be calculated by FSRS
+                rating=rating,  # 1=Again, 2=Hard, 3=Good, 4=Easy
+                response_time_ms=1000,  # Placeholder - could be tracked in future
+                session_id=None,  # Could be connected to active session
+            )
+
+            # Publish event to trigger FSRS scheduling
+            await self.event_bus.publish(event)
+
+            logger.info(
+                f"Answer submitted and CardScheduledEvent published: Q{self.question.id}, "
+                f"Selected: {self.selected_answer}, "
+                f"Correct: {self.question.correct}, "
+                f"Rating: {rating}"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to publish CardScheduledEvent: {e}")
+            # Continue execution even if event publishing fails
 
     class QuestionCompleted(Message):
         """Message sent when question is completed with rating."""
@@ -487,14 +534,43 @@ class PracticeScreen(Screen):
     """Screen for practicing questions."""
 
     CSS = """
-    .question-container {
-        align: center middle;
-        width: 90%;
+    /* Tab-based layout styles */
+    .question-tabs {
+        width: 95vw;
         max-width: 120;
+        height: auto;
+        max-height: 70vh;
         background: $surface;
         border: solid white;
-        padding: 2;
         margin: 1;
+    }
+
+    .question-pane {
+        height: auto;
+        overflow: hidden;
+    }
+
+    .learn-pane {
+        height: auto;
+        overflow: hidden;
+    }
+
+    .question-container {
+        width: 100%;
+        height: auto;
+        max-height: 65vh;
+        padding: 1;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+    }
+
+    .learn-container {
+        width: 100%;
+        height: auto;
+        max-height: 65vh;
+        padding: 1;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
     }
 
     .question-number {
@@ -502,6 +578,7 @@ class PracticeScreen(Screen):
         color: $primary;
         text-style: bold;
         margin-bottom: 1;
+        height: auto;
     }
 
     .question-category {
@@ -509,25 +586,31 @@ class PracticeScreen(Screen):
         color: $accent;
         text-style: italic;
         margin-bottom: 1;
+        height: auto;
     }
 
     .question-text {
         text-align: left;
-        margin-bottom: 2;
+        margin-bottom: 1;
         padding: 1;
+        height: auto;
+        min-height: 3;
         background: $panel;
         border-left: solid white;
     }
 
     .answer-options {
         margin: 1;
-        margin-bottom: 2;
+        margin-bottom: 1;
+        height: auto;
     }
 
     .answer-option {
         width: 100%;
-        height: 3;
+        height: auto;
+        min-height: 3;
         text-align: left;
+        margin-bottom: 1;
     }
 
     .answer-option.selected {
@@ -536,8 +619,9 @@ class PracticeScreen(Screen):
     }
 
     .answer-result {
-        margin: 2 0;
+        margin: 1 0;
         padding: 1;
+        height: auto;
         background: $background;
         border: solid white;
     }
@@ -546,21 +630,26 @@ class PracticeScreen(Screen):
         text-align: center;
         text-style: bold;
         margin-bottom: 1;
+        height: auto;
     }
 
     .correct-answer {
         text-align: center;
         margin-bottom: 1;
+        height: auto;
     }
 
     /* Enhanced content styles */
     .enhanced-content {
-        margin-top: 2;
+        margin-top: 1;
         margin: 1;
+        height: auto;
+        overflow: auto;
     }
 
     .content-section {
         margin-bottom: 1;
+        height: auto;
         border: solid white;
         background: $panel;
     }
@@ -604,7 +693,8 @@ class PracticeScreen(Screen):
     }
 
     .wrong-explanation {
-        color: $text-muted;
+        color: $text;
+        background: $surface;
     }
 
     .image-descriptions {
@@ -635,26 +725,33 @@ class PracticeScreen(Screen):
     }
 
     .fsrs-rating {
-        margin-top: 2;
+        dock: bottom;
+        width: 100%;
+        height: auto;
+        min-height: 8;
         padding: 1;
         background: $accent 20%;
         border: solid white;
+        margin: 0;
     }
 
     .rating-prompt {
         text-align: center;
         text-style: bold;
         margin-bottom: 1;
+        height: auto;
     }
 
     .rating-buttons {
         align: center middle;
         width: 100%;
+        height: auto;
         margin: 1;
     }
 
     .rating-btn {
         width: 1fr;
+        min-width: 8;
         height: 3;
     }
 
@@ -701,40 +798,48 @@ class PracticeScreen(Screen):
 
     async def load_next_question(self) -> None:
         """Load the next question for practice."""
-        # TODO: Get question from session workflow
-        # For now, create different dummy questions
-        question_pool = [
-            Question(
+        # Get database manager from app container
+        try:
+            from src.infrastructure.containers.main_container import MainContainer
+
+            # Check if app has a container, otherwise create one
+            if hasattr(self.app, "container"):
+                container = self.app.container
+            else:
+                container = MainContainer()
+
+            db_manager = container.get_db_manager()
+
+            # Get question based on practice mode
+            question = await self._get_question_by_mode(db_manager)
+
+            if question:
+                self.current_question = question
+            else:
+                # Fallback to a simple question if database is empty
+                self.current_question = Question(
+                    id=1,
+                    question="Was ist die Hauptstadt von Deutschland?",
+                    options=["Berlin", "München", "Hamburg", "Köln"],
+                    correct="Berlin",
+                    category="Geschichte",
+                    difficulty="easy",
+                )
+                logger.warning(
+                    "No questions found in database, using fallback question"
+                )
+
+        except Exception as e:
+            logger.error(f"Error loading question from database: {e}")
+            # Use fallback question
+            self.current_question = Question(
                 id=1,
                 question="Was ist die Hauptstadt von Deutschland?",
                 options=["Berlin", "München", "Hamburg", "Köln"],
                 correct="Berlin",
                 category="Geschichte",
                 difficulty="easy",
-            ),
-            Question(
-                id=2,
-                question="Wann wurde das Grundgesetz verkündet?",
-                options=["1945", "1949", "1950", "1952"],
-                correct="1949",
-                category="Geschichte",
-                difficulty="medium",
-            ),
-            Question(
-                id=3,
-                question="Wie viele Bundesländer hat Deutschland?",
-                options=["14", "15", "16", "17"],
-                correct="16",
-                category="Politik",
-                difficulty="easy",
-            ),
-        ]
-
-        # Cycle through questions
-        current_index = getattr(self, "_question_index", -1)
-        current_index = (current_index + 1) % len(question_pool)
-        self._question_index = current_index
-        self.current_question = question_pool[current_index]
+            )
 
         # Create enhanced question widget with language support
         if self.user_repository:
@@ -748,8 +853,8 @@ class PracticeScreen(Screen):
             # Fallback: create a temporary repository
             from src.infrastructure.database.database import DatabaseManager
 
-            db_manager = DatabaseManager()
-            temp_repository = UserSettingsRepository(db_manager)
+            temp_db_manager = DatabaseManager()
+            temp_repository = UserSettingsRepository(temp_db_manager)
 
             question_widget = QuestionWidget(
                 question=self.current_question,
@@ -777,6 +882,48 @@ class PracticeScreen(Screen):
 
         # Mount the new question widget
         await self.mount(question_widget)
+
+    async def _get_question_by_mode(self, db_manager) -> Question | None:
+        """Get question based on practice mode."""
+        if self.practice_mode == "review":
+            # Get questions due for review
+            questions = db_manager.get_questions_for_review(limit=1)
+            return questions[0] if questions else None
+
+        elif self.practice_mode == "random":
+            # Get a random question by cycling through available ones
+            # Use a simple approach: get questions by different categories and cycle
+            categories = ["Geschichte", "Politik", "Recht", "Kultur", "Geographie"]
+            current_category_index = getattr(self, "_category_index", 0)
+            category = categories[current_category_index % len(categories)]
+            self._category_index = current_category_index + 1
+
+            questions = db_manager.get_questions_by_category(category)
+            if questions:
+                # Cycle through questions in this category
+                question_index = getattr(self, f"_question_index_{category}", 0)
+                question = questions[question_index % len(questions)]
+                setattr(self, f"_question_index_{category}", question_index + 1)
+                return question
+            return None
+
+        elif self.practice_mode == "sequential":
+            # Get questions sequentially by ID
+            last_question_id = getattr(self, "_last_question_id", 0)
+            next_question_id = last_question_id + 1
+
+            question = db_manager.get_question(next_question_id)
+            if question:
+                self._last_question_id = next_question_id
+                return question
+            else:
+                # Reset to beginning if we've reached the end
+                self._last_question_id = 0
+                return db_manager.get_question(1)
+
+        else:
+            # Default: get first available question
+            return db_manager.get_question(1)
 
     def action_select_option_1(self) -> None:
         """Select option 1 via keyboard."""

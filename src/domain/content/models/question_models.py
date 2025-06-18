@@ -137,6 +137,22 @@ class Question(Base):
         "LearningData", back_populates="question", uselist=False
     )
 
+    @property
+    def options_list(self) -> list[str]:
+        """Get options as a list, handling JSON deserialization."""
+        import json
+
+        if isinstance(self.options, str):
+            try:
+                return json.loads(self.options)
+            except (json.JSONDecodeError, TypeError):
+                # If it's not valid JSON, split by comma or return as single item
+                return [self.options] if self.options else []
+        elif isinstance(self.options, list):
+            return self.options
+        else:
+            return []
+
 
 class QuestionAttempt(Base):
     """Individual question attempt tracking."""

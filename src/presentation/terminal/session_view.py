@@ -182,6 +182,8 @@ class SessionScreen(Screen):
         self.practice_mode = practice_mode
         self.session_active = False
         self.session_paused = False
+        self.current_session_id: int | None = None
+        self.session_questions: list = []
 
     def compose(self) -> ComposeResult:
         """Compose the session screen."""
@@ -233,33 +235,96 @@ class SessionScreen(Screen):
 
         logger.info(f"Starting {self.practice_mode} session")
 
-        # TODO: Use session workflow to start session
-        # For now, just update UI state
-        self.session_active = True
-        self.session_paused = False
+        try:
+            # Create session configuration based on practice mode
+            from src.domain.learning.services.complete_learning_session import (
+                SessionConfig,
+                SessionType,
+            )
 
-        # Update progress display
-        progress_widget = self.query_one("#session-progress", SessionProgressWidget)
-        progress_widget.update_progress(0, 10, 0, 0)
+            # Map practice mode to session type
+            session_type_map = {
+                "review": SessionType.REVIEW,
+                "learn": SessionType.LEARN,
+                "random": SessionType.MIXED,
+                "quiz": SessionType.QUIZ,
+                "weak": SessionType.WEAK_FOCUS,
+            }
 
-        # Update button
-        start_button = self.query_one("#start", Button)
-        start_button.label = "Session Running"
-        start_button.variant = "primary"
-        start_button.disabled = True
+            session_type = session_type_map.get(self.practice_mode, SessionType.MIXED)
+
+            # Create session configuration
+            config = SessionConfig(
+                session_type=session_type,
+                max_reviews=20,  # Reasonable session size
+                max_new_cards=10,
+                target_retention=0.9,
+                time_limit_minutes=30,  # 30 minute sessions
+                categories=None,  # Use all categories
+                shuffle_questions=True,
+            )
+
+            # Start session using workflow
+            result = await self.session_workflow.start_session(config, user_id=1)
+
+            if result["success"]:
+                self.session_active = True
+                self.session_paused = False
+                self.current_session_id = result["session_id"]
+                self.session_questions = result["questions"]
+
+                logger.info(
+                    f"Successfully started session {self.current_session_id} with {len(self.session_questions)} questions"
+                )
+
+                # Update progress display with real data
+                progress_widget = self.query_one(
+                    "#session-progress", SessionProgressWidget
+                )
+                progress_widget.update_progress(0, len(self.session_questions), 0, 0)
+
+                # Update button
+                start_button = self.query_one("#start", Button)
+                start_button.label = "Session Running"
+                start_button.variant = "primary"
+                start_button.disabled = True
+
+                self.notify(
+                    f"Started {session_type.value} session with {len(self.session_questions)} questions"
+                )
+            else:
+                self.notify("Failed to start session", severity="error")
+                logger.error("Failed to start session through workflow")
+
+        except Exception as e:
+            logger.error(f"Error starting session: {e}")
+            self.notify("Error starting session - check logs", severity="error")
 
     async def pause_session(self) -> None:
-        """Pause the current session."""
-        if not self.session_active or self.session_paused:
+        """Pause or resume the current session."""
+        if not self.session_active:
             return
 
-        logger.info("Pausing session")
-        self.session_paused = True
+        if self.session_paused:
+            # Resume session
+            logger.info("Resuming session")
+            self.session_paused = False
 
-        # TODO: Implement pause logic
-        pause_button = self.query_one("#pause", Button)
-        pause_button.label = "Resume Session"
-        pause_button.variant = "success"
+            pause_button = self.query_one("#pause", Button)
+            pause_button.label = "Pause Session"
+            pause_button.variant = "warning"
+
+            self.notify("Session resumed")
+        else:
+            # Pause session
+            logger.info("Pausing session")
+            self.session_paused = True
+
+            pause_button = self.query_one("#pause", Button)
+            pause_button.label = "Resume Session"
+            pause_button.variant = "success"
+
+            self.notify("Session paused")
 
     async def end_session(self) -> None:
         """End the current session."""
@@ -267,21 +332,76 @@ class SessionScreen(Screen):
             return
 
         logger.info("Ending session")
-        self.session_active = False
-        self.session_paused = False
 
-        # TODO: Save session results and show summary
+        try:
+            # Complete session using workflow if we have a session ID
+            if self.current_session_id is not None:
+                result = await self.session_workflow.complete_session(
+                    self.current_session_id
+                )
 
-        # Reset UI
-        start_button = self.query_one("#start", Button)
-        start_button.label = "Start Session"
-        start_button.variant = "success"
-        start_button.disabled = False
+                if result["success"]:
+                    session_summary = result["summary"]
+                    logger.info(
+                        f"Successfully completed session {self.current_session_id}"
+                    )
+
+                    # Show session summary
+                    accuracy = (
+                        session_summary.get("correct_answers", 0)
+                        / max(session_summary.get("total_questions", 1), 1)
+                    ) * 100
+
+                    summary_text = (
+                        f"Session Complete!\n"
+                        f"Questions: {session_summary.get('total_questions', 0)}\n"
+                        f"Correct: {session_summary.get('correct_answers', 0)}\n"
+                        f"Accuracy: {accuracy:.1f}%"
+                    )
+
+                    self.notify(summary_text, title="Session Summary")
+                else:
+                    logger.error("Failed to complete session through workflow")
+                    self.notify(
+                        "Session ended but summary unavailable", severity="warning"
+                    )
+
+            # Reset session state
+            self.session_active = False
+            self.session_paused = False
+            self.current_session_id = None
+            self.session_questions = []
+
+            # Reset UI
+            start_button = self.query_one("#start", Button)
+            start_button.label = "Start Session"
+            start_button.variant = "success"
+            start_button.disabled = False
+
+            # Reset pause button
+            pause_button = self.query_one("#pause", Button)
+            pause_button.label = "Pause Session"
+            pause_button.variant = "warning"
+
+        except Exception as e:
+            logger.error(f"Error ending session: {e}")
+            self.notify("Error ending session - check logs", severity="error")
 
     async def configure_session(self) -> None:
         """Configure session settings."""
         logger.info("Opening session configuration")
-        # TODO: Open configuration modal or screen
+
+        # For now, show available configuration options as a notification
+        # In a full implementation, this would open a configuration screen/modal
+        config_options = [
+            f"Current mode: {self.practice_mode}",
+            "Available modes: review, learn, random, quiz, weak",
+            "Session settings: 20 reviews, 10 new cards, 30 min limit",
+            "Use Settings screen to modify preferences",
+        ]
+
+        config_text = "\n".join(config_options)
+        self.notify(config_text, title="Session Configuration")
 
     def action_pause_session(self) -> None:
         """Pause session via keyboard."""

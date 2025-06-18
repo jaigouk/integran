@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
     Button,
@@ -68,216 +69,207 @@ class SettingsWidget(EventAwareWidget):
     def compose(self) -> ComposeResult:
         """Compose the settings interface."""
         yield Header(show_clock=True)
-        with TabbedContent(id="settings-tabs"):
-            with TabPane("General", id="general"):
-                yield from self._compose_general_settings()
-            with TabPane("Learning", id="learning"):
-                yield from self._compose_learning_settings()
-            with TabPane("Developer", id="developer"):
-                yield from self._compose_developer_settings()
-            with TabPane("Advanced", id="advanced"):
-                yield from self._compose_advanced_settings()
-        yield Container(
-            Horizontal(
-                Button("Save Changes", id="save", variant="primary"),
-                Button("Reset to Defaults", id="reset", variant="warning"),
-                Button("Back to Menu", id="cancel", variant="default"),
-                classes="settings-actions",
-            ),
-            classes="settings-footer",
-        )
+        with Container(classes="settings-main-container"):
+            with TabbedContent(id="settings-tabs"):
+                with TabPane("General", id="general"):  # noqa: SIM117
+                    with VerticalScroll(classes="tab-scroll"):  # noqa: SIM117
+                        yield from self._compose_general_settings()
+                with TabPane("Learning", id="learning"):  # noqa: SIM117
+                    with VerticalScroll(classes="tab-scroll"):  # noqa: SIM117
+                        yield from self._compose_learning_settings()
+                with TabPane("Developer", id="developer"):  # noqa: SIM117
+                    with VerticalScroll(classes="tab-scroll"):  # noqa: SIM117
+                        yield from self._compose_developer_settings()
+                with TabPane("Advanced", id="advanced"):  # noqa: SIM117
+                    with VerticalScroll(classes="tab-scroll"):  # noqa: SIM117
+                        yield from self._compose_advanced_settings()
+            yield Container(
+                Horizontal(
+                    Button("Save Changes", id="save", variant="primary"),
+                    Button("Reset to Defaults", id="reset", variant="warning"),
+                    Button("Back to Menu", id="cancel", variant="default"),
+                    classes="settings-actions",
+                ),
+                classes="settings-footer",
+            )
         yield Footer()
 
     def _compose_general_settings(self) -> ComposeResult:
         """Compose general settings tab."""
-        yield Vertical(
-            Label("Interface Settings", classes="section-header"),
-            Container(
-                Label("Language:"),
-                Select(
-                    [
-                        ("English", Language.ENGLISH.value),
-                        ("Deutsch", Language.GERMAN.value),
-                        ("Türkçe", Language.TURKISH.value),
-                        ("Українська", Language.UKRAINIAN.value),
-                        ("العربية", Language.ARABIC.value),
-                    ],
-                    value=Language.ENGLISH.value,
-                    id="language-select",
-                ),
-                classes="setting-item",
+        yield Label("Interface Settings", classes="section-header")
+        yield Container(
+            Label("Language:"),
+            Select(
+                [
+                    ("English", Language.ENGLISH.value),
+                    ("Deutsch", Language.GERMAN.value),
+                    ("Türkçe", Language.TURKISH.value),
+                    ("Українська", Language.UKRAINIAN.value),
+                    ("العربية", Language.ARABIC.value),
+                ],
+                value=Language.ENGLISH.value,
+                id="language-select",
             ),
-            Container(
-                Label("Theme Mode:"),
-                Select(
-                    [
-                        ("Auto (System)", ThemeMode.AUTO.value),
-                        ("Light", ThemeMode.LIGHT.value),
-                        ("Dark", ThemeMode.DARK.value),
-                    ],
-                    value=ThemeMode.AUTO.value,
-                    id="theme-select",
-                ),
-                classes="setting-item",
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Theme Mode:"),
+            Select(
+                [
+                    ("Auto (System)", ThemeMode.AUTO.value),
+                    ("Light", ThemeMode.LIGHT.value),
+                    ("Dark", ThemeMode.DARK.value),
+                ],
+                value=ThemeMode.AUTO.value,
+                id="theme-select",
             ),
-            Container(
-                Label("Notifications:"),
-                Switch(value=True, id="notifications-switch"),
-                classes="setting-item",
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Notifications:"),
+            Switch(value=True, id="notifications-switch"),
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Reminder Time (24h):"),
+            Select(
+                [
+                    ("08:00", "08:00"),
+                    ("12:00", "12:00"),
+                    ("16:00", "16:00"),
+                    ("19:00", "19:00"),
+                    ("21:00", "21:00"),
+                ],
+                value="19:00",
+                id="reminder-select",
             ),
-            Container(
-                Label("Reminder Time (24h):"),
-                Select(
-                    [
-                        ("08:00", "08:00"),
-                        ("12:00", "12:00"),
-                        ("16:00", "16:00"),
-                        ("19:00", "19:00"),
-                        ("21:00", "21:00"),
-                    ],
-                    value="19:00",
-                    id="reminder-select",
-                ),
-                classes="setting-item",
-            ),
-            classes="settings-section",
+            classes="setting-item",
         )
 
     def _compose_learning_settings(self) -> ComposeResult:
         """Compose learning settings tab."""
-        yield Vertical(
-            Label("Learning Preferences", classes="section-header"),
-            Container(
-                Label("Daily Goal (questions):"),
-                Select(
-                    [
-                        ("10 questions", 10),
-                        ("20 questions", 20),
-                        ("30 questions", 30),
-                        ("50 questions", 50),
-                        ("100 questions", 100),
-                    ],
-                    value=20,
-                    id="daily-goal-select",
-                ),
-                classes="setting-item",
+        yield Label("Learning Preferences", classes="section-header")
+        yield Container(
+            Label("Daily Goal (questions):"),
+            Select(
+                [
+                    ("10 questions", 10),
+                    ("20 questions", 20),
+                    ("30 questions", 30),
+                    ("50 questions", 50),
+                    ("100 questions", 100),
+                ],
+                value=20,
+                id="daily-goal-select",
             ),
-            Container(
-                Label("Session Timeout:"),
-                Select(
-                    [
-                        ("30 minutes", 30),
-                        ("60 minutes", 60),
-                        ("90 minutes", 90),
-                        ("120 minutes", 120),
-                        ("No timeout", 0),
-                    ],
-                    value=60,
-                    id="timeout-select",
-                ),
-                classes="setting-item",
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Session Timeout:"),
+            Select(
+                [
+                    ("30 minutes", 30),
+                    ("60 minutes", 60),
+                    ("90 minutes", 90),
+                    ("120 minutes", 120),
+                    ("No timeout", 0),
+                ],
+                value=60,
+                id="timeout-select",
             ),
-            Container(
-                Label("Show Explanations:"),
-                Switch(value=True, id="explanations-switch"),
-                Static(
-                    "Show detailed explanations after answering", classes="help-text"
-                ),
-                classes="setting-item",
-            ),
-            Container(
-                Label("Auto Advance:"),
-                Switch(value=False, id="auto-advance-switch"),
-                Static("Automatically proceed to next question", classes="help-text"),
-                classes="setting-item",
-            ),
-            classes="settings-section",
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Show Explanations:"),
+            Switch(value=True, id="explanations-switch"),
+            Static("Show detailed explanations after answering", classes="help-text"),
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Auto Advance:"),
+            Switch(value=False, id="auto-advance-switch"),
+            Static("Automatically proceed to next question", classes="help-text"),
+            classes="setting-item",
         )
 
     def _compose_developer_settings(self) -> ComposeResult:
         """Compose developer settings tab."""
-        yield Vertical(
-            Label("Developer Mode", classes="section-header"),
-            Container(
-                Static(
-                    "⚠️ Developer Mode enables advanced features that use external APIs",
-                    classes="warning-text",
-                ),
-                Static(
-                    "These features may incur costs (~$50-80 for full dataset generation)",
-                    classes="warning-text",
-                ),
-                classes="warning-box",
-            ),
-            Container(
-                Label("Enable Developer Mode:"),
-                Switch(value=False, id="developer-mode-switch"),
-                Static(
-                    "Enables access to AI-powered content generation",
-                    classes="help-text",
-                ),
-                classes="setting-item",
-            ),
-            Container(
-                Label("Current Status:", classes="status-label"),
-                Static(
-                    "Disabled - Using local dataset only",
-                    id="developer-status",
-                    classes="status-text",
-                ),
-                classes="setting-item",
-            ),
-            Container(
-                Label("Available Features:", classes="features-label"),
-                OptionList(
-                    "📊 Dataset Generation (AI-powered)",
-                    "🖼️ Image Processing (AI descriptions)",
-                    "🌐 Multilingual Answer Generation",
-                    "🔧 Advanced Debug Tools",
-                    id="developer-features",
-                    disabled=True,
-                ),
-                classes="setting-item",
+        yield Label("Developer Mode", classes="section-header")
+        yield Container(
+            Static(
+                "⚠️ Developer Mode enables advanced features that use external APIs",
+                classes="warning-text",
             ),
             Static(
-                "💡 Tip: The existing final_dataset.json contains all 460 questions with complete multilingual content",
-                classes="tip-text",
+                "These features may incur costs (~$50-80 for full dataset generation)",
+                classes="warning-text",
             ),
-            classes="settings-section",
+            classes="warning-box",
+        )
+        yield Container(
+            Label("Enable Developer Mode:"),
+            Switch(value=False, id="developer-mode-switch"),
+            Static(
+                "Enables access to AI-powered content generation",
+                classes="help-text",
+            ),
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Current Status:", classes="status-label"),
+            Static(
+                "Disabled - Using local dataset only",
+                id="developer-status",
+                classes="status-text",
+            ),
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Available Features:", classes="features-label"),
+            OptionList(
+                "📊 Dataset Generation (AI-powered)",
+                "🖼️ Image Processing (AI descriptions)",
+                "🌐 Multilingual Answer Generation",
+                "🔧 Advanced Debug Tools",
+                id="developer-features",
+                disabled=True,
+            ),
+            classes="setting-item",
+        )
+        yield Static(
+            "💡 Tip: The existing final_dataset.json contains all 460 questions with complete multilingual content",
+            classes="tip-text",
         )
 
     def _compose_advanced_settings(self) -> ComposeResult:
         """Compose advanced settings tab."""
-        yield Vertical(
-            Label("Advanced Configuration", classes="section-header"),
-            Container(
-                Label("Debug Information:"),
-                Pretty(
-                    {
-                        "version": "0.1.0",
-                        "database": "data/trainer.db",
-                        "dataset": "data/final_dataset.json",
-                        "config_path": "~/.config/integran/",
-                    },
-                    id="debug-info",
-                ),
-                classes="setting-item",
+        yield Label("Advanced Configuration", classes="section-header")
+        yield Container(
+            Label("Debug Information:"),
+            Pretty(
+                {
+                    "version": "0.1.0",
+                    "database": "data/trainer.db",
+                    "dataset": "data/final_dataset.json",
+                    "config_path": "~/.config/integran/",
+                },
+                id="debug-info",
             ),
-            Container(
-                Label("Export Settings:"),
-                Button("Export to File", id="export-settings", variant="default"),
-                classes="setting-item",
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Export Settings:"),
+            Button("Export to File", id="export-settings", variant="default"),
+            classes="setting-item",
+        )
+        yield Container(
+            Label("Reset Everything:"),
+            Button("Factory Reset", id="factory-reset", variant="error"),
+            Static(
+                "⚠️ This will delete all progress and settings",
+                classes="warning-text",
             ),
-            Container(
-                Label("Reset Everything:"),
-                Button("Factory Reset", id="factory-reset", variant="error"),
-                Static(
-                    "⚠️ This will delete all progress and settings",
-                    classes="warning-text",
-                ),
-                classes="setting-item",
-            ),
-            classes="settings-section",
+            classes="setting-item",
         )
 
     async def on_mount(self) -> None:
@@ -439,6 +431,84 @@ class SettingsWidget(EventAwareWidget):
         """Cancel settings changes and return to main menu."""
         self.app.pop_screen()
 
+    @on(Button.Pressed, "#export-settings")
+    async def on_export_settings(self) -> None:
+        """Export settings to file."""
+        try:
+            if not self.current_settings:
+                await self._show_error("No settings to export")
+                return
+
+            # Create export data
+            export_data = {
+                "export_timestamp": datetime.now().isoformat(),
+                "user_settings": {
+                    "user_id": self.current_settings.user_id,
+                    "language": self.current_settings.language.value,
+                    "theme_mode": self.current_settings.theme_mode.value,
+                    "developer_mode": {
+                        "enabled": self.current_settings.developer_mode.enabled,
+                        "use_gemini": self.current_settings.developer_mode.use_gemini,
+                        "api_usage_warnings": self.current_settings.developer_mode.api_usage_warnings,
+                    },
+                    "first_time_setup": self.current_settings.first_time_setup,
+                    "onboarding_completed": self.current_settings.onboarding_completed,
+                    "preferences": {
+                        "daily_goal": self.current_settings.preferences.daily_goal,
+                        "session_timeout_minutes": self.current_settings.preferences.session_timeout_minutes,
+                        "show_explanations": self.current_settings.preferences.show_explanations,
+                        "auto_advance": self.current_settings.preferences.auto_advance,
+                        "theme_mode": self.current_settings.preferences.theme_mode.value,
+                        "language": self.current_settings.preferences.language.value,
+                        "enable_notifications": self.current_settings.preferences.enable_notifications,
+                        "reminder_time": self.current_settings.preferences.reminder_time,
+                        "custom_settings": self.current_settings.preferences.custom_settings,
+                    },
+                    "flow_state": {
+                        "current_screen": self.current_settings.flow_state.current_screen,
+                        "session_in_progress": self.current_settings.flow_state.session_in_progress,
+                        "current_session_id": self.current_settings.flow_state.current_session_id,
+                        "last_question_id": self.current_settings.flow_state.last_question_id,
+                        "setup_step": self.current_settings.flow_state.setup_step,
+                        "flow_data": self.current_settings.flow_state.flow_data,
+                    },
+                },
+            }
+
+            # Write to file
+            import json
+            from pathlib import Path
+
+            export_path = Path("data/settings_export.json")
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(export_path, "w", encoding="utf-8") as f:
+                json.dump(export_data, f, indent=2, ensure_ascii=False)
+
+            await self._show_success(f"Settings exported to {export_path}")
+            logger.info(f"Successfully exported settings to {export_path}")
+
+        except Exception as e:
+            logger.error(f"Failed to export settings: {e}")
+            await self._show_error("Export failed - check logs for details")
+
+    @on(Button.Pressed, "#factory-reset")
+    async def on_factory_reset(self) -> None:
+        """Perform factory reset with confirmation."""
+        try:
+            # Simple confirmation - in a full implementation you'd use a proper dialog
+            await self._show_warning(
+                "Factory reset requested - this will delete all data!"
+            )
+            # For now, just show a warning without actually resetting
+            await self._show_error(
+                "Factory reset not implemented yet - use with caution!"
+            )
+
+        except Exception as e:
+            logger.error(f"Error during factory reset: {e}")
+            await self._show_error("Factory reset failed")
+
     async def _gather_settings_from_ui(self) -> UserSettings:
         """Gather all settings values from UI components."""
         if not self.current_settings:
@@ -486,18 +556,18 @@ class SettingsWidget(EventAwareWidget):
 
     async def _show_success(self, message: str) -> None:
         """Show success notification."""
-        # TODO: Implement notification system
         logger.info(f"Success: {message}")
+        self.notify(message, severity="information", timeout=3.0)
 
     async def _show_warning(self, message: str) -> None:
         """Show warning notification."""
-        # TODO: Implement notification system
         logger.warning(f"Warning: {message}")
+        self.notify(message, severity="warning", timeout=5.0)
 
     async def _show_error(self, message: str) -> None:
         """Show error notification."""
-        # TODO: Implement notification system
         logger.error(f"Error: {message}")
+        self.notify(message, severity="error", timeout=5.0)
 
 
 class SettingsScreen(Screen[None]):
@@ -515,14 +585,31 @@ class SettingsScreen(Screen[None]):
         margin: 1 0;
     }
 
+    .settings-main-container {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
     .settings-container {
-        align: center middle;
-        width: 90%;
+        align: center top;
+        width: 95vw;
         max-width: 120;
         height: auto;
+        max-height: 95vh;
         background: $surface;
         border: solid white;
-        padding: 2;
+        padding: 1;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+    }
+
+    .tab-scroll {
+        width: 100%;
+        height: auto;
+        max-height: 60vh;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
     }
 
     .settings-section {
@@ -540,15 +627,30 @@ class SettingsScreen(Screen[None]):
     }
 
     .setting-item {
-        margin: 1 0;
+        margin: 0 0 1 0;
         padding: 1;
         background: $background;
         border: solid white;
+        height: auto;
+        min-height: 4;
     }
 
     .setting-item Label {
         text-style: bold;
-        margin-bottom: 1;
+        margin-bottom: 0;
+    }
+
+    .setting-item Select {
+        margin-top: 0;
+        margin-bottom: 0;
+        height: 3;
+        width: 100%;
+    }
+
+    .setting-item Switch {
+        margin-top: 0;
+        margin-bottom: 0;
+        height: 3;
     }
 
     .help-text {
@@ -563,11 +665,11 @@ class SettingsScreen(Screen[None]):
     }
 
     .warning-box {
-        background: $warning;
-        color: white;
+        background: $warning 20%;
+        color: $warning;
         padding: 1;
         margin: 1 0;
-        border: solid white;
+        border: solid $warning;
     }
 
     .tip-text {
@@ -588,16 +690,17 @@ class SettingsScreen(Screen[None]):
         margin-top: 1;
         padding: 1;
         border: solid white;
+        background: $surface;
     }
 
     .status-enabled {
         color: $success;
-        background: $success;
+        text-style: bold;
     }
 
     .status-disabled {
-        color: $error;
-        background: $error;
+        color: $text-muted;
+        text-style: italic;
     }
 
     .features-label {
@@ -607,25 +710,30 @@ class SettingsScreen(Screen[None]):
     }
 
     .settings-footer {
-        margin-top: 2;
+        dock: bottom;
         width: 100%;
+        height: auto;
+        padding: 1;
+        background: $background;
+        border-top: solid white;
     }
 
     .settings-actions {
         align: center middle;
         width: 100%;
-        margin: 2;
+        height: auto;
     }
 
     .settings-actions Button {
         width: 1fr;
         height: 3;
+        margin: 0 1;
     }
 
     #settings-tabs {
         width: 100%;
-        height: 60;
-        margin: 1 0;
+        height: auto;
+        margin: 0;
     }
 
     #developer-features {
