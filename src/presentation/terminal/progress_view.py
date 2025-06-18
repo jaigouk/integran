@@ -100,12 +100,9 @@ Study Time: 0.0h
     def _get_total_sessions_count(self) -> int:
         """Get total number of learning sessions."""
         try:
-            from src.domain.learning.models.learning_models import LearningSession
-
-            # Access database manager from analytics service
-            with self.analytics_service.db_manager.get_session() as session:
-                count = session.query(LearningSession).filter_by(user_id=1).count()
-                return count
+            # Use analytics service to get session stats instead of direct DB access
+            stats = self.analytics_service.get_learning_statistics(user_id=1)
+            return stats.get("total_sessions", 0)
         except Exception as e:
             logger.error(f"Failed to get sessions count: {e}")
             return 0

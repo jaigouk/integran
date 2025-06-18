@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from src.application.events import EventSubscriptionManager
+from src.application.events.handlers.card_scheduled_handler import CardScheduledHandler
+from src.application.queries.get_questions_by_mode_query import (
+    GetQuestionsByModeQueryHandler,
+)
 from src.application.queries.get_session_progress_query import (
     GetSessionProgressQueryHandler,
 )
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
 from src.domain.analytics.services.analyze_performance import ProgressAnalytics
+from src.domain.learning.events.card_events import CardScheduledEvent
 from src.domain.learning.services.complete_learning_session import (
     CompleteLearningSession,
 )
@@ -56,11 +62,18 @@ class MainContainer:
         self._query_service = GetSessionProgressQueryHandler(
             db_manager=self._db_manager,
         )
+        self._questions_query_service = GetQuestionsByModeQueryHandler(
+            db_manager=self._db_manager,
+        )
 
         # Analytics services
         self._analytics_service = ProgressAnalytics(
             db_manager=self._db_manager,
         )
+
+        # Event subscription manager and handlers
+        self._event_subscription_manager = EventSubscriptionManager(self._event_bus)
+        self._setup_event_handlers()
 
     def get_event_bus(self) -> EnhancedEventBus:
         """Get the event bus instance."""
@@ -89,3 +102,19 @@ class MainContainer:
     def get_analytics_service(self) -> ProgressAnalytics:
         """Get the analytics service."""
         return self._analytics_service
+
+    def get_schedule_card_service(self) -> ScheduleCard:
+        """Get the schedule card service."""
+        return self._schedule_card
+
+    def get_questions_query_service(self) -> GetQuestionsByModeQueryHandler:
+        """Get the questions query service."""
+        return self._questions_query_service
+
+    def _setup_event_handlers(self) -> None:
+        """Setup all event handlers."""
+        # Register CardScheduledEvent handler
+        card_scheduled_handler = CardScheduledHandler(self._db_manager)
+        self._event_subscription_manager.subscribe(
+            CardScheduledEvent, card_scheduled_handler
+        )

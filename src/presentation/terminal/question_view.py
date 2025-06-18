@@ -18,6 +18,8 @@ from src.domain.content.services.enhanced_question_display import (
     EnhancedQuestionDisplay,
     EnhancedQuestionDisplayRequest,
 )
+from src.domain.learning.services.schedule_card import ScheduleCard, ScheduleCardRequest
+from src.domain.shared.models import FSRSRating
 from src.domain.user.models.user_models import Language
 from src.domain.user.services.load_user_settings import (
     LoadUserSettings,
@@ -39,12 +41,14 @@ class QuestionWidget(EventAwareWidget):
         question: Question,
         event_bus: EventBus,
         user_repository: UserSettingsRepository,
+        schedule_card_service: ScheduleCard,
         preferred_language: Language = Language.ENGLISH,
         **kwargs: Any,
     ):
         super().__init__(event_bus=event_bus, **kwargs)
         self.question = question
         self.user_repository = user_repository
+        self.schedule_card_service = schedule_card_service
         self.preferred_language = preferred_language
         self.selected_answer: str | None = None
         self.answer_revealed = False
@@ -482,40 +486,38 @@ class QuestionWidget(EventAwareWidget):
 
     async def submit_answer_with_rating(self, rating: int) -> None:
         """Submit the answer with FSRS rating to the domain."""
-        import uuid
-        from datetime import UTC, datetime
-
-        from src.domain.learning.events.card_events import CardScheduledEvent
-
         try:
-            # Create CardScheduledEvent for FSRS processing
-            event = CardScheduledEvent(
-                event_id=str(uuid.uuid4()),
-                occurred_at=datetime.now(UTC),
+            # Convert rating to FSRSRating enum
+            fsrs_rating = FSRSRating(rating)
+
+            # Create schedule card request
+            request = ScheduleCardRequest(
                 card_id=self.question.id,  # Use question ID as card ID
-                question_id=self.question.id,
-                new_difficulty=0.0,  # Will be calculated by FSRS
-                new_stability=0.0,  # Will be calculated by FSRS
-                new_retrievability=0.0,  # Will be calculated by FSRS
-                next_review_date=datetime.now(UTC),  # Will be calculated by FSRS
-                rating=rating,  # 1=Again, 2=Hard, 3=Good, 4=Easy
+                rating=fsrs_rating,
                 response_time_ms=1000,  # Placeholder - could be tracked in future
                 session_id=None,  # Could be connected to active session
             )
 
-            # Publish event to trigger FSRS scheduling
-            await self.event_bus.publish(event)
+            # Call the ScheduleCard domain service
+            result = await self.schedule_card_service.call(request)
 
-            logger.info(
-                f"Answer submitted and CardScheduledEvent published: Q{self.question.id}, "
-                f"Selected: {self.selected_answer}, "
-                f"Correct: {self.question.correct}, "
-                f"Rating: {rating}"
-            )
+            if result.success:
+                logger.info(
+                    f"Answer submitted successfully: Q{self.question.id}, "
+                    f"Selected: {self.selected_answer}, "
+                    f"Correct: {self.question.correct}, "
+                    f"Rating: {rating}, "
+                    f"Next review: {result.schedule_result.next_review_date if result.schedule_result else 'N/A'}"
+                )
+            else:
+                logger.warning(
+                    f"Answer submission had issues: Q{self.question.id}, "
+                    f"Error: {result.error_message}"
+                )
 
         except Exception as e:
-            logger.error(f"Failed to publish CardScheduledEvent: {e}")
-            # Continue execution even if event publishing fails
+            logger.error(f"Failed to submit answer with rating: {e}")
+            # Continue execution even if scheduling fails
 
     class QuestionCompleted(Message):
         """Message sent when question is completed with rating."""
@@ -752,14 +754,25 @@ class PracticeScreen(Screen):
         self,
         practice_mode: str = "random",
         user_repository: UserSettingsRepository | None = None,
+        schedule_card_service: ScheduleCard | None = None,
+        questions_query_service=None,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self.practice_mode = practice_mode
         self.user_repository = user_repository
+        self.schedule_card_service = schedule_card_service
+        self.questions_query_service = questions_query_service
         self.current_question: Question | None = None
         self.questions_answered = 0
         self.correct_answers = 0
+
+        # State for question cycling
+        self._question_state = {
+            "category_index": 0,
+            "question_indices": {},
+            "last_question_id": 0,
+        }
 
     def compose(self) -> ComposeResult:
         """Compose the practice screen."""
@@ -776,49 +789,71 @@ class PracticeScreen(Screen):
         await self.load_next_question()
 
     async def load_next_question(self) -> None:
-        """Load the next question for practice."""
-        # Get database manager from app container
+        """Load the next question for practice using proper query handler."""
         try:
-            from src.infrastructure.containers.main_container import MainContainer
+            # Get query service from app container or fallback
+            query_service = self.questions_query_service
+            if not query_service:
+                if hasattr(self.app, "container") and self.app.container:
+                    query_service = self.app.container.get_questions_query_service()
+                else:
+                    # Fallback: create temporary service
+                    from src.infrastructure.containers.main_container import (
+                        MainContainer,
+                    )
 
-            # Check if app has a container, otherwise create one
-            if hasattr(self.app, "container"):
-                container = self.app.container
-            else:
-                container = MainContainer()
+                    container = MainContainer()
+                    query_service = container.get_questions_query_service()
 
-            db_manager = container.get_db_manager()
+            # Create query with current state
+            from src.application.queries.get_questions_by_mode_query import (
+                GetQuestionsByModeQuery,
+            )
 
-            # Get question based on practice mode
-            question = await self._get_question_by_mode(db_manager)
+            query = GetQuestionsByModeQuery(
+                practice_mode=self.practice_mode,
+                category_index=self._question_state["category_index"],
+                question_indices=self._question_state["question_indices"],
+                last_question_id=self._question_state["last_question_id"],
+            )
 
-            if question:
-                self.current_question = question
-            else:
-                # Fallback to a simple question if database is empty
-                self.current_question = Question(
-                    id=1,
-                    question="Was ist die Hauptstadt von Deutschland?",
-                    options=["Berlin", "München", "Hamburg", "Köln"],
-                    correct="Berlin",
-                    category="Geschichte",
-                    difficulty="easy",
+            # Execute query
+            result = await query_service.handle(query)
+
+            if result.success and result.question:
+                self.current_question = result.question
+
+                # Update state for next question
+                if result.next_state:
+                    self._question_state.update(result.next_state)
+
+                logger.info(
+                    f"Loaded question {self.current_question.id} for {self.practice_mode} mode"
                 )
-                logger.warning(
-                    "No questions found in database, using fallback question"
-                )
+            else:
+                logger.error(f"Failed to load question: {result.error_message}")
+                raise Exception(result.error_message or "Unknown error")
 
         except Exception as e:
-            logger.error(f"Error loading question from database: {e}")
-            # Use fallback question
-            self.current_question = Question(
-                id=1,
-                question="Was ist die Hauptstadt von Deutschland?",
-                options=["Berlin", "München", "Hamburg", "Köln"],
-                correct="Berlin",
-                category="Geschichte",
-                difficulty="easy",
-            )
+            logger.error(f"Error loading question: {e}")
+            # This should not happen in a properly initialized app
+            # Remove fallback questions to force proper architecture
+            raise Exception(
+                f"Question loading failed - check query service setup: {e}"
+            ) from e
+
+        # Get or create schedule card service
+        schedule_service = self.schedule_card_service
+        if not schedule_service:
+            # Fallback: get from app container if available
+            if hasattr(self.app, "container"):
+                schedule_service = self.app.container.get_schedule_card_service()
+            else:
+                # Create a temporary one as last resort
+                from src.infrastructure.database.database import DatabaseManager
+
+                temp_db_manager = DatabaseManager()
+                schedule_service = ScheduleCard(temp_db_manager, self.app.event_bus)
 
         # Create enhanced question widget with language support
         if self.user_repository:
@@ -826,6 +861,7 @@ class PracticeScreen(Screen):
                 question=self.current_question,
                 event_bus=self.app.event_bus,
                 user_repository=self.user_repository,
+                schedule_card_service=schedule_service,
                 preferred_language=Language.ENGLISH,  # Will be updated from user settings
             )
         else:
@@ -839,6 +875,7 @@ class PracticeScreen(Screen):
                 question=self.current_question,
                 event_bus=self.app.event_bus,
                 user_repository=temp_repository,
+                schedule_card_service=schedule_service,
                 preferred_language=Language.ENGLISH,
             )
 
@@ -848,55 +885,13 @@ class PracticeScreen(Screen):
             children = list(self.children)
             for child in children:
                 # Keep header and footer, remove everything else
-                if not (hasattr(child, 'id') and child.id in ['header', 'footer']):
+                if not (hasattr(child, "id") and child.id in ["header", "footer"]):
                     await child.remove()
         except Exception as e:
             logger.debug(f"Could not remove existing widgets: {e}")
 
         # Mount the new question widget
         await self.mount(question_widget)
-
-    async def _get_question_by_mode(self, db_manager) -> Question | None:
-        """Get question based on practice mode."""
-        if self.practice_mode == "review":
-            # Get questions due for review
-            questions = db_manager.get_questions_for_review(limit=1)
-            return questions[0] if questions else None
-
-        elif self.practice_mode == "random":
-            # Get a random question by cycling through available ones
-            # Use a simple approach: get questions by different categories and cycle
-            categories = ["Geschichte", "Politik", "Recht", "Kultur", "Geographie"]
-            current_category_index = getattr(self, "_category_index", 0)
-            category = categories[current_category_index % len(categories)]
-            self._category_index = current_category_index + 1
-
-            questions = db_manager.get_questions_by_category(category)
-            if questions:
-                # Cycle through questions in this category
-                question_index = getattr(self, f"_question_index_{category}", 0)
-                question = questions[question_index % len(questions)]
-                setattr(self, f"_question_index_{category}", question_index + 1)
-                return question
-            return None
-
-        elif self.practice_mode == "sequential":
-            # Get questions sequentially by ID
-            last_question_id = getattr(self, "_last_question_id", 0)
-            next_question_id = last_question_id + 1
-
-            question = db_manager.get_question(next_question_id)
-            if question:
-                self._last_question_id = next_question_id
-                return question
-            else:
-                # Reset to beginning if we've reached the end
-                self._last_question_id = 0
-                return db_manager.get_question(1)
-
-        else:
-            # Default: get first available question
-            return db_manager.get_question(1)
 
     def action_select_option_1(self) -> None:
         """Select option 1 via keyboard."""

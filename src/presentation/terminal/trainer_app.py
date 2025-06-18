@@ -95,7 +95,9 @@ class MainMenuScreen(Screen):
             VerticalScroll(
                 Vertical(
                     Button("1. Random Practice", id="random", variant="primary"),
-                    Button("2. Sequential Practice", id="sequential", variant="success"),
+                    Button(
+                        "2. Sequential Practice", id="sequential", variant="success"
+                    ),
                     Button("3. Category Practice", id="category", variant="warning"),
                     Button("4. Review Failed Questions", id="review", variant="error"),
                     Button("Statistics & Progress", id="stats", variant="default"),
@@ -112,22 +114,62 @@ class MainMenuScreen(Screen):
     @on(Button.Pressed, "#random")
     def action_random_practice(self) -> None:
         """Start random practice session."""
-        self.app.push_screen("practice", {"mode": "random"})
+        practice_screen = PracticeScreen(
+            practice_mode="random",
+            user_repository=self.app.user_repository,
+            schedule_card_service=self.app.container.get_schedule_card_service()
+            if hasattr(self.app, "container")
+            else None,
+            questions_query_service=self.app.container.get_questions_query_service()
+            if hasattr(self.app, "container")
+            else None,
+        )
+        self.app.push_screen(practice_screen)
 
     @on(Button.Pressed, "#sequential")
     def action_sequential_practice(self) -> None:
         """Start sequential practice session."""
-        self.app.push_screen("practice", {"mode": "sequential"})
+        practice_screen = PracticeScreen(
+            practice_mode="sequential",
+            user_repository=self.app.user_repository,
+            schedule_card_service=self.app.container.get_schedule_card_service()
+            if hasattr(self.app, "container")
+            else None,
+            questions_query_service=self.app.container.get_questions_query_service()
+            if hasattr(self.app, "container")
+            else None,
+        )
+        self.app.push_screen(practice_screen)
 
     @on(Button.Pressed, "#category")
     def action_category_practice(self) -> None:
         """Start category-based practice session."""
-        self.app.push_screen("practice", {"mode": "category"})
+        practice_screen = PracticeScreen(
+            practice_mode="category",
+            user_repository=self.app.user_repository,
+            schedule_card_service=self.app.container.get_schedule_card_service()
+            if hasattr(self.app, "container")
+            else None,
+            questions_query_service=self.app.container.get_questions_query_service()
+            if hasattr(self.app, "container")
+            else None,
+        )
+        self.app.push_screen(practice_screen)
 
     @on(Button.Pressed, "#review")
     def action_review_practice(self) -> None:
         """Review failed questions."""
-        self.app.push_screen("practice", {"mode": "review"})
+        practice_screen = PracticeScreen(
+            practice_mode="review",
+            user_repository=self.app.user_repository,
+            schedule_card_service=self.app.container.get_schedule_card_service()
+            if hasattr(self.app, "container")
+            else None,
+            questions_query_service=self.app.container.get_questions_query_service()
+            if hasattr(self.app, "container")
+            else None,
+        )
+        self.app.push_screen(practice_screen)
 
     @on(Button.Pressed, "#stats")
     def action_show_stats(self) -> None:
@@ -235,6 +277,7 @@ class TrainerApp(EventAwareApp):
         query_service: GetSessionProgressQueryHandler,
         analytics_service: ProgressAnalytics,
         user_repository=None,
+        container=None,
         **kwargs: Any,
     ):
         """Initialize the trainer app."""
@@ -247,6 +290,7 @@ class TrainerApp(EventAwareApp):
         self.query_service = query_service
         self.analytics_service = analytics_service
         self.user_repository = user_repository
+        self.container = container  # Store the container for service access
 
         # Set app title
         self.title = "Integran - German Integration Exam Trainer"
@@ -254,8 +298,28 @@ class TrainerApp(EventAwareApp):
 
     async def setup_event_handlers(self) -> None:
         """Setup global event handlers for the app."""
-        # TODO: Add event handlers for domain events
+        from src.domain.analytics.events.analytics_events import LeechDetectedEvent
+        from src.domain.learning.events.card_events import CardScheduledEvent
+
+        # Subscribe to card scheduled events for UI updates
+        await self.event_bus.subscribe(CardScheduledEvent, self._handle_card_scheduled)
+
+        # Subscribe to leech detection for notifications
+        await self.event_bus.subscribe(LeechDetectedEvent, self._handle_leech_detected)
+
         logger.info("Event handlers setup complete")
+
+    async def _handle_card_scheduled(self, event: Any) -> None:
+        """Handle card scheduled events for UI updates."""
+        logger.debug(f"Card {event.card_id} scheduled for {event.next_review_date}")
+        # Could update UI elements if needed
+
+    async def _handle_leech_detected(self, event: Any) -> None:
+        """Handle leech detection events."""
+        logger.info(
+            f"Leech detected: Card {event.card_id} with {event.lapse_count} lapses"
+        )
+        # Could show notification to user
 
     def on_mount(self) -> None:
         """Called when the app is mounted."""

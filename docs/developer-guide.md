@@ -569,6 +569,256 @@ The project uses several tools for code quality:
 4. Push to GitHub
 5. GitHub Actions will handle the release
 
+## 📊 Data Flow Architecture
+
+### Understanding the Complete Data Flow
+
+One of the most critical aspects of the Integran architecture is understanding how data flows between the presentation, application, domain, and infrastructure layers. This section explains the complete flow using the example of a user answering a question.
+
+### 🔄 Layer Responsibilities
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        PRESENTATION LAYER                           │
+│  • UI Components (Terminal/Web/Mobile)                              │
+│  • User Input Handling                                              │
+│  • Display Results                                                  │
+│  • NO Business Logic                                                │
+└─────────────────────────────────────────────────────────────────────┘
+                                  ↕
+┌─────────────────────────────────────────────────────────────────────┐
+│                        APPLICATION LAYER                            │
+│  • Thin Coordinators (< 50 lines)                                  │
+│  • Command/Query Handlers                                           │
+│  • Event Handlers                                                   │
+│  • Orchestrates Domain Services                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                                  ↕
+┌─────────────────────────────────────────────────────────────────────┐
+│                          DOMAIN LAYER                               │
+│  • Business Logic                                                   │
+│  • Domain Services (ScheduleCard, etc.)                             │
+│  • Domain Events                                                    │
+│  • FSRS Algorithm                                                   │
+└─────────────────────────────────────────────────────────────────────┘
+                                  ↕
+┌─────────────────────────────────────────────────────────────────────┐
+│                      INFRASTRUCTURE LAYER                           │
+│  • Database (SQLite)                                                │
+│  • Event Bus                                                        │
+│  • Repositories                                                     │
+│  • External APIs (Gemini)                                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 📍 Example: User Answers a Question
+
+#### Success Flow: Correct Answer with "Good" Rating
+
+```
+USER INTERACTION
+     │
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ PRESENTATION: QuestionWidget (question_view.py)                    │
+│                                                                     │
+│  1. User clicks answer option                                       │
+│  2. Answer revealed as correct ✓                                    │
+│  3. User clicks "Good" rating button                                │
+│  4. submit_answer_with_rating(rating=3) called                      │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     │ Creates ScheduleCardRequest
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ DOMAIN: ScheduleCard Service (schedule_card.py)                    │
+│                                                                     │
+│  1. Validates request (card_id > 0, valid rating)                  │
+│  2. Gets/Creates FSRS card from database                           │
+│  3. Calculates FSRS parameters:                                    │
+│     • Difficulty: 5.0 → 4.8 (easier after correct)                 │
+│     • Stability: 1.0 → 4.14 (more stable)                          │
+│     • Next Review: now → in 4 days                                 │
+│  4. Updates database with new state                                │
+│  5. Records review history                                          │
+│  6. Publishes CardScheduledEvent                                   │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     │ Event Published
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ INFRASTRUCTURE: EventBus (enhanced_event_bus.py)                   │
+│                                                                     │
+│  1. Receives CardScheduledEvent                                     │
+│  2. Finds registered handlers: [CardScheduledHandler]               │
+│  3. Calls handler.handle(event) asynchronously                      │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     │ Async Handler Call
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ APPLICATION: CardScheduledHandler (card_scheduled_handler.py)      │
+│                                                                     │
+│  1. Updates performance metrics                                     │
+│  2. Checks for leech status (if rating=1)                           │
+│  3. Updates daily statistics                                        │
+│  4. Triggers analytics calculations                                 │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     │ Analytics Update
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ RESULT: Updated State in Database                                  │
+│                                                                     │
+│  • FSRS card updated with new schedule                             │
+│  • Review history recorded                                          │
+│  • Analytics updated                                                │
+│  • Stats page shows: 1 question answered, 100% correct             │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Failure Flow: Wrong Answer with "Again" Rating
+
+```
+USER INTERACTION
+     │
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ PRESENTATION: QuestionWidget                                        │
+│                                                                     │
+│  1. User clicks wrong answer option                                 │
+│  2. Answer revealed as incorrect ✗                                  │
+│  3. User clicks "Again" rating button                               │
+│  4. submit_answer_with_rating(rating=1) called                      │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ DOMAIN: ScheduleCard Service                                        │
+│                                                                     │
+│  1. FSRS calculations for "Again":                                  │
+│     • Difficulty: 5.0 → 5.2 (harder after fail)                    │
+│     • Stability: 4.14 → 0.4 (much less stable)                     │
+│     • State: REVIEW → RELEARNING                                    │
+│     • Next Review: in 10 minutes                                   │
+│  2. Increments lapse_count                                          │
+│  3. Publishes CardScheduledEvent with rating=1                      │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ APPLICATION: CardScheduledHandler                                   │
+│                                                                     │
+│  1. Special handling for "Again" rating:                            │
+│     • Checks leech threshold (8 lapses)                             │
+│     • May create LeechDetectedEvent                                 │
+│     • Updates failure statistics                                    │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ RESULT: Card in Relearning State                                   │
+│                                                                     │
+│  • Card scheduled for short interval (10 min)                      │
+│  • Lapse count incremented                                          │
+│  • Stats show: 1 question answered, 0% correct                     │
+│  • Potential leech detection if multiple failures                  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 🔍 Critical Implementation Details
+
+#### 1. **Event Handler Registration (CRITICAL!)**
+```python
+# In MainContainer.__init__():
+self._event_subscription_manager = EventSubscriptionManager(self._event_bus)
+self._setup_event_handlers()
+
+# In _setup_event_handlers():
+card_scheduled_handler = CardScheduledHandler(self._db_manager)
+self._event_subscription_manager.subscribe(CardScheduledEvent, card_scheduled_handler)
+```
+
+**Without this registration**: Events are published but nothing happens!
+
+#### 2. **Proper Service Injection**
+```python
+# WRONG: Publishing events directly from UI
+event = CardScheduledEvent(...)  # Dummy data
+await self.event_bus.publish(event)  # Bypasses domain logic!
+
+# CORRECT: Call domain service
+request = ScheduleCardRequest(card_id=1, rating=FSRSRating.GOOD, ...)
+result = await self.schedule_card_service.call(request)  # Proper flow
+```
+
+#### 3. **Auto-Creation of FSRS Cards**
+```python
+# In ScheduleCard service:
+card = await self._get_card_by_id(request.card_id)
+if not card:
+    # Auto-create for new questions
+    card = self.db_manager.create_fsrs_card(question_id=request.card_id, user_id=1)
+```
+
+### 📈 Data Flow for Statistics Display
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ PRESENTATION: ProgressScreen requests stats                         │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ APPLICATION: GetSessionProgressQueryHandler                         │
+│  • Direct database query (CQRS read side)                           │
+│  • No domain logic needed for reads                                 │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ INFRASTRUCTURE: DatabaseManager                                     │
+│  • get_fsrs_learning_stats()                                        │
+│  • Aggregates: cards_learning, cards_review, retention_rate         │
+└─────────────────────────────────────────────────────────────────────┘
+     │
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ RESULT: Statistics Displayed                                        │
+│  • Questions answered: X                                            │
+│  • Correct: Y%                                                      │
+│  • Cards in learning/review states                                  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 🚨 Common Data Flow Issues
+
+1. **Missing Event Handlers**
+   - **Symptom**: Actions complete but stats don't update
+   - **Fix**: Register handlers in MainContainer
+
+2. **Bypassing Domain Layer**
+   - **Symptom**: Events published but no business logic runs
+   - **Fix**: Always call domain services, never publish events directly from UI
+
+3. **No FSRS Cards**
+   - **Symptom**: "Card not found" errors
+   - **Fix**: Auto-create cards in ScheduleCard service
+
+4. **Stale Statistics**
+   - **Symptom**: Stats don't reflect recent answers
+   - **Fix**: Ensure CardScheduledHandler updates analytics
+
+### 🎯 Key Takeaways
+
+1. **Presentation Layer**: Only handles UI, calls domain services
+2. **Domain Layer**: Contains ALL business logic (FSRS calculations)
+3. **Application Layer**: Thin coordination, event handling
+4. **Infrastructure Layer**: Data persistence, event distribution
+
+5. **Event Flow**: Domain services publish events → Event bus distributes → Handlers process
+6. **CQRS Pattern**: Commands go through domain services, queries go direct to database
+
 ## 🔄 Event Flow Management
 
 ### Event Flow Definition File
