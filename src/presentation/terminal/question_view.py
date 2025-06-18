@@ -842,22 +842,16 @@ class PracticeScreen(Screen):
                 preferred_language=Language.ENGLISH,
             )
 
-        # Remove all existing question widgets first
+        # Remove all children except header and footer, then mount the question widget
         try:
-            # Find and remove any existing QuestionWidget
-            existing_widgets = self.query("QuestionWidget")
-            for widget in existing_widgets:
-                await widget.remove()
+            # Get all direct children of the screen
+            children = list(self.children)
+            for child in children:
+                # Keep header and footer, remove everything else
+                if not (hasattr(child, 'id') and child.id in ['header', 'footer']):
+                    await child.remove()
         except Exception as e:
-            logger.debug(f"Could not remove existing question widgets: {e}")
-
-        # Also try to remove the initial container if it exists
-        try:
-            container = self.query_one("#question-container", fallback=None)
-            if container:
-                await container.remove()
-        except Exception as e:
-            logger.debug(f"Could not remove question container: {e}")
+            logger.debug(f"Could not remove existing widgets: {e}")
 
         # Mount the new question widget
         await self.mount(question_widget)

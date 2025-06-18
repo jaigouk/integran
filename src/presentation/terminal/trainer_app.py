@@ -7,7 +7,7 @@ from typing import Any
 
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
@@ -92,14 +92,17 @@ class MainMenuScreen(Screen):
                 "🇩🇪 Integran - German Integration Exam Trainer", classes="text-title"
             ),
             Static("Choose your practice mode:", classes="text-subtitle"),
-            Vertical(
-                Button("1. Random Practice", id="random", variant="primary"),
-                Button("2. Sequential Practice", id="sequential", variant="success"),
-                Button("3. Category Practice", id="category", variant="warning"),
-                Button("4. Review Failed Questions", id="review", variant="error"),
-                Button("Statistics & Progress", id="stats", variant="default"),
-                Button("Settings", id="settings", variant="default"),
-                classes="buttons-vertical",
+            VerticalScroll(
+                Vertical(
+                    Button("1. Random Practice", id="random", variant="primary"),
+                    Button("2. Sequential Practice", id="sequential", variant="success"),
+                    Button("3. Category Practice", id="category", variant="warning"),
+                    Button("4. Review Failed Questions", id="review", variant="error"),
+                    Button("Statistics & Progress", id="stats", variant="default"),
+                    Button("Settings", id="settings", variant="default"),
+                    classes="buttons-vertical",
+                ),
+                classes="buttons-scroll",
             ),
             Static("Press number keys or click buttons to select", classes="text-help"),
             classes="container-centered",
@@ -160,9 +163,24 @@ class TrainerApp(EventAwareApp):
         + """
     /* Main menu specific styling */
     .container-centered {
-        max-width: 100;
-        min-height: 25;
-        max-height: 90vh;
+        align: center middle;
+        width: 95vw;
+        max-width: 120;
+        height: auto;
+        max-height: 85vh;
+        background: $surface;
+        border: solid white;
+        padding: 2;
+        margin: 1;
+    }
+
+    .buttons-scroll {
+        width: 100%;
+        height: auto;
+        max-height: 50vh;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+        margin: 1 0;
     }
 
     /* Confirm dialog specific styling */
