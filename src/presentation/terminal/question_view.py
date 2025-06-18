@@ -26,6 +26,7 @@ from src.domain.user.services.load_user_settings import (
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
+from src.presentation.terminal.themes import COMMON_CSS_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +61,10 @@ class QuestionWidget(EventAwareWidget):
             with TabPane("Question", id="question-tab", classes="question-pane"):  # noqa: SIM117
                 with VerticalScroll(classes="question-container"):  # noqa: SIM117
                     # Question header
-                    yield Static(
-                        f"Question {self.question.id}", classes="question-number"
-                    )
+                    yield Static(f"Question {self.question.id}", classes="text-title")
                     yield Static(
                         f"Category: {self.question.category}",
-                        classes="question-category",
+                        classes="text-subtitle",
                     )
                     yield Static(self.question.question, classes="question-text")
 
@@ -529,8 +528,10 @@ class QuestionWidget(EventAwareWidget):
 class PracticeScreen(Screen):
     """Screen for practicing questions."""
 
-    CSS = """
-    /* Tab-based layout styles */
+    CSS = (
+        COMMON_CSS_BASE
+        + """
+    /* Question view specific styling */
     .question-tabs {
         width: 95vw;
         max-width: 120;
@@ -567,22 +568,6 @@ class PracticeScreen(Screen):
         padding: 1;
         overflow-y: auto;
         scrollbar-gutter: stable;
-    }
-
-    .question-number {
-        text-align: center;
-        color: $primary;
-        text-style: bold;
-        margin-bottom: 1;
-        height: auto;
-    }
-
-    .question-category {
-        text-align: center;
-        color: $accent;
-        text-style: italic;
-        margin-bottom: 1;
-        height: auto;
     }
 
     .question-text {
@@ -643,14 +628,7 @@ class PracticeScreen(Screen):
         overflow: auto;
     }
 
-    .content-section {
-        margin-bottom: 1;
-        height: auto;
-        border: solid white;
-        background: $panel;
-    }
-
-    /* Specific styling for the wrong analysis collapsible */
+    /* Specific styling for content sections */
     .content-section Collapsible {
         height: auto;
         min-height: 0;
@@ -726,11 +704,13 @@ class PracticeScreen(Screen):
         text-style: italic;
     }
 
+    /* FSRS rating buttons - ensure visibility */
     .fsrs-rating {
         dock: bottom;
         width: 100%;
         height: auto;
         min-height: 8;
+        max-height: 12;
         padding: 1;
         background: $accent 20%;
         border: solid white;
@@ -742,6 +722,7 @@ class PracticeScreen(Screen):
         text-style: bold;
         margin-bottom: 1;
         height: auto;
+        color: white;
     }
 
     .rating-buttons {
@@ -756,12 +737,8 @@ class PracticeScreen(Screen):
         min-width: 8;
         height: 3;
     }
-
-    .hidden {
-        display: none;
-    }
-
     """
+    )
 
     BINDINGS = [
         ("1", "select_option_1", "Option 1"),
@@ -788,10 +765,10 @@ class PracticeScreen(Screen):
         """Compose the practice screen."""
         yield Container(
             Static(
-                f"Practice Mode: {self.practice_mode.title()}", classes="mode-title"
+                f"Practice Mode: {self.practice_mode.title()}", classes="text-title"
             ),
             Static("Loading question...", id="question-container"),
-            classes="practice-container",
+            classes="container-centered",
         )
 
     async def on_mount(self) -> None:

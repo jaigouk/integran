@@ -39,6 +39,7 @@ from src.domain.user.services.toggle_developer_mode import ToggleDeveloperMode
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
+from src.presentation.terminal.themes import COMMON_CSS_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,8 @@ class SettingsWidget(EventAwareWidget):
     def compose(self) -> ComposeResult:
         """Compose the settings interface."""
         yield Header(show_clock=True)
-        with Container(classes="settings-main-container"):
-            with TabbedContent(id="settings-tabs"):
+        with Container(classes="container-full"):
+            with TabbedContent(id="settings-tabs", classes="tab-container"):
                 with TabPane("General", id="general"):  # noqa: SIM117
                     with VerticalScroll(classes="tab-scroll"):  # noqa: SIM117
                         yield from self._compose_general_settings()
@@ -88,15 +89,15 @@ class SettingsWidget(EventAwareWidget):
                     Button("Save Changes", id="save", variant="primary"),
                     Button("Reset to Defaults", id="reset", variant="warning"),
                     Button("Back to Menu", id="cancel", variant="default"),
-                    classes="settings-actions",
+                    classes="buttons-horizontal",
                 ),
-                classes="settings-footer",
+                classes="footer-container",
             )
         yield Footer()
 
     def _compose_general_settings(self) -> ComposeResult:
         """Compose general settings tab."""
-        yield Label("Interface Settings", classes="section-header")
+        yield Label("Interface Settings", classes="text-section-header")
         yield Container(
             Label("Language:"),
             Select(
@@ -110,7 +111,7 @@ class SettingsWidget(EventAwareWidget):
                 value=Language.ENGLISH.value,
                 id="language-select",
             ),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Theme Mode:"),
@@ -123,12 +124,12 @@ class SettingsWidget(EventAwareWidget):
                 value=ThemeMode.AUTO.value,
                 id="theme-select",
             ),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Notifications:"),
             Switch(value=True, id="notifications-switch"),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Reminder Time (24h):"),
@@ -143,12 +144,12 @@ class SettingsWidget(EventAwareWidget):
                 value="19:00",
                 id="reminder-select",
             ),
-            classes="setting-item",
+            classes="form-item",
         )
 
     def _compose_learning_settings(self) -> ComposeResult:
         """Compose learning settings tab."""
-        yield Label("Learning Preferences", classes="section-header")
+        yield Label("Learning Preferences", classes="text-section-header")
         yield Container(
             Label("Daily Goal (questions):"),
             Select(
@@ -162,7 +163,7 @@ class SettingsWidget(EventAwareWidget):
                 value=20,
                 id="daily-goal-select",
             ),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Session Timeout:"),
@@ -177,24 +178,24 @@ class SettingsWidget(EventAwareWidget):
                 value=60,
                 id="timeout-select",
             ),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Show Explanations:"),
             Switch(value=True, id="explanations-switch"),
             Static("Show detailed explanations after answering", classes="help-text"),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Auto Advance:"),
             Switch(value=False, id="auto-advance-switch"),
             Static("Automatically proceed to next question", classes="help-text"),
-            classes="setting-item",
+            classes="form-item",
         )
 
     def _compose_developer_settings(self) -> ComposeResult:
         """Compose developer settings tab."""
-        yield Label("Developer Mode", classes="section-header")
+        yield Label("Developer Mode", classes="text-section-header")
         yield Static(
             "⚠️ Developer Mode enables advanced features that use external APIs\n\nThese features may incur costs (~$50-80 for full dataset generation)",
             classes="warning-box",
@@ -204,9 +205,9 @@ class SettingsWidget(EventAwareWidget):
             Switch(value=False, id="developer-mode-switch"),
             Static(
                 "Enables access to AI-powered content generation",
-                classes="help-text",
+                classes="text-help",
             ),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Current Status:", classes="status-label"),
@@ -215,7 +216,7 @@ class SettingsWidget(EventAwareWidget):
                 id="developer-status",
                 classes="status-text",
             ),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Available Features:", classes="features-label"),
@@ -227,16 +228,16 @@ class SettingsWidget(EventAwareWidget):
                 id="developer-features",
                 disabled=True,
             ),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Static(
             "💡 Tip: The existing final_dataset.json contains all 460 questions with complete multilingual content",
-            classes="tip-text",
+            classes="text-tip",
         )
 
     def _compose_advanced_settings(self) -> ComposeResult:
         """Compose advanced settings tab."""
-        yield Label("Advanced Configuration", classes="section-header")
+        yield Label("Advanced Configuration", classes="text-section-header")
         yield Container(
             Label("Debug Information:"),
             Pretty(
@@ -248,21 +249,21 @@ class SettingsWidget(EventAwareWidget):
                 },
                 id="debug-info",
             ),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Export Settings:"),
             Button("Export to File", id="export-settings", variant="default"),
-            classes="setting-item",
+            classes="form-item",
         )
         yield Container(
             Label("Reset Everything:"),
             Button("Factory Reset", id="factory-reset", variant="error"),
             Static(
                 "⚠️ This will delete all progress and settings",
-                classes="warning-text",
+                classes="text-warning",
             ),
-            classes="setting-item",
+            classes="form-item",
         )
 
     async def on_mount(self) -> None:
@@ -570,104 +571,12 @@ class SettingsScreen(Screen[None]):
         ("escape", "back_to_menu", "Back to Menu"),
     ]
 
-    CSS = """
-    .settings-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin: 1 0;
-    }
-
-    .settings-main-container {
-        width: 100%;
-        height: 100%;
-        display: block;
-    }
-
-    #settings-tabs {
-        width: 100%;
-        height: 1fr;
-        margin: 0;
-    }
-
-    .tab-scroll {
-        width: 100%;
-        height: 1fr;
-        min-height: 15;
-        overflow-y: auto;
-        scrollbar-gutter: stable;
-    }
-
-    .settings-section {
-        width: 100%;
-        margin: 1 0;
-        padding: 1;
-    }
-
-    .section-header {
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        border-bottom: solid white;
-        padding-bottom: 1;
-    }
-
-    .setting-item {
-        margin: 0 0 1 0;
-        padding: 1;
-        background: $background;
-        border: solid white;
-        height: auto;
-        min-height: 4;
-    }
-
-    .setting-item Label {
-        text-style: bold;
-        margin-bottom: 0;
-    }
-
-    .setting-item Select {
-        margin-top: 0;
-        margin-bottom: 0;
-        height: 3;
-        width: 100%;
-    }
-
-    .setting-item Switch {
-        margin-top: 0;
-        margin-bottom: 0;
-        height: 3;
-    }
-
-    .help-text {
-        color: $text-muted;
-        text-style: italic;
-        margin-top: 1;
-    }
-
-    .warning-text {
-        color: white;
-        text-style: bold;
-    }
-
+    CSS = (
+        COMMON_CSS_BASE
+        + """
+    /* Settings specific styling */
     .warning-box {
-        background: $warning 20%;
         color: white;
-        padding: 1;
-        margin: 1 0;
-        border: solid $warning;
-        height: auto;
-        min-height: 5;
-        width: 100%;
-    }
-
-    .tip-text {
-        color: $accent;
-        text-style: italic;
-        margin: 1 0;
-        padding: 1;
-        background: $background;
-        border-left: solid white;
     }
 
     .status-label {
@@ -682,43 +591,11 @@ class SettingsScreen(Screen[None]):
         background: $surface;
     }
 
-    .status-enabled {
-        color: $success;
-        text-style: bold;
-    }
-
-    .status-disabled {
-        color: $text-muted;
-        text-style: italic;
-    }
-
     .features-label {
         text-style: bold;
         color: $secondary;
         margin-top: 1;
     }
-
-    .settings-footer {
-        dock: bottom;
-        width: 100%;
-        height: auto;
-        padding: 1;
-        background: $background;
-        border-top: solid white;
-    }
-
-    .settings-actions {
-        align: center middle;
-        width: 100%;
-        height: auto;
-    }
-
-    .settings-actions Button {
-        width: 1fr;
-        height: 3;
-        margin: 0 1;
-    }
-
 
     #developer-features {
         height: 8;
@@ -731,6 +608,7 @@ class SettingsScreen(Screen[None]):
         border: solid white;
     }
     """
+    )
 
     def __init__(
         self,

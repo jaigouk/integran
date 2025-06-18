@@ -64,8 +64,16 @@ def test_eliminated_nested_scrolling():
 
     css = PracticeScreen.CSS
 
-    # Enhanced content should not have max-height causing overflow
-    enhanced_section = css[css.find(".enhanced-content") : css.find(".content-section")]
+    # Enhanced content should have proper overflow handling
+    enhanced_start = css.find(".enhanced-content")
+    # Find the next CSS rule after enhanced-content
+    next_rule_start = css.find(".", enhanced_start + 1)
+    if next_rule_start != -1:
+        enhanced_section = css[enhanced_start:next_rule_start]
+    else:
+        # If no next rule found, take a reasonable chunk
+        enhanced_section = css[enhanced_start : enhanced_start + 200]
+
     assert (
         "overflow: auto" in enhanced_section
     )  # Changed from 'visible' to fix Textual compatibility

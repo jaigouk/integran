@@ -21,7 +21,11 @@ from src.application.queries.get_session_progress_query import (
 from src.domain.analytics.services.analyze_performance import ProgressAnalytics
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareWidget
-from src.presentation.terminal.themes import format_percentage, get_progress_color
+from src.presentation.terminal.themes import (
+    COMMON_CSS_BASE,
+    format_percentage,
+    get_progress_color,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +123,7 @@ class CategoryProgressWidget(EventAwareWidget):
     def compose(self) -> ComposeResult:
         """Compose the category progress widget."""
         with Container(classes="category-container"):
-            yield Static("Progress by Category", classes="category-title")
+            yield Static("Progress by Category", classes="text-section-header")
             yield Static(
                 "Loading category data...",
                 id="category-table",
@@ -197,12 +201,10 @@ class CategoryProgressWidget(EventAwareWidget):
 class ProgressScreen(Screen):
     """Screen for displaying progress and statistics."""
 
-    CSS = """
-    .progress-main {
-        width: 100%;
-        height: 100%;
-    }
-
+    CSS = (
+        COMMON_CSS_BASE
+        + """
+    /* Progress view specific styling */
     .progress-container {
         align: center top;
         width: 95vw;
@@ -215,15 +217,6 @@ class ProgressScreen(Screen):
         margin: 1;
         overflow-y: auto;
         scrollbar-gutter: stable;
-    }
-
-    .progress-footer {
-        dock: bottom;
-        width: 100%;
-        height: auto;
-        padding: 1;
-        background: $background;
-        border-top: solid white;
     }
 
     #stats-widget {
@@ -251,34 +244,14 @@ class ProgressScreen(Screen):
         scrollbar-gutter: stable;
     }
 
-    .category-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        height: auto;
-    }
-
     .category-table {
         width: 100%;
         height: auto;
         text-align: left;
         overflow-x: auto;
     }
-
-    .progress-actions {
-        align: center middle;
-        width: 100%;
-        height: auto;
-    }
-
-    .progress-actions Button {
-        width: 1fr;
-        min-width: 12;
-        height: 3;
-        margin: 0 1;
-    }
     """
+    )
 
     BINDINGS = [
         ("r", "refresh", "Refresh"),
@@ -298,7 +271,7 @@ class ProgressScreen(Screen):
 
     def compose(self) -> ComposeResult:
         """Compose the progress screen."""
-        with Container(classes="progress-main"):
+        with Container(classes="container-main"):
             yield VerticalScroll(
                 StatsWidget(
                     query_service=self.query_service,
@@ -319,9 +292,9 @@ class ProgressScreen(Screen):
                     Button("Export Stats", id="export", variant="default"),
                     Button("Reset Progress", id="reset", variant="error"),
                     Button("Back to Menu", id="back", variant="default"),
-                    classes="progress-actions",
+                    classes="buttons-horizontal",
                 ),
-                classes="progress-footer",
+                classes="footer-container",
             )
 
     async def on_mount(self) -> None:

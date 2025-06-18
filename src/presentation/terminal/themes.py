@@ -157,6 +157,278 @@ COMPONENT_STYLES = {
 }
 
 
+# Common CSS Base Classes for consistent UI styling
+COMMON_CSS_BASE = """
+/* ===== LAYOUT FOUNDATIONS ===== */
+.container-centered {
+    align: center middle;
+    width: 95vw;
+    max-width: 120;
+    height: auto;
+    max-height: 85vh;
+    background: $surface;
+    border: solid white;
+    padding: 2;
+    margin: 1;
+}
+
+.container-full {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.container-scrollable {
+    width: 100%;
+    height: auto;
+    max-height: 70vh;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding: 1;
+}
+
+.container-main {
+    width: 100%;
+    height: 100%;
+}
+
+/* ===== TYPOGRAPHY SYSTEM ===== */
+.text-title {
+    text-align: center;
+    text-style: bold;
+    color: $primary;
+    margin: 1 0;
+    height: auto;
+}
+
+.text-subtitle {
+    text-align: center;
+    color: $text-muted;
+    margin-bottom: 2;
+    text-style: italic;
+    height: auto;
+}
+
+.text-section-header {
+    text-style: bold;
+    color: $primary;
+    margin-bottom: 1;
+    border-bottom: solid white;
+    padding-bottom: 1;
+    height: auto;
+}
+
+.text-help {
+    color: $text-muted;
+    text-style: italic;
+    margin-top: 1;
+    height: auto;
+}
+
+.text-warning {
+    color: $warning;
+    text-style: bold;
+    margin: 1 0;
+}
+
+.text-tip {
+    color: $accent;
+    text-style: italic;
+    margin: 1 0;
+    padding: 1;
+    background: $background;
+    border-left: solid white;
+}
+
+/* ===== BUTTON SYSTEM ===== */
+.buttons-horizontal {
+    align: center middle;
+    width: 100%;
+    height: auto;
+    margin: 1;
+}
+
+.buttons-vertical {
+    align: center middle;
+    width: 100%;
+    height: auto;
+}
+
+.buttons-horizontal Button {
+    width: 1fr;
+    min-width: 12;
+    height: 3;
+    margin: 0 1;
+}
+
+.buttons-vertical Button {
+    width: 100%;
+    height: 3;
+    margin: 1 0;
+}
+
+.button-full-width {
+    width: 100%;
+    height: 3;
+}
+
+/* ===== STATUS & STATE SYSTEM ===== */
+.status-enabled {
+    color: $success;
+    text-style: bold;
+}
+
+.status-disabled {
+    color: $text-muted;
+    text-style: italic;
+}
+
+.status-warning {
+    color: $warning;
+    text-style: bold;
+}
+
+.status-error {
+    color: $error;
+    text-style: bold;
+}
+
+/* ===== FORM SYSTEM ===== */
+.form-item {
+    margin: 0 0 1 0;
+    padding: 1;
+    background: $background;
+    border: solid white;
+    height: auto;
+    min-height: 4;
+}
+
+.form-item Label {
+    text-style: bold;
+    margin-bottom: 0;
+}
+
+.form-item Select {
+    margin-top: 0;
+    margin-bottom: 0;
+    height: 3;
+    width: 100%;
+}
+
+.form-item Switch {
+    margin-top: 0;
+    margin-bottom: 0;
+    height: 3;
+}
+
+.form-item Input {
+    margin-top: 0;
+    margin-bottom: 0;
+    height: 3;
+    width: 100%;
+}
+
+/* ===== CONTENT SECTIONS ===== */
+.content-section {
+    margin: 2 0;
+    padding: 2;
+    background: $surface;
+    border: solid white;
+    height: auto;
+}
+
+.content-container {
+    width: 100%;
+    height: auto;
+    background: $background;
+    border: solid white;
+    padding: 1;
+    margin-bottom: 1;
+}
+
+.warning-box {
+    background: $warning 20%;
+    color: white;
+    padding: 1;
+    margin: 1 0;
+    border: solid $warning;
+    height: auto;
+    min-height: 5;
+    width: 100%;
+}
+
+/* ===== TAB SYSTEM ===== */
+.tab-container {
+    width: 100%;
+    height: 1fr;
+    margin: 0;
+}
+
+.tab-scroll {
+    width: 100%;
+    height: 1fr;
+    min-height: 15;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+/* ===== FOOTER SYSTEM ===== */
+.footer-container {
+    dock: bottom;
+    width: 100%;
+    height: auto;
+    padding: 1;
+    background: $background;
+    border-top: solid white;
+}
+
+/* ===== UTILITY CLASSES ===== */
+.hidden {
+    display: none;
+}
+
+.full-height {
+    height: 1fr;
+}
+
+.auto-height {
+    height: auto;
+}
+
+.min-height-10 {
+    min-height: 10;
+}
+
+.min-height-15 {
+    min-height: 15;
+}
+
+.no-margin {
+    margin: 0;
+}
+
+.no-padding {
+    padding: 0;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-bold {
+    text-style: bold;
+}
+
+.text-italic {
+    text-style: italic;
+}
+"""
+
+
 def get_difficulty_color(rating: int) -> str:
     """Get color for FSRS rating/difficulty."""
     rating_colors = {

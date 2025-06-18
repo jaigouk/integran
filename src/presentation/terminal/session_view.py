@@ -13,6 +13,7 @@ from textual.widgets import Button, ProgressBar, Static
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareWidget
+from src.presentation.terminal.themes import COMMON_CSS_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class SessionProgressWidget(EventAwareWidget):
     def compose(self) -> ComposeResult:
         """Compose the session progress widget."""
         with Container(classes="session-progress"):
-            yield Static("Session Progress", classes="progress-title")
+            yield Static("Session Progress", classes="text-section-header")
 
             with Horizontal(classes="progress-stats"):
                 yield Static("0/0", id="question-counter", classes="stat-item")
@@ -90,7 +91,10 @@ class SessionProgressWidget(EventAwareWidget):
 class SessionScreen(Screen):
     """Screen for managing learning sessions."""
 
-    CSS = """
+    CSS = (
+        COMMON_CSS_BASE
+        + """
+    /* Session view specific styling */
     .session-container {
         align: center middle;
         width: 80%;
@@ -106,13 +110,6 @@ class SessionScreen(Screen):
         background: $background;
         border: solid white;
         padding: 2;
-        margin-bottom: 2;
-    }
-
-    .progress-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
         margin-bottom: 2;
     }
 
@@ -164,6 +161,7 @@ class SessionScreen(Screen):
         height: 3;
     }
     """
+    )
 
     BINDINGS = [
         ("p", "pause_session", "Pause"),
@@ -190,7 +188,7 @@ class SessionScreen(Screen):
         yield Container(
             Static(
                 f"Learning Session - {self.practice_mode.title()}",
-                classes="session-info",
+                classes="text-title",
             ),
             SessionProgressWidget(
                 event_bus=self.app.event_bus,
@@ -198,13 +196,13 @@ class SessionScreen(Screen):
             ),
             Static(
                 "Session controls and question display will appear here",
-                classes="session-info",
+                classes="text-help",
             ),
             Horizontal(
                 Button("Start Session", id="start", variant="success"),
                 Button("Configure", id="configure", variant="default"),
                 Button("Back to Menu", id="back", variant="default"),
-                classes="session-actions",
+                classes="buttons-horizontal",
             ),
             classes="session-container",
         )

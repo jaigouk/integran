@@ -22,8 +22,7 @@ from src.presentation.terminal.progress_view import ProgressScreen
 from src.presentation.terminal.question_view import PracticeScreen
 from src.presentation.terminal.session_view import SessionScreen
 from src.presentation.terminal.settings_view import SettingsScreen
-
-# Theme system ready for future implementation
+from src.presentation.terminal.themes import COMMON_CSS_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +88,10 @@ class MainMenuScreen(Screen):
         """Compose the main menu screen."""
         yield Header(show_clock=True)
         yield Container(
-            Static("🇩🇪 Integran - German Integration Exam Trainer", classes="title"),
-            Static("Choose your practice mode:", classes="subtitle"),
+            Static(
+                "🇩🇪 Integran - German Integration Exam Trainer", classes="text-title"
+            ),
+            Static("Choose your practice mode:", classes="text-subtitle"),
             Vertical(
                 Button("1. Random Practice", id="random", variant="primary"),
                 Button("2. Sequential Practice", id="sequential", variant="success"),
@@ -98,10 +99,10 @@ class MainMenuScreen(Screen):
                 Button("4. Review Failed Questions", id="review", variant="error"),
                 Button("Statistics & Progress", id="stats", variant="default"),
                 Button("Settings", id="settings", variant="default"),
-                classes="menu-buttons",
+                classes="buttons-vertical",
             ),
-            Static("Press number keys or click buttons to select", classes="help"),
-            classes="main-menu",
+            Static("Press number keys or click buttons to select", classes="text-help"),
+            classes="container-centered",
         )
         yield Footer()
 
@@ -154,50 +155,17 @@ class MainMenuScreen(Screen):
 class TrainerApp(EventAwareApp):
     """Main Integran trainer application."""
 
-    CSS = """
-    .title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin: 1;
+    CSS = (
+        COMMON_CSS_BASE
+        + """
+    /* Main menu specific styling */
+    .container-centered {
+        max-width: 100;
+        min-height: 25;
+        max-height: 90vh;
     }
 
-    .subtitle {
-        text-align: center;
-        color: $text-muted;
-        margin-bottom: 2;
-    }
-
-    .main-menu {
-        align: center middle;
-        width: 95vw;
-        max-width: 80;
-        height: auto;
-        max-height: 85vh;
-        background: $surface;
-        border: solid white;
-        padding: 2;
-        overflow-y: auto;
-        scrollbar-gutter: stable;
-    }
-
-    .menu-buttons {
-        align: center middle;
-        width: 100%;
-    }
-
-    .menu-buttons Button {
-        width: 100%;
-        height: 3;
-        margin: 1 0;
-    }
-
-    .help {
-        text-align: center;
-        color: $text-muted;
-        margin-top: 2;
-    }
-
+    /* Confirm dialog specific styling */
     .confirm-dialog {
         align: center middle;
         width: 60;
@@ -232,6 +200,7 @@ class TrainerApp(EventAwareApp):
         text-style: bold;
     }
     """
+    )
 
     SCREENS = {
         "main": MainMenuScreen,

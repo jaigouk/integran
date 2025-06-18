@@ -43,6 +43,7 @@ from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.infrastructure.repositories.content_repository import ContentRepository
 from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
+from src.presentation.terminal.themes import COMMON_CSS_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -94,11 +95,11 @@ class DeveloperOperationsWidget(EventAwareWidget):
                 Label(
                     "🔧 Developer Operations",
                     id="developer-title",
-                    classes="developer-title",
+                    classes="text-title",
                 ),
                 Static(
                     "AI-powered tools for content generation and advanced operations",
-                    classes="developer-subtitle",
+                    classes="text-subtitle",
                 ),
                 id="developer-header",
                 classes="developer-header",
@@ -106,16 +107,16 @@ class DeveloperOperationsWidget(EventAwareWidget):
 
             # Developer mode status
             yield Container(
-                Label("Developer Mode Status", classes="section-header"),
+                Label("Developer Mode Status", classes="text-section-header"),
                 Static("🔴 Disabled", id="dev-status", classes="status-disabled"),
                 Button(
                     "Enable Developer Mode", id="toggle-dev-mode", variant="primary"
                 ),
                 Static(
                     "⚠️ Developer mode required for AI operations",
-                    classes="warning-text",
+                    classes="text-warning",
                 ),
-                classes="status-section",
+                classes="content-section",
             )
 
             with TabbedContent(id="developer-tabs"):
@@ -193,7 +194,7 @@ Build comprehensive multilingual datasets with AI-powered content generation.
                 Button(
                     "Check Build Status", id="check-build-status", variant="default"
                 ),
-                classes="operation-section",
+                classes="content-section",
             ),
             Container(
                 Label("Operation Progress", classes="section-header"),
@@ -218,7 +219,7 @@ Build comprehensive multilingual datasets with AI-powered content generation.
                 ),
                 Static(
                     "💡 Tip: Use existing dataset to avoid costs. AI generation is for development only.",
-                    classes="tip-text",
+                    classes="text-tip",
                 ),
                 classes="cost-section",
             ),
@@ -279,7 +280,7 @@ Generate multilingual explanations and educational content for specific question
                     variant="primary",
                     disabled=True,
                 ),
-                classes="operation-section",
+                classes="content-section",
             ),
             Container(
                 Label("Generated Content Preview", classes="section-header"),
@@ -346,7 +347,7 @@ Analyze educational images using AI vision to generate contextual descriptions.
                     variant="primary",
                     disabled=True,
                 ),
-                classes="operation-section",
+                classes="content-section",
             ),
             Container(
                 Label("Available Images", classes="section-header"),
@@ -724,21 +725,10 @@ Analyze educational images using AI vision to generate contextual descriptions.
 class DeveloperOperationsScreen(Screen[None]):
     """Developer operations screen."""
 
-    CSS = """
-    .developer-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin: 1 0;
-    }
-
-    .developer-subtitle {
-        text-align: center;
-        color: $text-muted;
-        margin-bottom: 2;
-        text-style: italic;
-    }
-
+    CSS = (
+        COMMON_CSS_BASE
+        + """
+    /* Developer view specific styling */
     .developer-header {
         width: 100%;
         align: center middle;
@@ -746,32 +736,6 @@ class DeveloperOperationsScreen(Screen[None]):
         padding: 1;
         background: $surface;
         border: solid white;
-    }
-
-    .status-section {
-        width: 100%;
-        margin: 1 0;
-        padding: 2;
-        background: $background;
-        border: solid white;
-    }
-
-    .status-enabled {
-        color: $success;
-        text-style: bold;
-    }
-
-    .status-disabled {
-        color: $error;
-        text-style: bold;
-    }
-
-    .section-header {
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
-        border-bottom: solid white;
-        padding-bottom: 1;
     }
 
     .operation-header {
@@ -785,33 +749,6 @@ class DeveloperOperationsScreen(Screen[None]):
         margin: 1 0;
     }
 
-    .operation-section {
-        margin: 2 0;
-        padding: 2;
-        background: $surface;
-        border: solid white;
-    }
-
-    .setting-item {
-        margin: 1 0;
-        padding: 1;
-        background: $background;
-        border: solid white;
-    }
-
-    .help-text {
-        color: $text-muted;
-        text-style: italic;
-        margin-top: 1;
-    }
-
-    .progress-section {
-        margin: 2 0;
-        padding: 2;
-        background: $surface;
-        border: solid white;
-    }
-
     .progress-text {
         color: $text;
         margin-top: 1;
@@ -822,21 +759,6 @@ class DeveloperOperationsScreen(Screen[None]):
         padding: 2;
         background: $warning;
         border: solid white;
-    }
-
-    .tip-text {
-        color: $accent;
-        text-style: italic;
-        margin: 1 0;
-        padding: 1;
-        background: $background;
-        border-left: solid white;
-    }
-
-    .warning-text {
-        color: $warning;
-        text-style: bold;
-        margin: 1 0;
     }
 
     .danger-header {
@@ -941,6 +863,7 @@ class DeveloperOperationsScreen(Screen[None]):
         margin: 1 0;
     }
     """
+    )
 
     def __init__(
         self,

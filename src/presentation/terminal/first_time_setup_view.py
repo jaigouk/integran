@@ -33,6 +33,7 @@ from src.domain.user.services.save_user_settings import SaveUserSettings
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
+from src.presentation.terminal.themes import COMMON_CSS_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -506,21 +507,10 @@ You'll be taken to the main menu where you can:
 class FirstTimeSetupScreen(Screen[None]):
     """First-time setup screen."""
 
-    CSS = """
-    .setup-title {
-        text-align: center;
-        text-style: bold;
-        color: $primary;
-        margin: 1 0;
-    }
-
-    .setup-subtitle {
-        text-align: center;
-        color: $text-muted;
-        margin-bottom: 2;
-        text-style: italic;
-    }
-
+    CSS = (
+        COMMON_CSS_BASE
+        + """
+    /* Setup view specific styling */
     .setup-header {
         width: 100%;
         align: center middle;
@@ -545,56 +535,10 @@ class FirstTimeSetupScreen(Screen[None]):
         margin: 1 0;
     }
 
-    .setting-item {
-        margin: 2 0;
-        padding: 1;
-        background: $surface;
-        border: solid white;
-    }
-
     .setting-label {
         text-style: bold;
         color: $primary;
         margin-bottom: 1;
-    }
-
-    .help-text {
-        color: $text-muted;
-        text-style: italic;
-        margin-top: 1;
-    }
-
-    .tip-text {
-        color: $accent;
-        text-style: italic;
-        margin: 1 0;
-        padding: 1;
-        background: $background;
-        border-left: solid white;
-    }
-
-    .warning-text {
-        color: $warning;
-        text-style: bold;
-        margin-top: 1;
-    }
-
-    .setup-footer {
-        width: 100%;
-        align: center middle;
-        margin-top: 2;
-        padding: 1;
-    }
-
-    .setup-navigation {
-        align: center middle;
-        width: 100%;
-        margin: 2;
-    }
-
-    .setup-navigation Button {
-        width: 1fr;
-        height: 3;
     }
 
     .completion-header {
@@ -646,6 +590,7 @@ class FirstTimeSetupScreen(Screen[None]):
         margin: 1 0;
     }
     """
+    )
 
     def __init__(
         self,

@@ -7,17 +7,17 @@ def test_settings_widgets_have_proper_css():
 
     css = SettingsScreen.CSS
 
-    # Check that setting items have proper height constraints
+    # Check that form items have proper height constraints (using new common CSS)
     assert "min-height: 4" in css
-    assert ".setting-item" in css
+    assert ".form-item" in css
 
     # Check that Select widgets have explicit height and width
-    assert ".setting-item Select" in css
+    assert ".form-item Select" in css
     assert "height: 3" in css
     assert "width: 100%" in css
 
     # Check that Switch widgets have proper height
-    assert ".setting-item Switch" in css
+    assert ".form-item Switch" in css
 
 
 def test_stats_widgets_have_proper_css():
@@ -34,8 +34,8 @@ def test_stats_widgets_have_proper_css():
     assert ".category-container" in css
     assert "min-height: 10" in css
 
-    # Check that category title has proper height
-    assert ".category-title" in css
+    # Check that section headers have proper height (using new common CSS)
+    assert ".text-section-header" in css
     assert "height: auto" in css
 
 
