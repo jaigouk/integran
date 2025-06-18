@@ -38,10 +38,10 @@ def test_improved_text_contrast():
 
     css = PracticeScreen.CSS
 
-    # Wrong explanation should have better contrast
-    assert ".wrong-explanation" in css
+    # Wrong analysis items should have better contrast
+    assert ".wrong-item" in css
     assert "color: $text" in css  # Not $text-muted
-    assert "background: $surface" in css  # Added background for contrast
+    assert "background: $error 20%" in css  # Added background for contrast
 
 
 def test_fixed_rating_positioning():

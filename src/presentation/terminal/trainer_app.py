@@ -170,11 +170,15 @@ class TrainerApp(EventAwareApp):
 
     .main-menu {
         align: center middle;
-        width: 60;
+        width: 95vw;
+        max-width: 80;
         height: auto;
+        max-height: 85vh;
         background: $surface;
         border: solid white;
         padding: 2;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
     }
 
     .menu-buttons {

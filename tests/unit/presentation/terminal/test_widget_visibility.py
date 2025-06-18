@@ -26,17 +26,17 @@ def test_stats_widgets_have_proper_css():
 
     css = ProgressScreen.CSS
 
-    # Check that stat numbers have proper height constraints
-    assert ".stat-number" in css
-    assert "min-height: 3" in css
+    # Check that stats widget has proper height constraints
+    assert "#stats-widget" in css
+    assert "min-height: 15" in css
 
-    # Check that stat labels have proper height
-    assert ".stat-label" in css
-    assert "min-height: 2" in css
+    # Check that category container has proper height
+    assert ".category-container" in css
+    assert "min-height: 10" in css
 
-    # Check that detailed stats have proper height
-    assert ".detail-stat" in css
-    assert "min-height: 3" in css
+    # Check that category title has proper height
+    assert ".category-title" in css
+    assert "height: auto" in css
 
 
 def test_stats_widgets_composition_code_has_loading_text():

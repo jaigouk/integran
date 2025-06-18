@@ -228,7 +228,7 @@ class ProgressScreen(Screen):
 
     #stats-widget {
         width: 100%;
-        height: auto;
+        height: 1fr;
         min-height: 15;
         background: $surface;
         border: solid white;

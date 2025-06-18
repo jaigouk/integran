@@ -195,15 +195,8 @@ class SettingsWidget(EventAwareWidget):
     def _compose_developer_settings(self) -> ComposeResult:
         """Compose developer settings tab."""
         yield Label("Developer Mode", classes="section-header")
-        yield Container(
-            Static(
-                "⚠️ Developer Mode enables advanced features that use external APIs",
-                classes="warning-text",
-            ),
-            Static(
-                "These features may incur costs (~$50-80 for full dataset generation)",
-                classes="warning-text",
-            ),
+        yield Static(
+            "⚠️ Developer Mode enables advanced features that use external APIs\n\nThese features may incur costs (~$50-80 for full dataset generation)",
             classes="warning-box",
         )
         yield Container(
@@ -591,23 +584,16 @@ class SettingsScreen(Screen[None]):
         display: block;
     }
 
-    .settings-container {
-        align: center top;
-        width: 95vw;
-        max-width: 120;
-        height: auto;
-        max-height: 95vh;
-        background: $surface;
-        border: solid white;
-        padding: 1;
-        overflow-y: auto;
-        scrollbar-gutter: stable;
+    #settings-tabs {
+        width: 100%;
+        height: 1fr;
+        margin: 0;
     }
 
     .tab-scroll {
         width: 100%;
-        height: auto;
-        max-height: 60vh;
+        height: 1fr;
+        min-height: 15;
         overflow-y: auto;
         scrollbar-gutter: stable;
     }
@@ -660,16 +646,19 @@ class SettingsScreen(Screen[None]):
     }
 
     .warning-text {
-        color: $warning;
+        color: white;
         text-style: bold;
     }
 
     .warning-box {
         background: $warning 20%;
-        color: $warning;
+        color: white;
         padding: 1;
         margin: 1 0;
         border: solid $warning;
+        height: auto;
+        min-height: 5;
+        width: 100%;
     }
 
     .tip-text {
@@ -730,11 +719,6 @@ class SettingsScreen(Screen[None]):
         margin: 0 1;
     }
 
-    #settings-tabs {
-        width: 100%;
-        height: auto;
-        margin: 0;
-    }
 
     #developer-features {
         height: 8;

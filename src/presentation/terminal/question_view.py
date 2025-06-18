@@ -441,12 +441,8 @@ class QuestionWidget(EventAwareWidget):
 
         # Add analysis for each wrong option
         for analysis in self.enhanced_data.wrong_answer_analysis:
-            wrong_item = Container(
-                Static(
-                    f"[bold]{analysis.option_letter}. {analysis.option_text}[/bold]",
-                    classes="wrong-option",
-                ),
-                Static(analysis.explanation, classes="wrong-explanation"),
+            wrong_item = Static(
+                f"[bold red]{analysis.option_letter}. {analysis.option_text}[/bold red]\n{analysis.explanation}",
                 classes="wrong-item",
             )
             await wrong_analysis_container.mount(wrong_item)
@@ -654,6 +650,18 @@ class PracticeScreen(Screen):
         background: $panel;
     }
 
+    /* Specific styling for the wrong analysis collapsible */
+    .content-section Collapsible {
+        height: auto;
+        min-height: 0;
+    }
+
+    .content-section > Contents {
+        height: auto;
+        min-height: 0;
+        padding: 0;
+    }
+
     .rich-explanation {
         padding: 1;
         color: $text;
@@ -676,25 +684,19 @@ class PracticeScreen(Screen):
     }
 
     .wrong-analysis {
-        padding: 1;
-        margin: 1;
+        padding: 0;
+        margin: 0;
+        height: auto;
+        min-height: 0;
     }
 
     .wrong-item {
-        margin-bottom: 1;
+        margin-bottom: 0;
         padding: 1;
         background: $error 20%;
         border-left: solid white;
-    }
-
-    .wrong-option {
-        color: $error;
-        margin-bottom: 1;
-    }
-
-    .wrong-explanation {
+        height: auto;
         color: $text;
-        background: $surface;
     }
 
     .image-descriptions {
