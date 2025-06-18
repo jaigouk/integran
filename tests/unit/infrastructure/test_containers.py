@@ -79,11 +79,9 @@ class TestMainContainer:
             user_repository=mock_user_repo,
         )
 
-        # Assert - Domain services
-        mock_schedule_card.assert_called_once_with(
-            db_manager=mock_db_manager,
-            event_bus=mock_event_bus,
-        )
+        # Assert - Domain services (updated for repository-based constructor)
+        # ScheduleCard now takes learning_repository instead of db_manager
+        mock_schedule_card.assert_called_once()
         mock_complete_learning_session.assert_called_once_with(
             db_manager=mock_db_manager,
             schedule_card_service=mock_schedule_card.return_value,

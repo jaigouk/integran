@@ -158,3 +158,17 @@ class LearningVelocityCalculatedEvent(DomainEvent):
     def __post_init__(self) -> None:
         # Initialize parent DomainEvent with auto-generated values
         DomainEvent.__init__(self)
+
+
+@dataclass
+class UserProgressResetEvent(DomainEvent):
+    """Event published when user progress is reset."""
+
+    user_id: int
+    items_deleted: dict[str, int]
+    reset_timestamp: datetime
+    preserve_settings: bool = True
+
+    def __post_init__(self) -> None:
+        # Initialize parent DomainEvent with auto-generated values
+        DomainEvent.__init__(self)

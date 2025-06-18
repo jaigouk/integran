@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from src.application.commands.reset_user_progress_command import (
+    ResetUserProgressCommandHandler,
+)
 from src.application.events import EventSubscriptionManager
 from src.application.events.handlers.card_scheduled_handler import CardScheduledHandler
 from src.application.queries.get_questions_by_mode_query import (
@@ -12,6 +15,7 @@ from src.application.queries.get_session_progress_query import (
 )
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
 from src.domain.analytics.services.analyze_performance import ProgressAnalytics
+from src.domain.analytics.services.reset_user_progress import ResetUserProgress
 from src.domain.learning.events.card_events import CardScheduledEvent
 from src.domain.learning.services.complete_learning_session import (
     CompleteLearningSession,
@@ -21,6 +25,19 @@ from src.infrastructure.containers.content_container import ContentContainer
 from src.infrastructure.containers.user_container import UserContainer
 from src.infrastructure.database.database import DatabaseManager
 from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
+from src.infrastructure.repositories.analytics_repository import (
+    SQLAlchemyAnalyticsRepository,
+)
+from src.infrastructure.repositories.learning_repository import (
+    SQLAlchemyLearningRepository,
+)
+from src.infrastructure.repositories.question_repository import (
+    SQLAlchemyQuestionRepository,
+)
+from src.infrastructure.repositories.session_repository import (
+    SQLAlchemySessionRepository,
+)
+from src.infrastructure.repositories.user_repository import SQLAlchemyUserRepository
 
 
 class MainContainer:
@@ -31,6 +48,13 @@ class MainContainer:
         # Core infrastructure
         self._event_bus = EnhancedEventBus.create_basic()
         self._db_manager = DatabaseManager()
+
+        # Repository layer
+        self._question_repository = SQLAlchemyQuestionRepository(self._db_manager)
+        self._user_repository = SQLAlchemyUserRepository(self._db_manager)
+        self._learning_repository = SQLAlchemyLearningRepository(self._db_manager)
+        self._analytics_repository = SQLAlchemyAnalyticsRepository(self._db_manager)
+        self._session_repository = SQLAlchemySessionRepository(self._db_manager)
 
         # Sub-containers
         self._user_container = UserContainer(
@@ -44,7 +68,7 @@ class MainContainer:
 
         # Domain services
         self._schedule_card = ScheduleCard(
-            db_manager=self._db_manager,
+            learning_repository=self._learning_repository,
             event_bus=self._event_bus,
         )
         self._complete_learning_session = CompleteLearningSession(
@@ -68,7 +92,19 @@ class MainContainer:
 
         # Analytics services
         self._analytics_service = ProgressAnalytics(
-            db_manager=self._db_manager,
+            analytics_repository=self._analytics_repository,
+        )
+        self._reset_progress_service = ResetUserProgress(
+            user_repository=self._user_repository,
+            learning_repository=self._learning_repository,
+            analytics_repository=self._analytics_repository,
+            session_repository=self._session_repository,
+            event_bus=self._event_bus,
+        )
+
+        # Command handlers
+        self._reset_progress_command_handler = ResetUserProgressCommandHandler(
+            reset_service=self._reset_progress_service,
         )
 
         # Event subscription manager and handlers
@@ -110,6 +146,30 @@ class MainContainer:
     def get_questions_query_service(self) -> GetQuestionsByModeQueryHandler:
         """Get the questions query service."""
         return self._questions_query_service
+
+    def get_reset_progress_command_handler(self) -> ResetUserProgressCommandHandler:
+        """Get the reset progress command handler."""
+        return self._reset_progress_command_handler
+
+    def get_question_repository(self) -> SQLAlchemyQuestionRepository:
+        """Get the question repository."""
+        return self._question_repository
+
+    def get_user_repository(self) -> SQLAlchemyUserRepository:
+        """Get the user repository."""
+        return self._user_repository
+
+    def get_learning_repository(self) -> SQLAlchemyLearningRepository:
+        """Get the learning repository."""
+        return self._learning_repository
+
+    def get_analytics_repository(self) -> SQLAlchemyAnalyticsRepository:
+        """Get the analytics repository."""
+        return self._analytics_repository
+
+    def get_session_repository(self) -> SQLAlchemySessionRepository:
+        """Get the session repository."""
+        return self._session_repository
 
     def _setup_event_handlers(self) -> None:
         """Setup all event handlers."""

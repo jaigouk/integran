@@ -177,6 +177,9 @@ class MainMenuScreen(Screen):
         stats_screen = ProgressScreen(
             query_service=self.app.query_service,
             analytics_service=self.app.analytics_service,
+            reset_command_handler=self.app.container.get_reset_progress_command_handler()
+            if hasattr(self.app, "container")
+            else None,
         )
         self.app.push_screen(stats_screen)
 

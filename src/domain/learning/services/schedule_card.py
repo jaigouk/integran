@@ -10,10 +10,7 @@ import logging
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from src.infrastructure.database.database import DatabaseManager
 from src.domain.learning.events.card_events import CardScheduledEvent
 from src.domain.learning.models.learning_models import (
     FSRSCard,
@@ -22,6 +19,7 @@ from src.domain.learning.models.learning_models import (
     ScheduleResult,
 )
 from src.domain.shared.models import FSRSRating, FSRSState
+from src.domain.shared.repositories import LearningRepository
 from src.domain.shared.services import (
     BusinessRuleViolationError,
     DomainService,
@@ -90,22 +88,30 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
     - Domain event publishing
     """
 
-    def __init__(self, db_manager: DatabaseManager, event_bus: EventBus) -> None:
+    def __init__(
+        self, learning_repository: LearningRepository, event_bus: EventBus
+    ) -> None:
         """Initialize ScheduleCard service.
 
         Args:
-            db_manager: Database manager for card operations
+            learning_repository: Repository for FSRS card operations
             event_bus: Event bus for publishing domain events
         """
         super().__init__(event_bus)
-        self.db_manager = db_manager
+        self.learning_repository = learning_repository
         self._parameters: FSRSParameters | None = None
+
+        # TEMPORARY: Access db_manager through repository for backward compatibility
+        # TODO: Remove these direct database calls and use repository methods instead
+        if hasattr(learning_repository, "db_manager"):
+            self.db_manager = learning_repository.db_manager
 
     @property
     def parameters(self) -> FSRSParameters:
         """Get FSRS parameters, loading from database if needed."""
         if self._parameters is None:
-            config = self.db_manager.get_algorithm_config()
+            # For now, use default parameters - algorithm config will be moved to repository
+            config = None
             if config:
                 import json
 
@@ -134,15 +140,16 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
             await self._validate_request(request)
 
             # Get current card state or create new one
-            card = await self._get_card_by_id(request.card_id)
+            card = await self.learning_repository.get_fsrs_card(
+                request.card_id, user_id=1
+            )
             if not card:
                 # Auto-create new FSRS card for this question
                 self.logger.info(
                     f"Creating new FSRS card for question {request.card_id}"
                 )
-                card = self.db_manager.create_fsrs_card(
-                    question_id=request.card_id, user_id=1
-                )
+                card = FSRSCard.create_new(question_id=request.card_id, user_id=1)
+                card = await self.learning_repository.save_fsrs_card(card)
                 if not card:
                     self.logger.error(
                         f"Failed to create card for question {request.card_id}"

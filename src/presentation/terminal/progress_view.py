@@ -15,6 +15,10 @@ from textual.containers import (
 from textual.screen import Screen
 from textual.widgets import Button, Static
 
+from src.application.commands.reset_user_progress_command import (
+    ResetUserProgressCommand,
+    ResetUserProgressCommandHandler,
+)
 from src.application.queries.get_session_progress_query import (
     GetSessionProgressQueryHandler,
 )
@@ -38,6 +42,7 @@ class StatsWidget(Static):
         query_service: GetSessionProgressQueryHandler,
         analytics_service: ProgressAnalytics,
         event_bus: EventBus,
+        reset_command_handler: ResetUserProgressCommandHandler | None = None,
         **kwargs: Any,
     ):
         # Start with simple visible content
@@ -48,6 +53,7 @@ class StatsWidget(Static):
         self.query_service = query_service
         self.analytics_service = analytics_service
         self.event_bus = event_bus
+        self.reset_command_handler = reset_command_handler
 
     async def refresh_stats(self) -> None:
         """Refresh statistics display."""
@@ -260,11 +266,13 @@ class ProgressScreen(Screen):
         self,
         query_service: GetSessionProgressQueryHandler,
         analytics_service: ProgressAnalytics,
+        reset_command_handler: ResetUserProgressCommandHandler | None = None,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self.query_service = query_service
         self.analytics_service = analytics_service
+        self.reset_command_handler = reset_command_handler
 
     def compose(self) -> ComposeResult:
         """Compose the progress screen."""
@@ -274,6 +282,7 @@ class ProgressScreen(Screen):
                     query_service=self.query_service,
                     analytics_service=self.analytics_service,
                     event_bus=self.app.event_bus,
+                    reset_command_handler=self.reset_command_handler,
                     id="stats-widget",
                 ),
                 CategoryProgressWidget(
@@ -421,54 +430,40 @@ class ProgressScreen(Screen):
         return True
 
     async def _perform_reset(self) -> None:
-        """Perform the actual progress reset."""
-        # Access database manager through analytics service to reset data
-        with self.analytics_service.db_manager.get_session() as session:
-            from src.domain.analytics.models.analytics_models import (
-                CategoryProgress,
-                UserProgress,
+        """Perform the actual progress reset using CQRS command handler."""
+        try:
+            # Check if command handler is available
+            if not self.reset_command_handler:
+                # Fallback: try to get it from app container
+                if hasattr(self.app, "container") and self.app.container:
+                    self.reset_command_handler = (
+                        self.app.container.get_reset_progress_command_handler()
+                    )
+                else:
+                    raise Exception(
+                        "Reset command handler not available - check container setup"
+                    )
+
+            # Create and execute reset command
+            command = ResetUserProgressCommand(
+                user_id=1,
+                preserve_settings=True,  # Keep user settings while resetting progress
             )
-            from src.domain.content.models.question_models import (
-                PracticeSession,
-                QuestionAttempt,
-            )
-            from src.domain.learning.models.learning_models import (
-                FSRSCard,
-                LearningData,
-                LearningSession,
-                ReviewHistory,
-            )
 
-            # Delete all user progress data (keep questions and content)
-            user_id = 1
+            # Execute command through proper CQRS handler
+            result = await self.reset_command_handler.handle(command)
 
-            # Reset FSRS cards
-            session.query(FSRSCard).filter_by(user_id=user_id).delete()
+            if result.success:
+                items_count = (
+                    sum(result.items_deleted.values()) if result.items_deleted else 0
+                )
+                logger.info(f"Successfully reset {items_count} items for user progress")
+            else:
+                raise Exception(result.error_message or "Reset command failed")
 
-            # Reset learning data
-            session.query(LearningData).filter_by(user_id=user_id).delete()
-
-            # Reset learning sessions
-            session.query(LearningSession).filter_by(user_id=user_id).delete()
-
-            # Reset review history
-            session.query(ReviewHistory).filter_by(user_id=user_id).delete()
-
-            # Reset practice sessions and attempts
-            practice_sessions = (
-                session.query(PracticeSession).filter_by(user_id=user_id).all()
-            )
-            for ps in practice_sessions:
-                session.query(QuestionAttempt).filter_by(session_id=ps.id).delete()
-            session.query(PracticeSession).filter_by(user_id=user_id).delete()
-
-            # Reset analytics data
-            session.query(UserProgress).filter_by(user_id=user_id).delete()
-            session.query(CategoryProgress).filter_by(user_id=user_id).delete()
-
-            session.commit()
-
-        logger.info("Successfully reset all user progress data")
+        except Exception as e:
+            logger.error(f"Reset operation failed: {e}")
+            raise
 
     def action_refresh(self) -> None:
         """Refresh data via keyboard."""

@@ -7,13 +7,14 @@ from typing import Any
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from src.domain.shared.repositories import UserRepository
 from src.domain.user.models.user_models import UserSettings, UserSettingsDB
 from src.infrastructure.database.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
 
-class UserSettingsRepository:
+class SQLAlchemyUserRepository(UserRepository):
     """Repository for managing user settings persistence."""
 
     def __init__(self, database_manager: DatabaseManager):
@@ -21,7 +22,7 @@ class UserSettingsRepository:
         self.database_manager = database_manager
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def load_user_settings(self, user_id: int = 1) -> UserSettings | None:
+    async def get_user_settings(self, user_id: int) -> UserSettings | None:
         """Load user settings from database.
 
         Args:
@@ -112,7 +113,7 @@ class UserSettingsRepository:
             self.logger.error(f"Unexpected error saving user settings: {e}")
             raise RepositoryError(f"Unexpected error saving user settings: {e}") from e
 
-    async def delete_user_settings(self, user_id: int = 1) -> bool:
+    async def delete_user_data(self, user_id: int) -> int:
         """Delete user settings from database.
 
         Args:
@@ -132,14 +133,10 @@ class UserSettingsRepository:
                     .delete()
                 )
 
-                if deleted_count > 0:
-                    self.logger.info(f"Deleted user settings for user_id={user_id}")
-                    return True
-                else:
-                    self.logger.info(
-                        f"No user settings found to delete for user_id={user_id}"
-                    )
-                    return False
+                self.logger.info(
+                    f"Deleted {deleted_count} user settings for user_id={user_id}"
+                )
+                return deleted_count
 
         except SQLAlchemyError as e:
             self.logger.error(f"Database error deleting user settings: {e}")
@@ -150,7 +147,7 @@ class UserSettingsRepository:
                 f"Unexpected error deleting user settings: {e}"
             ) from e
 
-    async def user_settings_exist(self, user_id: int = 1) -> bool:
+    async def user_exists(self, user_id: int) -> bool:
         """Check if user settings exist in database.
 
         Args:
@@ -202,7 +199,7 @@ class UserSettingsRepository:
             RepositoryError: If database operation fails
         """
         try:
-            user_settings = await self.load_user_settings(user_id)
+            user_settings = await self.get_user_settings(user_id)
             if not user_settings:
                 return None
 
@@ -234,6 +231,15 @@ class UserSettingsRepository:
                 f"Failed to retrieve setting {setting_key}: {e}"
             ) from e
 
+    # Method aliases for backward compatibility
+    async def load_user_settings(self, user_id: int) -> UserSettings | None:
+        """Alias for get_user_settings."""
+        return await self.get_user_settings(user_id)
+
+    async def user_settings_exist(self, user_id: int) -> bool:
+        """Alias for user_exists."""
+        return await self.user_exists(user_id)
+
 
 class RepositoryError(Exception):
     """Exception raised by repository operations."""
@@ -242,3 +248,7 @@ class RepositoryError(Exception):
         """Initialize repository error."""
         super().__init__(message)
         self.error_code = error_code
+
+
+# Backward compatibility alias
+UserSettingsRepository = SQLAlchemyUserRepository
