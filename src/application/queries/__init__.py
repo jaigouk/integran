@@ -7,11 +7,7 @@ for a single read operation that returns data without changing state.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
-
-# Query and Result type variables
-T = TypeVar("T")  # Query type
-U = TypeVar("U")  # Result type
+from typing import Any
 
 
 class Query(ABC):
@@ -40,7 +36,7 @@ class QueryResult(ABC):
         pass
 
 
-class QueryHandler(ABC, Generic[T, U]):
+class QueryHandler[T, U](ABC):
     """Base class for all query handlers."""
 
     @abstractmethod

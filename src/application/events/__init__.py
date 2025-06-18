@@ -7,15 +7,12 @@ and performs side effects, analytics, or cross-context operations.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from src.infrastructure.messaging.enhanced_event_bus import DomainEvent
 
-# Event type variable
-T = TypeVar("T", bound=DomainEvent)
 
-
-class EventHandler(ABC, Generic[T]):
+class EventHandler[T: DomainEvent](ABC):
     """Base class for all event handlers."""
 
     @abstractmethod

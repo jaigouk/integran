@@ -10,18 +10,14 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
-# Generic type variables for request and response
-T = TypeVar("T")  # Request type
-U = TypeVar("U")  # Response type
 
-
-class DomainService(ABC, Generic[T, U]):
+class DomainService[T, U](ABC):
     """Base class for all domain services following DDD patterns.
 
     Each domain service should:

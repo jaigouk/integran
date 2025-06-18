@@ -7,11 +7,7 @@ for a single write operation that changes system state.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
-
-# Command and Result type variables
-T = TypeVar("T")  # Command type
-U = TypeVar("U")  # Result type
+from typing import Any
 
 
 class Command(ABC):
@@ -40,7 +36,7 @@ class CommandResult(ABC):
         pass
 
 
-class CommandHandler(ABC, Generic[T, U]):
+class CommandHandler[T, U](ABC):
     """Base class for all command handlers."""
 
     @abstractmethod
