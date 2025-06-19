@@ -12,6 +12,9 @@ from src.domain.content.services.process_image import ProcessImage
 from src.infrastructure.database.database import DatabaseManager
 from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
 from src.infrastructure.repositories.content_repository import ContentRepository
+from src.infrastructure.repositories.question_repository import (
+    SQLAlchemyQuestionRepository,
+)
 from src.infrastructure.repositories.user_repository import UserSettingsRepository
 
 
@@ -28,7 +31,8 @@ class ContentContainer:
         self._event_bus = event_bus or EnhancedEventBus.create_basic()
 
         # Initialize repositories
-        self._repository = ContentRepository()
+        self._content_repository = ContentRepository()
+        self._question_repository = SQLAlchemyQuestionRepository(DatabaseManager())
         self._user_repository = user_repository or UserSettingsRepository(
             database_manager=DatabaseManager()
         )
@@ -44,9 +48,13 @@ class ContentContainer:
         """Get the event bus instance."""
         return self._event_bus
 
-    def get_repository(self) -> ContentRepository:
+    def get_content_repository(self) -> ContentRepository:
         """Get the content repository instance."""
-        return self._repository
+        return self._content_repository
+
+    def get_question_repository(self) -> SQLAlchemyQuestionRepository:
+        """Get the question repository instance."""
+        return self._question_repository
 
     def get_generate_answer_service(self) -> GenerateAnswer:
         """Get the GenerateAnswer domain service (lazy initialization)."""
@@ -77,8 +85,8 @@ class ContentContainer:
         if self._build_dataset is None:
             # Get the services with proper user repository injection
             self._build_dataset = BuildDataset(
+                question_repository=self._question_repository,
                 event_bus=self._event_bus,
-                repository=self._repository,
                 generate_answer=self.get_generate_answer_service(),
                 process_image=self.get_process_image_service(),
                 create_mapping=self.get_create_image_mapping_service(),

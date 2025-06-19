@@ -63,7 +63,7 @@ class TestMainContainer:
         mock_user_container.return_value = mock_user_container_instance
 
         # Act
-        MainContainer()
+        container = MainContainer()
 
         # Assert - Core infrastructure
         mock_event_bus_class.create_basic.assert_called_once()
@@ -83,7 +83,9 @@ class TestMainContainer:
         # ScheduleCard now takes learning_repository instead of db_manager
         mock_schedule_card.assert_called_once()
         mock_complete_learning_session.assert_called_once_with(
-            db_manager=mock_db_manager,
+            learning_repository=container._learning_repository,
+            question_repository=container._question_repository,
+            session_repository=container._session_repository,
             schedule_card_service=mock_schedule_card.return_value,
             event_bus=mock_event_bus,
         )
@@ -293,7 +295,7 @@ class TestContentContainer:
 
         # Verify the container stores the event bus correctly
         assert container._event_bus == provided_event_bus
-        assert container._repository == mock_repository.return_value
+        assert container._content_repository == mock_repository.return_value
 
         # Verify services are None initially (lazy initialization)
         assert container._generate_answer is None
@@ -368,13 +370,13 @@ class TestContentContainer:
         assert result == provided_event_bus
 
     @patch("src.infrastructure.containers.content_container.ContentRepository")
-    def test_get_repository(self, mock_repository):
-        """Test getting repository instance."""
+    def test_get_content_repository(self, mock_repository):
+        """Test getting content repository instance."""
         mock_repo = Mock()
         mock_repository.return_value = mock_repo
 
         container = ContentContainer()
-        result = container.get_repository()
+        result = container.get_content_repository()
 
         assert result == mock_repo
 
@@ -468,8 +470,8 @@ class TestContentContainer:
 
             # BuildDataset should be created first
             mock_build_dataset.assert_called_once_with(
+                question_repository=container._question_repository,
                 event_bus=provided_event_bus,
-                repository=mock_repo,
                 generate_answer=mock_generate_service,
                 process_image=mock_process_service,
                 create_mapping=mock_mapping_service,

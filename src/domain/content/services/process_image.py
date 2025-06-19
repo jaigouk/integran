@@ -25,13 +25,11 @@ try:
     from google import genai
     from google.genai import types
 
+    from src.domain.shared.repositories import UserRepository
     from src.domain.user.models.user_models import LoadUserSettingsRequest
 
     # User domain imports for developer mode validation
     from src.domain.user.services.load_user_settings import LoadUserSettings
-    from src.infrastructure.repositories.user_repository import (
-        UserSettingsRepository,
-    )
 
     GENAI_AVAILABLE = True
 except ImportError:
@@ -46,7 +44,7 @@ class ProcessImage(DomainService[ImageProcessingRequest, ImageProcessingResult])
     """Domain service for processing images and generating descriptions."""
 
     def __init__(
-        self, event_bus: EventBus, user_repository: UserSettingsRepository | None = None
+        self, event_bus: EventBus, user_repository: UserRepository | None = None
     ):
         """Initialize the image processing service."""
         super().__init__(event_bus)

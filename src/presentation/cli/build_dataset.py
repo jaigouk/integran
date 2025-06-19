@@ -15,7 +15,9 @@ from src.domain.content.services.build_dataset import (
 )
 from src.infrastructure.config.settings import has_gemini_config
 from src.infrastructure.messaging.enhanced_event_bus import EnhancedEventBus
-from src.infrastructure.repositories.content_repository import ContentRepository
+from src.infrastructure.repositories.question_repository import (
+    SQLAlchemyQuestionRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +105,12 @@ Examples:
     try:
         # Initialize domain service
         event_bus = EnhancedEventBus.create_basic()
-        repository = ContentRepository()
-        build_service = BuildDataset(repository=repository, event_bus=event_bus)
+        from src.infrastructure.database.database import DatabaseManager
+
+        repository = SQLAlchemyQuestionRepository(DatabaseManager())
+        build_service = BuildDataset(
+            question_repository=repository, event_bus=event_bus
+        )
 
         # Show status if requested
         if args.status:

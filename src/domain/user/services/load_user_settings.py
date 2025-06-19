@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from src.domain.shared.repositories import UserRepository
 from src.domain.shared.services import (
     DomainService,
     ValidationError,
@@ -19,10 +20,7 @@ from src.domain.user.models.user_models import (
     UserSettings,
 )
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
-from src.infrastructure.repositories.user_repository import (
-    RepositoryError,
-    UserSettingsRepository,
-)
+from src.infrastructure.repositories.user_repository import RepositoryError
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +36,7 @@ class LoadUserSettings(DomainService[LoadUserSettingsRequest, LoadUserSettingsRe
     def __init__(
         self,
         event_bus: EventBus,
-        user_repository: UserSettingsRepository,
+        user_repository: UserRepository,
     ):
         """Initialize the LoadUserSettings domain service.
 
@@ -67,25 +65,14 @@ class LoadUserSettings(DomainService[LoadUserSettingsRequest, LoadUserSettingsRe
         self._validate_request(request)
 
         try:
-            # Check if user settings exist
-            settings_exist = await self.user_repository.user_settings_exist(
+            # Try to load existing settings
+            user_settings = await self.user_repository.get_user_settings(
                 request.user_id
             )
 
-            if settings_exist:
-                # Load existing settings
-                user_settings = await self.user_repository.load_user_settings(
-                    request.user_id
-                )
-                if not user_settings:
-                    # This shouldn't happen but handle gracefully
-                    self.logger.warning(
-                        f"Settings exist flag was true but loading returned None for user {request.user_id}"
-                    )
-                    user_settings = UserSettings.create_default(request.user_id)
-                    is_first_time = True
-                else:
-                    is_first_time = user_settings.first_time_setup
+            if user_settings:
+                # User settings exist
+                is_first_time = user_settings.first_time_setup
             else:
                 # Create default settings for first-time user
                 user_settings = UserSettings.create_default(request.user_id)

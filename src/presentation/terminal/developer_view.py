@@ -41,6 +41,9 @@ from src.domain.user.services.load_user_settings import LoadUserSettings
 from src.domain.user.services.toggle_developer_mode import ToggleDeveloperMode
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.infrastructure.repositories.content_repository import ContentRepository
+from src.infrastructure.repositories.question_repository import (
+    SQLAlchemyQuestionRepository,
+)
 from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import COMMON_CSS_BASE
@@ -56,11 +59,13 @@ class DeveloperOperationsWidget(EventAwareWidget):
         event_bus: EventBus,
         user_repository: UserSettingsRepository,
         content_repository: ContentRepository,
+        question_repository: SQLAlchemyQuestionRepository,
         **kwargs: Any,
     ):
         super().__init__(event_bus=event_bus, **kwargs)
         self.user_repository = user_repository
         self.content_repository = content_repository
+        self.question_repository = question_repository
         self.developer_mode_enabled = False
 
         # Operation status tracking
@@ -74,7 +79,7 @@ class DeveloperOperationsWidget(EventAwareWidget):
         self.generate_answer = GenerateAnswer(event_bus, user_repository)
         self.process_image = ProcessImage(event_bus, user_repository)
         self.build_dataset = BuildDataset(
-            repository=content_repository,
+            question_repository=question_repository,
             event_bus=event_bus,
             generate_answer=self.generate_answer,
             process_image=self.process_image,
@@ -870,12 +875,14 @@ class DeveloperOperationsScreen(Screen[None]):
         event_bus: EventBus,
         user_repository: UserSettingsRepository,
         content_repository: ContentRepository,
+        question_repository: SQLAlchemyQuestionRepository,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self.event_bus = event_bus
         self.user_repository = user_repository
         self.content_repository = content_repository
+        self.question_repository = question_repository
 
     def compose(self) -> ComposeResult:
         """Compose the developer operations screen."""
@@ -883,4 +890,5 @@ class DeveloperOperationsScreen(Screen[None]):
             event_bus=self.event_bus,
             user_repository=self.user_repository,
             content_repository=self.content_repository,
+            question_repository=self.question_repository,
         )

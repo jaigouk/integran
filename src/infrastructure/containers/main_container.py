@@ -72,7 +72,9 @@ class MainContainer:
             event_bus=self._event_bus,
         )
         self._complete_learning_session = CompleteLearningSession(
-            db_manager=self._db_manager,
+            learning_repository=self._learning_repository,
+            question_repository=self._question_repository,
+            session_repository=self._session_repository,
             schedule_card_service=self._schedule_card,
             event_bus=self._event_bus,
         )
