@@ -32,7 +32,8 @@ async def main() -> None:
         container = MainContainer()
 
         # Ensure database is initialized
-        db_path = Path.home() / ".integran" / "trainer.db"
+        # Use the same path as DatabaseManager (relative to project root)
+        db_path = Path("data/trainer.db")
         if not db_path.exists():
             console.print(
                 "[yellow]Database not found. Please run 'integran-setup' first.[/yellow]"

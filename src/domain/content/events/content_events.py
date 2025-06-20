@@ -61,6 +61,18 @@ class BatchContentProcessedEvent(DomainEvent):
 
 
 @dataclass
+class DatasetBuildProgressEvent(DomainEvent):
+    """Event raised during dataset building to report progress."""
+
+    current_stage: str  # "images_processing", "answers_generating", "finalizing"
+    questions_processed: int
+    total_questions: int
+    progress_percentage: float
+    current_operation: str  # Human-readable description
+    estimated_time_remaining_minutes: int | None = None
+
+
+@dataclass
 class DatasetBuildStartedEvent(DomainEvent):
     """Event raised when dataset building process starts."""
 

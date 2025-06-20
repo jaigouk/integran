@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.domain.content.models.question_models import Question
-from src.infrastructure.database.database import DatabaseManager
+from src.domain.shared.repositories import QuestionRepository
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +38,9 @@ class GetQuestionsByModeResult:
 class GetQuestionsByModeQueryHandler:
     """Handler for getting questions by practice mode using CQRS pattern."""
 
-    def __init__(self, db_manager: DatabaseManager):
-        """Initialize with database manager."""
-        self.db_manager = db_manager
+    def __init__(self, question_repository: QuestionRepository):
+        """Initialize with question repository."""
+        self.question_repository = question_repository
 
     async def handle(self, query: GetQuestionsByModeQuery) -> GetQuestionsByModeResult:
         """Handle the query to get questions by practice mode."""
@@ -68,7 +68,9 @@ class GetQuestionsByModeQueryHandler:
         self, query: GetQuestionsByModeQuery
     ) -> GetQuestionsByModeResult:
         """Get questions due for review."""
-        questions = self.db_manager.get_questions_for_review(limit=query.limit)
+        questions = await self.question_repository.get_questions_for_review(
+            user_id=query.user_id, limit=query.limit
+        )
         if questions:
             return GetQuestionsByModeResult(success=True, question=questions[0])
         return GetQuestionsByModeResult(
@@ -83,7 +85,7 @@ class GetQuestionsByModeQueryHandler:
         current_category_index = query.category_index
         category = categories[current_category_index % len(categories)]
 
-        questions = self.db_manager.get_questions_by_category(category)
+        questions = await self.question_repository.get_questions_by_category(category)
         if questions:
             # Initialize question indices if not provided
             question_indices = query.question_indices or {}
@@ -114,7 +116,7 @@ class GetQuestionsByModeQueryHandler:
         """Get questions sequentially by ID."""
         next_question_id = query.last_question_id + 1
 
-        question = self.db_manager.get_question(next_question_id)
+        question = await self.question_repository.get_question_by_id(next_question_id)
         if question:
             next_state = {"last_question_id": next_question_id}
             return GetQuestionsByModeResult(
@@ -122,7 +124,7 @@ class GetQuestionsByModeQueryHandler:
             )
         else:
             # Reset to beginning if we've reached the end
-            question = self.db_manager.get_question(1)
+            question = await self.question_repository.get_question_by_id(1)
             if question:
                 next_state = {"last_question_id": 1}
                 return GetQuestionsByModeResult(
@@ -145,7 +147,7 @@ class GetQuestionsByModeQueryHandler:
     ) -> GetQuestionsByModeResult:
         """Get default question (first available)."""
         # _query is unused but kept for interface consistency
-        question = self.db_manager.get_question(1)
+        question = await self.question_repository.get_question_by_id(1)
         if question:
             return GetQuestionsByModeResult(success=True, question=question)
 

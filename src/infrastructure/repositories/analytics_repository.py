@@ -23,10 +23,21 @@ class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
 
     async def get_session_progress(self, user_id: int) -> dict[str, Any]:
         """Get session progress data for a user."""
-        # NOTE: DatabaseManager doesn't have get_session_progress method
-        raise NotImplementedError(
-            "get_session_progress not implemented in DatabaseManager"
-        )
+        # Use the new session statistics method from DatabaseManager
+        session_stats = self.db_manager.get_session_statistics(user_id)
+
+        # Get additional learning stats for current streak
+        learning_stats = self.db_manager.get_learning_stats()
+
+        return {
+            "total_sessions": session_stats["total_sessions"],
+            "avg_duration": session_stats["avg_duration"],
+            "total_time": session_stats["total_time"],
+            "total_questions": session_stats["total_questions"],
+            "total_correct": session_stats["total_correct"],
+            "current_streak": getattr(learning_stats, "current_streak", 0),
+            "longest_streak": getattr(learning_stats, "longest_streak", 0),
+        }
 
     async def save_user_progress(
         self, user_id: int, progress_data: dict[str, Any]

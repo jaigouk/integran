@@ -26,6 +26,12 @@ from textual.widgets import (
     TabPane,
 )
 
+from src.domain.content.events.content_events import (
+    DatasetBuildCompletedEvent,
+    DatasetBuildFailedEvent,
+    DatasetBuildProgressEvent,
+    DatasetBuildStartedEvent,
+)
 from src.domain.content.services.build_dataset import (
     BuildDataset,
     BuildDatasetRequest,
@@ -88,8 +94,17 @@ class DeveloperOperationsWidget(EventAwareWidget):
 
     async def setup_event_subscriptions(self) -> None:
         """Setup event subscriptions for developer operations."""
-        # Subscribe to relevant events for operation monitoring
-        pass
+        # Subscribe to dataset build events for real-time UI updates
+        self.event_bus.subscribe(
+            DatasetBuildStartedEvent, self._on_dataset_build_started
+        )
+        self.event_bus.subscribe(
+            DatasetBuildProgressEvent, self._on_dataset_build_progress
+        )
+        self.event_bus.subscribe(
+            DatasetBuildCompletedEvent, self._on_dataset_build_completed
+        )
+        self.event_bus.subscribe(DatasetBuildFailedEvent, self._on_dataset_build_failed)
 
     def compose(self) -> ComposeResult:
         """Compose the developer operations interface."""
@@ -583,6 +598,9 @@ Analyze educational images using AI vision to generate contextual descriptions.
 
         except Exception as e:
             logger.error(f"Error loading available images: {e}")
+            await self._show_warning(
+                "⚠️ Could not load available images. Image processing may be limited."
+            )
 
     @on(Button.Pressed, "#toggle-dev-mode")
     async def on_toggle_developer_mode(self) -> None:
@@ -597,11 +615,22 @@ Analyze educational images using AI vision to generate contextual descriptions.
                 await self._update_operation_buttons()
                 await self._load_available_images()
 
+                # Enhanced success notification with context
+                if result.developer_mode_enabled:
+                    await self._show_success(
+                        "🔓 Developer mode enabled! AI operations now available. "
+                        "⚠️ Note: External API calls may incur costs."
+                    )
+                else:
+                    await self._show_success(
+                        "🔒 Developer mode disabled. AI operations are now restricted."
+                    )
+
                 if result.warning_message:
                     await self._show_warning(result.warning_message)
             else:
                 await self._show_error(
-                    f"Failed to toggle developer mode: {result.error_message}"
+                    f"❌ Failed to toggle developer mode: {result.error_message}"
                 )
 
         except Exception as e:
@@ -612,7 +641,10 @@ Analyze educational images using AI vision to generate contextual descriptions.
     async def on_start_dataset_build(self) -> None:
         """Handle dataset build operation."""
         if not self.developer_mode_enabled:
-            await self._show_error("Developer mode required for dataset building")
+            await self._show_error(
+                "🔒 Developer mode required for dataset building. "
+                "Please enable developer mode first."
+            )
             return
 
         try:
@@ -645,10 +677,17 @@ Analyze educational images using AI vision to generate contextual descriptions.
             result = await self.build_dataset.call(request)
 
             if result.success:
-                await self._show_success("Dataset build completed successfully!")
+                await self._show_success(
+                    "✅ Dataset build completed successfully! "
+                    f"Generated {result.statistics.get('questions_with_answers', 0)} answers "
+                    f"in {result.statistics.get('build_duration_minutes', 0):.1f} minutes."
+                )
                 await self._update_progress_display("Dataset build completed", 100)
             else:
-                await self._show_error(f"Dataset build failed: {result.error_message}")
+                await self._show_error(
+                    f"❌ Dataset build failed: {result.error_message}. "
+                    "Check logs for detailed error information."
+                )
                 await self._update_progress_display("Dataset build failed", 0)
 
             self.operation_in_progress = False
@@ -668,15 +707,21 @@ Analyze educational images using AI vision to generate contextual descriptions.
             if result.success:
                 # Update progress display with build status
                 if hasattr(result, "build_status") and result.build_status:
+                    status = result.build_status.get("status", "Unknown")
+                    progress = result.build_status.get("progress", 0)
                     await self._update_progress_display(
-                        f"Build status: {result.build_status.get('status', 'Unknown')}",
-                        result.build_status.get("progress", 0),
+                        f"Build status: {status}",
+                        progress,
+                    )
+                    await self._show_success(
+                        f"📊 Build status: {status} ({progress}% complete)"
                     )
                 else:
                     await self._update_progress_display("No active build operation", 0)
+                    await self._show_success("✅ No active build operations found")
             else:
                 await self._show_error(
-                    f"Failed to check build status: {result.error_message}"
+                    f"❌ Failed to check build status: {result.error_message}"
                 )
 
         except Exception as e:
@@ -714,17 +759,79 @@ Analyze educational images using AI vision to generate contextual descriptions.
     async def _show_success(self, message: str) -> None:
         """Show success notification."""
         logger.info(f"Success: {message}")
-        # TODO: Implement notification system
+        self.notify(message, severity="information", timeout=3.0)
 
     async def _show_warning(self, message: str) -> None:
         """Show warning notification."""
         logger.warning(f"Warning: {message}")
-        # TODO: Implement notification system
+        self.notify(message, severity="warning", timeout=5.0)
 
     async def _show_error(self, message: str) -> None:
         """Show error notification."""
         logger.error(f"Error: {message}")
-        # TODO: Implement notification system
+        self.notify(message, severity="error", timeout=5.0)
+
+    async def _on_dataset_build_started(self, event: DatasetBuildStartedEvent) -> None:
+        """Handle dataset build started event."""
+        try:
+            await self._update_progress_display(
+                f"Starting dataset build: {event.total_questions} questions", 0
+            )
+            self.operation_in_progress = True
+            self.current_operation = "Building Dataset"
+            logger.info(f"Dataset build started with {event.total_questions} questions")
+        except Exception as e:
+            logger.error(f"Error handling dataset build started event: {e}")
+
+    async def _on_dataset_build_progress(
+        self, event: DatasetBuildProgressEvent
+    ) -> None:
+        """Handle dataset build progress event."""
+        try:
+            status = f"{event.current_operation} ({event.questions_processed}/{event.total_questions})"
+            await self._update_progress_display(status, int(event.progress_percentage))
+
+            # Add time estimate if available
+            if event.estimated_time_remaining_minutes:
+                status += f" - ETA: {event.estimated_time_remaining_minutes}min"
+
+            logger.info(
+                f"Dataset build progress: {event.progress_percentage:.1f}% - {event.current_operation}"
+            )
+        except Exception as e:
+            logger.error(f"Error handling dataset build progress event: {e}")
+
+    async def _on_dataset_build_completed(
+        self, event: DatasetBuildCompletedEvent
+    ) -> None:
+        """Handle dataset build completed event."""
+        try:
+            await self._update_progress_display(
+                "Dataset build completed successfully!", 100
+            )
+            await self._show_success(
+                f"Generated {event.questions_with_answers} answers in {event.build_duration_seconds}s"
+            )
+            self.operation_in_progress = False
+            logger.info(
+                f"Dataset build completed: {event.questions_with_answers} answers generated"
+            )
+        except Exception as e:
+            logger.error(f"Error handling dataset build completed event: {e}")
+
+    async def _on_dataset_build_failed(self, event: DatasetBuildFailedEvent) -> None:
+        """Handle dataset build failed event."""
+        try:
+            await self._update_progress_display(
+                f"Build failed: {event.error_message}", 0
+            )
+            await self._show_error(
+                f"Dataset build failed at {event.failed_at_stage}: {event.error_message}"
+            )
+            self.operation_in_progress = False
+            logger.error(f"Dataset build failed: {event.error_message}")
+        except Exception as e:
+            logger.error(f"Error handling dataset build failed event: {e}")
 
 
 class DeveloperOperationsScreen(Screen[None]):

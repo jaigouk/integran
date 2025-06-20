@@ -97,7 +97,7 @@ class TestMainContainer:
 
         # Assert - Query services
         mock_query_handler.assert_called_once_with(
-            db_manager=mock_db_manager,
+            session_repository=container._session_repository,
         )
 
     @patch("src.infrastructure.containers.main_container.EnhancedEventBus")

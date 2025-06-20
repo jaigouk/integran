@@ -18,8 +18,6 @@ from src.domain.content.services.enhanced_question_display import (
     EnhancedQuestionDisplay,
     EnhancedQuestionDisplayRequest,
 )
-from src.domain.learning.services.schedule_card import ScheduleCard, ScheduleCardRequest
-from src.domain.shared.models import FSRSRating
 from src.domain.user.models.user_models import Language
 from src.domain.user.services.load_user_settings import (
     LoadUserSettings,
@@ -41,15 +39,17 @@ class QuestionWidget(EventAwareWidget):
         question: Question,
         event_bus: EventBus,
         user_repository: UserSettingsRepository,
-        schedule_card_service: ScheduleCard,
+        submit_answer_command_handler=None,
         preferred_language: Language = Language.ENGLISH,
+        session_id: int | None = None,
         **kwargs: Any,
     ):
         super().__init__(event_bus=event_bus, **kwargs)
         self.question = question
         self.user_repository = user_repository
-        self.schedule_card_service = schedule_card_service
+        self.submit_answer_command_handler = submit_answer_command_handler
         self.preferred_language = preferred_language
+        self.session_id = session_id
         self.selected_answer: str | None = None
         self.answer_revealed = False
         self.enhanced_data: EnhancedQuestionData | None = None
@@ -485,21 +485,28 @@ class QuestionWidget(EventAwareWidget):
             await image_container.mount(image_item)
 
     async def submit_answer_with_rating(self, rating: int) -> None:
-        """Submit the answer with FSRS rating to the domain."""
+        """Submit the answer with FSRS rating using CQRS command handler."""
         try:
-            # Convert rating to FSRSRating enum
-            fsrs_rating = FSRSRating(rating)
+            if not self.submit_answer_command_handler:
+                logger.warning("No submit answer command handler available")
+                return
 
-            # Create schedule card request
-            request = ScheduleCardRequest(
-                card_id=self.question.id,  # Use question ID as card ID
-                rating=fsrs_rating,
-                response_time_ms=1000,  # Placeholder - could be tracked in future
-                session_id=None,  # Could be connected to active session
+            # Create submit answer command
+            from src.application.commands.submit_answer_with_rating_command import (
+                SubmitAnswerWithRatingCommand,
             )
 
-            # Call the ScheduleCard domain service
-            result = await self.schedule_card_service.call(request)
+            command = SubmitAnswerWithRatingCommand(
+                question_id=self.question.id,
+                selected_answer=self.selected_answer or "",
+                correct_answer=self.question.correct,
+                fsrs_rating=rating,
+                user_id=1,  # Default user
+                session_id=self.session_id,  # Pass session ID for progress tracking
+            )
+
+            # Execute command through CQRS handler
+            result = await self.submit_answer_command_handler.handle(command)
 
             if result.success:
                 logger.info(
@@ -507,7 +514,7 @@ class QuestionWidget(EventAwareWidget):
                     f"Selected: {self.selected_answer}, "
                     f"Correct: {self.question.correct}, "
                     f"Rating: {rating}, "
-                    f"Next review: {result.schedule_result.next_review_date if result.schedule_result else 'N/A'}"
+                    f"Next review: {result.next_review_date if result.next_review_date else 'N/A'}"
                 )
             else:
                 logger.warning(
@@ -754,18 +761,19 @@ class PracticeScreen(Screen):
         self,
         practice_mode: str = "random",
         user_repository: UserSettingsRepository | None = None,
-        schedule_card_service: ScheduleCard | None = None,
-        questions_query_service=None,
+        submit_answer_command_handler=None,
+        start_practice_command_handler=None,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self.practice_mode = practice_mode
         self.user_repository = user_repository
-        self.schedule_card_service = schedule_card_service
-        self.questions_query_service = questions_query_service
+        self.submit_answer_command_handler = submit_answer_command_handler
+        self.start_practice_command_handler = start_practice_command_handler
         self.current_question: Question | None = None
         self.questions_answered = 0
         self.correct_answers = 0
+        self.session_id: int | None = None
 
         # State for question cycling
         self._question_state = {
@@ -786,46 +794,71 @@ class PracticeScreen(Screen):
 
     async def on_mount(self) -> None:
         """Load first question when screen mounts."""
-        await self.load_next_question()
+        try:
+            logger.info(f"PracticeScreen mounting with mode: {self.practice_mode}")
+
+            # Create a practice session for progress tracking
+            await self._create_practice_session()
+
+            await self.load_next_question()
+            logger.info("PracticeScreen mounted successfully")
+        except Exception as e:
+            logger.error(f"Critical error during PracticeScreen mount: {e}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            # Don't re-raise, just show an error message to user
+            self.mount(
+                Static(
+                    f"[red]Error loading practice session:[/red]\n{str(e)}\n\nPress Escape to return to menu.",
+                    classes="error-message",
+                )
+            )
 
     async def load_next_question(self) -> None:
-        """Load the next question for practice using proper query handler."""
+        """Load the next question for practice using CQRS command handler."""
         try:
-            # Get query service from app container or fallback
-            query_service = self.questions_query_service
-            if not query_service:
+            # Get command handler or fallback to app container
+            command_handler = self.start_practice_command_handler
+            if not command_handler:
                 if hasattr(self.app, "container") and self.app.container:
-                    query_service = self.app.container.get_questions_query_service()
+                    command_handler = (
+                        self.app.container.get_start_practice_session_command_handler()
+                    )
                 else:
-                    # Fallback: create temporary service
+                    # Fallback: create temporary handler
                     from src.infrastructure.containers.main_container import (
                         MainContainer,
                     )
 
                     container = MainContainer()
-                    query_service = container.get_questions_query_service()
+                    command_handler = (
+                        container.get_start_practice_session_command_handler()
+                    )
 
-            # Create query with current state
-            from src.application.queries.get_questions_by_mode_query import (
-                GetQuestionsByModeQuery,
+            # Create command with current state
+            from src.application.commands.start_practice_session_command import (
+                StartPracticeSessionCommand,
             )
 
-            query = GetQuestionsByModeQuery(
+            command = StartPracticeSessionCommand(
                 practice_mode=self.practice_mode,
+                user_id=1,
+                limit=1,
                 category_index=self._question_state["category_index"],
                 question_indices=self._question_state["question_indices"],
                 last_question_id=self._question_state["last_question_id"],
             )
 
-            # Execute query
-            result = await query_service.handle(query)
+            # Execute command
+            result = await command_handler.handle(command)
 
             if result.success and result.question:
                 self.current_question = result.question
 
                 # Update state for next question
-                if result.next_state:
-                    self._question_state.update(result.next_state)
+                if result.session_state:
+                    self._question_state.update(result.session_state)
 
                 logger.info(
                     f"Loaded question {self.current_question.id} for {self.practice_mode} mode"
@@ -836,33 +869,33 @@ class PracticeScreen(Screen):
 
         except Exception as e:
             logger.error(f"Error loading question: {e}")
-            # This should not happen in a properly initialized app
-            # Remove fallback questions to force proper architecture
-            raise Exception(
-                f"Question loading failed - check query service setup: {e}"
-            ) from e
+            import traceback
 
-        # Get or create schedule card service
-        schedule_service = self.schedule_card_service
-        if not schedule_service:
-            # Fallback: get from app container if available
-            if hasattr(self.app, "container"):
-                schedule_service = self.app.container.get_schedule_card_service()
-            else:
-                # Create a temporary one as last resort
-                from src.infrastructure.database.database import DatabaseManager
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            # Don't raise - return with error display instead
+            error_container = Container(
+                Static("[red]Failed to load question:[/red]", classes="text-title"),
+                Static(f"{str(e)}", classes="error-text"),
+                Static("Press Escape to return to menu", classes="text-help"),
+                classes="container-centered",
+            )
+            await self.mount(error_container)
+            return
 
-                temp_db_manager = DatabaseManager()
-                schedule_service = ScheduleCard(temp_db_manager, self.app.event_bus)
+        # Get submit answer command handler or fallback
+        submit_handler = self.submit_answer_command_handler
+        if not submit_handler and hasattr(self.app, "container") and self.app.container:
+            submit_handler = self.app.container.get_submit_answer_command_handler()
 
-        # Create enhanced question widget with language support
+        # Create enhanced question widget with command handler support
         if self.user_repository:
             question_widget = QuestionWidget(
                 question=self.current_question,
                 event_bus=self.app.event_bus,
                 user_repository=self.user_repository,
-                schedule_card_service=schedule_service,
+                submit_answer_command_handler=submit_handler,
                 preferred_language=Language.ENGLISH,  # Will be updated from user settings
+                session_id=self.session_id,  # Pass session ID for progress tracking
             )
         else:
             # Fallback: create a temporary repository
@@ -875,8 +908,9 @@ class PracticeScreen(Screen):
                 question=self.current_question,
                 event_bus=self.app.event_bus,
                 user_repository=temp_repository,
-                schedule_card_service=schedule_service,
+                submit_answer_command_handler=submit_handler,
                 preferred_language=Language.ENGLISH,
+                session_id=self.session_id,  # Pass session ID for progress tracking
             )
 
         # Remove all children except header and footer, then mount the question widget
@@ -948,3 +982,35 @@ class PracticeScreen(Screen):
         # Load next question
         logger.info(f"Question completed with rating {event.rating}")
         await self.load_next_question()
+
+    async def _create_practice_session(self) -> None:
+        """Create a practice session for progress tracking."""
+        try:
+            # Get session repository from app container
+            if hasattr(self.app, "container") and self.app.container:
+                session_repository = self.app.container.get_session_repository()
+                # Create session with practice mode type
+                session_id = await session_repository.create_session(
+                    user_id=1,
+                    session_type=self.practice_mode,
+                    configuration={"mode": self.practice_mode},
+                )
+                # Store session ID for tracking answers
+                self.session_id = session_id
+                logger.info(
+                    f"Created practice session {session_id} for mode {self.practice_mode}"
+                )
+            else:
+                # Fallback: create session directly with DatabaseManager
+                from src.infrastructure.database.database import DatabaseManager
+
+                db_manager = DatabaseManager()
+                session_id = db_manager.create_session(self.practice_mode, user_id=1)
+                self.session_id = session_id
+                logger.info(
+                    f"Created practice session {session_id} (fallback) for mode {self.practice_mode}"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to create practice session: {e}")
+            # Continue without session tracking
+            self.session_id = None

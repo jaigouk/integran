@@ -74,6 +74,20 @@ class SessionCompletedEvent(DomainEvent):
 
 
 @dataclass
+class SessionPausedEvent(DomainEvent):
+    """Event emitted when a learning session is paused or resumed."""
+
+    session_id: int
+    user_id: int
+    is_paused: bool  # True for pause, False for resume
+    pause_duration_seconds: int | None = None  # Total pause time if resuming
+
+    def __post_init__(self) -> None:
+        """Initialize parent DomainEvent fields."""
+        super().__init__()
+
+
+@dataclass
 class ProgressTrackedEvent(DomainEvent):
     """Event emitted when user progress is updated."""
 
@@ -92,6 +106,29 @@ class ProgressTrackedEvent(DomainEvent):
 # =============================================================================
 # Content Context Events
 # =============================================================================
+
+
+@dataclass
+class QuestionAnsweredEvent(DomainEvent):
+    """Event emitted when a user answers a question during practice.
+
+    This event enables cross-context tracking of question performance
+    and provides data for analytics, progress tracking, and learning insights.
+    """
+
+    question_id: int
+    user_id: int
+    selected_answer: str
+    correct_answer: str
+    is_correct: bool
+    fsrs_rating: int  # 1=Again, 2=Hard, 3=Good, 4=Easy
+    response_time_ms: int
+    session_id: int | None = None
+    answered_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        """Initialize parent DomainEvent fields."""
+        super().__init__()
 
 
 @dataclass

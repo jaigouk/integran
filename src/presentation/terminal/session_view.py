@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class SessionProgressWidget(EventAwareWidget):
-    """Widget for displaying session progress and statistics."""
+    """Widget for displaying rich session progress and analytics."""
 
     def __init__(self, event_bus: EventBus, **kwargs: Any):
         super().__init__(event_bus=event_bus, **kwargs)
@@ -28,15 +28,26 @@ class SessionProgressWidget(EventAwareWidget):
         self.correct_answers = 0
         self.session_time = 0
 
-    def compose(self) -> ComposeResult:
-        """Compose the session progress widget."""
-        with Container(classes="session-progress"):
-            yield Static("Session Progress", classes="text-section-header")
+        # Enhanced analytics tracking
+        self.new_cards_learned = 0
+        self.review_cards_completed = 0
+        self.response_times = []
+        self.difficulty_distribution = {"New": 0, "Learning": 0, "Review": 0, "Hard": 0}
+        self.category_performance = {}
+        self.predicted_retention = 0.0
+        self.learning_velocity = 0.0
 
+    def compose(self) -> ComposeResult:
+        """Compose the enhanced session progress widget with rich analytics."""
+        with Container(classes="session-progress"):
+            yield Static("Session Progress & Analytics", classes="text-section-header")
+
+            # Primary progress stats
             with Horizontal(classes="progress-stats"):
                 yield Static("0/0", id="question-counter", classes="stat-item")
                 yield Static("0%", id="accuracy", classes="stat-item")
                 yield Static("00:00", id="session-time", classes="stat-item")
+                yield Static("0.0s avg", id="avg-response-time", classes="stat-item")
 
             yield ProgressBar(
                 total=100,
@@ -46,14 +57,61 @@ class SessionProgressWidget(EventAwareWidget):
                 classes="session-progress-bar",
             )
 
+            # Rich analytics panel
+            with Container(classes="analytics-panel"):
+                yield Static("Session Analytics", classes="analytics-header")
+
+                with Horizontal(classes="analytics-row"):
+                    with Vertical(classes="analytics-column"):
+                        yield Static("Card Distribution", classes="analytics-label")
+                        yield Static(
+                            "New: 0 | Learning: 0 | Review: 0 | Hard: 0",
+                            id="difficulty-distribution",
+                            classes="analytics-value",
+                        )
+
+                        yield Static("Learning Progress", classes="analytics-label")
+                        yield Static(
+                            "New Cards: 0 | Reviews: 0",
+                            id="card-progress",
+                            classes="analytics-value",
+                        )
+
+                    with Vertical(classes="analytics-column"):
+                        yield Static("Performance Insights", classes="analytics-label")
+                        yield Static(
+                            "Retention: 0% | Velocity: Normal",
+                            id="performance-insights",
+                            classes="analytics-value",
+                        )
+
+                        yield Static("Recommendations", classes="analytics-label")
+                        yield Static(
+                            "Starting session...",
+                            id="session-recommendations",
+                            classes="analytics-value",
+                        )
+
             with Vertical(classes="session-controls"):
                 yield Button("Pause Session", id="pause", variant="warning")
                 yield Button("End Session", id="end", variant="error")
 
     async def setup_event_subscriptions(self) -> None:
         """Setup event subscriptions for this widget."""
-        # TODO: Subscribe to session progress events
-        pass
+        from src.domain.shared.events import (
+            CardScheduledEvent,
+            SessionCompletedEvent,
+            SessionPausedEvent,
+            SessionStartedEvent,
+        )
+
+        # Subscribe to session-related events for real-time progress updates
+        self.subscribe_to_event(SessionStartedEvent, self._handle_session_started)
+        self.subscribe_to_event(SessionCompletedEvent, self._handle_session_completed)
+        self.subscribe_to_event(SessionPausedEvent, self._handle_session_paused)
+        self.subscribe_to_event(CardScheduledEvent, self._handle_card_scheduled)
+
+        logger.debug(f"{self.__class__.__name__} subscribed to session progress events")
 
     def update_progress(
         self,
@@ -61,31 +119,243 @@ class SessionProgressWidget(EventAwareWidget):
         total: int,
         correct: int,
         time_elapsed: int,
+        response_time_ms: int = 0,
+        difficulty_rating: str = "",
+        is_new_card: bool = False,
+        category: str = "",
     ) -> None:
-        """Update session progress display."""
+        """Update enhanced session progress display with rich analytics."""
         self.questions_answered = answered
         self.total_questions = total
         self.correct_answers = correct
         self.session_time = time_elapsed
 
-        # Update question counter
+        # Track analytics data
+        if response_time_ms > 0:
+            self.response_times.append(response_time_ms)
+
+        if difficulty_rating and difficulty_rating in self.difficulty_distribution:
+            self.difficulty_distribution[difficulty_rating] += 1
+
+        if is_new_card:
+            self.new_cards_learned += 1
+        else:
+            self.review_cards_completed += 1
+
+        if category:
+            if category not in self.category_performance:
+                self.category_performance[category] = {"correct": 0, "total": 0}
+            self.category_performance[category]["total"] += 1
+            if correct > 0:  # If this question was correct
+                self.category_performance[category]["correct"] += 1
+
+        # Update primary stats
         counter = self.query_one("#question-counter", Static)
         counter.update(f"{answered}/{total}")
 
-        # Update accuracy
         accuracy = (correct / answered * 100) if answered > 0 else 0
         accuracy_widget = self.query_one("#accuracy", Static)
         accuracy_widget.update(f"{accuracy:.1f}%")
 
-        # Update time
         minutes, seconds = divmod(time_elapsed, 60)
         time_widget = self.query_one("#session-time", Static)
         time_widget.update(f"{minutes:02d}:{seconds:02d}")
+
+        # Update average response time
+        avg_response_time = (
+            sum(self.response_times) / len(self.response_times)
+            if self.response_times
+            else 0
+        )
+        avg_time_widget = self.query_one("#avg-response-time", Static)
+        avg_time_widget.update(f"{avg_response_time / 1000:.1f}s avg")
 
         # Update progress bar
         progress = (answered / total * 100) if total > 0 else 0
         progress_bar = self.query_one("#progress-bar", ProgressBar)
         progress_bar.update(progress=progress)
+
+        # Update analytics displays
+        self._update_analytics_display()
+
+    def _update_analytics_display(self) -> None:
+        """Update the rich analytics display panels."""
+        try:
+            # Update difficulty distribution
+            dist_widget = self.query_one("#difficulty-distribution", Static)
+            dist_text = " | ".join(
+                [
+                    f"{difficulty}: {count}"
+                    for difficulty, count in self.difficulty_distribution.items()
+                ]
+            )
+            dist_widget.update(dist_text)
+
+            # Update card progress
+            progress_widget = self.query_one("#card-progress", Static)
+            progress_widget.update(
+                f"New Cards: {self.new_cards_learned} | Reviews: {self.review_cards_completed}"
+            )
+
+            # Calculate and update performance insights
+            current_accuracy = (
+                (self.correct_answers / self.questions_answered * 100)
+                if self.questions_answered > 0
+                else 0
+            )
+
+            # Calculate learning velocity (questions per minute)
+            if self.session_time > 0:
+                velocity = self.questions_answered / (self.session_time / 60)
+                velocity_label = (
+                    "Fast" if velocity > 2.0 else "Normal" if velocity > 1.0 else "Slow"
+                )
+            else:
+                velocity_label = "Normal"
+
+            insights_widget = self.query_one("#performance-insights", Static)
+            insights_widget.update(
+                f"Retention: {current_accuracy:.0f}% | Velocity: {velocity_label}"
+            )
+
+            # Generate adaptive recommendations
+            recommendations = self._generate_recommendations()
+            recommendations_widget = self.query_one("#session-recommendations", Static)
+            recommendations_widget.update(recommendations)
+
+        except Exception as e:
+            logger.debug(f"Error updating analytics display: {e}")
+
+    def _generate_recommendations(self) -> str:
+        """Generate adaptive recommendations based on session performance."""
+        if self.questions_answered == 0:
+            return "Starting session..."
+
+        current_accuracy = (
+            (self.correct_answers / self.questions_answered * 100)
+            if self.questions_answered > 0
+            else 0
+        )
+        avg_response_time = (
+            sum(self.response_times) / len(self.response_times)
+            if self.response_times
+            else 0
+        )
+
+        recommendations = []
+
+        # Accuracy-based recommendations
+        if current_accuracy < 70:
+            recommendations.append("Focus on comprehension")
+        elif current_accuracy > 90:
+            recommendations.append("Excellent performance!")
+
+        # Response time recommendations
+        if avg_response_time > 15000:  # > 15 seconds
+            recommendations.append("Take your time")
+        elif avg_response_time < 3000:  # < 3 seconds
+            recommendations.append("Great speed!")
+
+        # Session length recommendations
+        if self.questions_answered > 15:
+            recommendations.append("Consider a break soon")
+
+        # Category-based recommendations
+        if self.category_performance:
+            weak_categories = [
+                cat
+                for cat, perf in self.category_performance.items()
+                if perf["total"] > 1 and (perf["correct"] / perf["total"]) < 0.7
+            ]
+            if weak_categories:
+                recommendations.append(f"Review {weak_categories[0]} category")
+
+        return (
+            " | ".join(recommendations) if recommendations else "Keep up the good work!"
+        )
+
+    async def _handle_session_started(self, event) -> None:
+        """Handle SessionStartedEvent to initialize session progress."""
+        try:
+            # Reset progress counters
+            self.questions_answered = 0
+            self.total_questions = event.max_reviews
+            self.correct_answers = 0
+            self.session_time = 0
+
+            # Update UI components
+            self.update_progress(0, event.max_reviews, 0, 0)
+            logger.debug(
+                f"Session started: {event.session_id} with {event.max_reviews} max reviews"
+            )
+        except Exception as e:
+            logger.error(f"Error handling session started event: {e}")
+
+    async def _handle_session_completed(self, event) -> None:
+        """Handle SessionCompletedEvent to finalize session display."""
+        try:
+            # Update final session statistics
+            self.questions_answered = event.questions_reviewed
+            self.correct_answers = event.questions_correct
+            self.session_time = event.duration_seconds
+
+            # Update UI with final stats
+            self.update_progress(
+                event.questions_reviewed,
+                event.questions_reviewed,  # Total equals answered for completed session
+                event.questions_correct,
+                event.duration_seconds,
+            )
+            logger.debug(
+                f"Session completed: {event.session_id} - {event.questions_correct}/{event.questions_reviewed} correct"
+            )
+        except Exception as e:
+            logger.error(f"Error handling session completed event: {e}")
+
+    async def _handle_session_paused(self, event) -> None:
+        """Handle SessionPausedEvent to update pause/resume state."""
+        try:
+            # Update session time if pausing
+            if event.is_paused and event.pause_duration_seconds:
+                self.session_time += event.pause_duration_seconds
+
+            # Update button states (could be implemented in UI)
+            pause_button = self.query_one("#pause", Button)
+            if event.is_paused:
+                pause_button.label = "Resume Session"
+                pause_button.variant = "success"
+            else:
+                pause_button.label = "Pause Session"
+                pause_button.variant = "warning"
+
+            logger.debug(
+                f"Session {'paused' if event.is_paused else 'resumed'}: {event.session_id}"
+            )
+        except Exception as e:
+            logger.error(f"Error handling session paused event: {e}")
+
+    async def _handle_card_scheduled(self, event) -> None:
+        """Handle CardScheduledEvent to update progress after each question."""
+        try:
+            # Increment questions answered
+            self.questions_answered += 1
+
+            # Update correct answers if rating indicates success (Good=3, Easy=4)
+            if event.rating >= 3:
+                self.correct_answers += 1
+
+            # Update UI with new progress
+            self.update_progress(
+                self.questions_answered,
+                self.total_questions,
+                self.correct_answers,
+                self.session_time,
+            )
+            logger.debug(
+                f"Card scheduled: Q{event.question_id} with rating {event.rating}"
+            )
+        except Exception as e:
+            logger.error(f"Error handling card scheduled event: {e}")
 
 
 class SessionScreen(Screen):
@@ -159,6 +429,52 @@ class SessionScreen(Screen):
     .session-actions Button {
         width: 1fr;
         height: 3;
+    }
+
+    /* Enhanced analytics styling */
+    .analytics-panel {
+        width: 100%;
+        background: $surface;
+        border: solid white;
+        padding: 2;
+        margin: 2 0;
+    }
+
+    .analytics-header {
+        text-style: bold;
+        color: $secondary;
+        text-align: center;
+        margin-bottom: 1;
+    }
+
+    .analytics-row {
+        width: 100%;
+        margin: 1 0;
+    }
+
+    .analytics-column {
+        width: 1fr;
+        padding: 0 1;
+    }
+
+    .analytics-label {
+        text-style: bold;
+        color: $accent;
+        margin: 1 0;
+        font-size: 90%;
+    }
+
+    .analytics-value {
+        color: $text;
+        background: $background;
+        padding: 1;
+        border: solid $primary;
+        margin-bottom: 1;
+        word-wrap: break-word;
+    }
+
+    .progress-stats .stat-item {
+        min-width: 12;
     }
     """
     )
@@ -300,29 +616,60 @@ class SessionScreen(Screen):
 
     async def pause_session(self) -> None:
         """Pause or resume the current session."""
-        if not self.session_active:
+        if not self.session_active or self.current_session_id is None:
             return
 
-        if self.session_paused:
-            # Resume session
-            logger.info("Resuming session")
-            self.session_paused = False
+        try:
+            # Get command handler from container
+            pause_command_handler = (
+                self.app.container.get_pause_session_command_handler()
+            )
 
-            pause_button = self.query_one("#pause", Button)
-            pause_button.label = "Pause Session"
-            pause_button.variant = "warning"
+            # Create command
+            from src.application.commands.pause_session_command import (
+                PauseSessionCommand,
+            )
 
-            self.notify("Session resumed")
-        else:
-            # Pause session
-            logger.info("Pausing session")
-            self.session_paused = True
+            command = PauseSessionCommand(
+                session_id=self.current_session_id,
+                is_pause=not self.session_paused,  # Toggle current state
+                user_id=1,
+            )
 
-            pause_button = self.query_one("#pause", Button)
-            pause_button.label = "Resume Session"
-            pause_button.variant = "success"
+            # Execute command through domain service
+            result = await pause_command_handler.handle(command)
 
-            self.notify("Session paused")
+            if result.success:
+                # Update UI state based on result
+                self.session_paused = result.is_paused
+
+                pause_button = self.query_one("#pause", Button)
+                if result.is_paused:
+                    pause_button.label = "Resume Session"
+                    pause_button.variant = "success"
+                    self.notify("Session paused")
+                    logger.info(f"Session {self.current_session_id} paused")
+                else:
+                    pause_button.label = "Pause Session"
+                    pause_button.variant = "warning"
+                    pause_message = "Session resumed"
+                    if result.pause_duration_seconds:
+                        duration_min = result.pause_duration_seconds // 60
+                        pause_message += f" (paused for {duration_min} minutes)"
+                    self.notify(pause_message)
+                    logger.info(f"Session {self.current_session_id} resumed")
+            else:
+                self.notify(
+                    f"Failed to {'pause' if not self.session_paused else 'resume'} session: {result.error_message}",
+                    severity="error",
+                )
+                logger.error(
+                    f"Failed to {'pause' if not self.session_paused else 'resume'} session: {result.error_message}"
+                )
+
+        except Exception as e:
+            logger.error(f"Error during session pause/resume: {e}")
+            self.notify("Error pausing/resuming session - check logs", severity="error")
 
     async def end_session(self) -> None:
         """End the current session."""
@@ -344,20 +691,73 @@ class SessionScreen(Screen):
                         f"Successfully completed session {self.current_session_id}"
                     )
 
-                    # Show session summary
+                    # Get session analytics from progress widget
+                    progress_widget = self.query_one(
+                        "#session-progress", SessionProgressWidget
+                    )
+
+                    # Show comprehensive session summary
                     accuracy = (
                         session_summary.get("correct_answers", 0)
                         / max(session_summary.get("total_questions", 1), 1)
                     ) * 100
 
-                    summary_text = (
-                        f"Session Complete!\n"
-                        f"Questions: {session_summary.get('total_questions', 0)}\n"
-                        f"Correct: {session_summary.get('correct_answers', 0)}\n"
-                        f"Accuracy: {accuracy:.1f}%"
+                    # Calculate session insights
+                    avg_response_time = (
+                        sum(progress_widget.response_times)
+                        / len(progress_widget.response_times)
+                        if progress_widget.response_times
+                        else 0
                     )
 
-                    self.notify(summary_text, title="Session Summary")
+                    # Generate comprehensive summary
+                    summary_lines = [
+                        "📊 Session Complete!",
+                        f"Questions: {session_summary.get('total_questions', 0)}",
+                        f"Correct: {session_summary.get('correct_answers', 0)}",
+                        f"Accuracy: {accuracy:.1f}%",
+                        f"Avg Response: {avg_response_time / 1000:.1f}s",
+                        "",
+                        "📈 Learning Progress:",
+                        f"New Cards Learned: {progress_widget.new_cards_learned}",
+                        f"Review Cards: {progress_widget.review_cards_completed}",
+                        "",
+                        "🎯 Performance Analysis:",
+                    ]
+
+                    # Add performance insights
+                    if accuracy >= 90:
+                        summary_lines.append("⭐ Excellent mastery!")
+                    elif accuracy >= 80:
+                        summary_lines.append("✅ Good performance")
+                    elif accuracy >= 70:
+                        summary_lines.append("⚠️ Needs improvement")
+                    else:
+                        summary_lines.append("🔄 Review recommended")
+
+                    # Add category insights if available
+                    if progress_widget.category_performance:
+                        weak_categories = [
+                            cat
+                            for cat, perf in progress_widget.category_performance.items()
+                            if perf["total"] > 1
+                            and (perf["correct"] / perf["total"]) < 0.7
+                        ]
+                        if weak_categories:
+                            summary_lines.append(
+                                f"Focus areas: {', '.join(weak_categories[:2])}"
+                            )
+
+                    # Add next session recommendation
+                    summary_lines.append("")
+                    summary_lines.append("🔮 Next Session:")
+                    if accuracy > 85:
+                        summary_lines.append("Ready for new content!")
+                    else:
+                        summary_lines.append("Review difficult cards")
+
+                    summary_text = "\n".join(summary_lines)
+                    self.notify(summary_text, title="Comprehensive Session Analysis")
                 else:
                     logger.error("Failed to complete session through workflow")
                     self.notify(

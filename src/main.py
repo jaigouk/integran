@@ -149,13 +149,16 @@ def _export_stats(db_manager: DatabaseManager) -> None:
     console.print(f"[green]✅ Statistics exported to {export_path}[/green]")
 
 
-def _start_trainer(
-    db_manager: DatabaseManager,
-    mode: str,
-    category: str | None,
-    review: bool,
+def _launch_terminal_ui(
+    mode: str = "random",  # noqa: ARG001
+    category: str | None = None,  # noqa: ARG001
+    num_questions: int | None = None,  # noqa: ARG001
 ) -> None:
-    """Start the main trainer application."""
+    """Launch the terminal UI with specified parameters.
+
+    Note: Currently the terminal UI handles mode selection internally.
+    Future implementation will use the mode, category, and num_questions parameters.
+    """
     try:
         # Launch the terminal UI
         from src.infrastructure.containers.main_container import MainContainer
@@ -173,21 +176,39 @@ def _start_trainer(
             query_service=container.get_query_service(),
             analytics_service=container.get_analytics_service(),
             user_repository=container.get_user_container().get_repository(),
+            container=container,
         )
 
         # Run the async app
         asyncio.run(app.run_async())
-        return
 
     except ImportError as e:
         console.print(f"[red]Terminal UI not available: {e}[/red]")
-        console.print("[yellow]Falling back to legacy CLI interface...[/yellow]")
+        console.print("[yellow]Terminal UI is required for practice sessions.[/yellow]")
+        console.input("[dim]Press Enter to continue...[/dim]")
     except Exception as e:
         console.print(f"[red]Error starting terminal UI: {e}[/red]")
-        console.print("[yellow]Falling back to legacy CLI interface...[/yellow]")
+        console.print("[yellow]Unable to start practice session.[/yellow]")
+        console.input("[dim]Press Enter to continue...[/dim]")
 
-    # Fall back to legacy CLI interface
-    _start_legacy_cli(db_manager, mode, category, review)
+
+def _start_trainer(
+    db_manager: DatabaseManager,
+    mode: str,
+    category: str | None,
+    review: bool,
+) -> None:
+    """Start the main trainer application."""
+    # Try to use the modern terminal UI first
+    try:
+        _launch_terminal_ui(mode=mode, category=category)
+        # If we reach here, terminal UI completed successfully
+        return
+    except Exception as e:
+        console.print(f"[yellow]Terminal UI failed: {e}[/yellow]")
+        console.print("[blue]Falling back to legacy CLI interface...[/blue]")
+        # If terminal UI fails, fall back to legacy CLI
+        _start_legacy_cli(db_manager, mode, category, review)
 
 
 def _start_legacy_cli(
@@ -236,8 +257,9 @@ def _start_review_mode(db_manager: DatabaseManager) -> None:
     console.print(
         f"[blue]📚 Starting review session with {len(questions)} questions[/blue]"
     )
-    # TODO: Implement question presentation logic
-    console.print("[yellow]Review mode implementation coming soon![/yellow]")
+
+    # Launch terminal UI in review mode
+    _launch_terminal_ui(mode="review")
 
 
 def _start_category_mode(db_manager: DatabaseManager, category: str) -> None:
@@ -251,8 +273,9 @@ def _start_category_mode(db_manager: DatabaseManager, category: str) -> None:
     console.print(
         f"[blue]📖 Starting practice with {len(questions)} questions from {category}[/blue]"
     )
-    # TODO: Implement question presentation logic
-    console.print("[yellow]Category mode implementation coming soon![/yellow]")
+
+    # Launch terminal UI in category mode
+    _launch_terminal_ui(mode="category", category=category)
 
 
 def _start_interactive_menu(db_manager: DatabaseManager) -> None:
@@ -356,9 +379,9 @@ def _handle_random_practice(db_manager: DatabaseManager) -> None:
         console.input("[dim]Press Enter to continue...[/dim]")
         return
 
-    # TODO: Implement practice session functionality
+    # Launch terminal UI in random practice mode
     console.print(f"[green]✓ Ready to practice with {len(questions)} questions[/green]")
-    console.input("[dim]Press Enter to continue...[/dim]")
+    _launch_terminal_ui(mode="random", num_questions=num_questions)
 
 
 def _handle_sequential_practice(db_manager: DatabaseManager) -> None:  # noqa: ARG001

@@ -17,6 +17,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from src.domain.shared.repositories import QuestionRepository
 
+from src.domain.content.events.content_events import (
+    DatasetBuildCompletedEvent,
+    DatasetBuildFailedEvent,
+    DatasetBuildProgressEvent,
+    DatasetBuildStartedEvent,
+)
 from src.domain.content.models.answer_models import (
     AnswerGenerationRequest,
     ImageDescription,
@@ -283,16 +289,51 @@ class BuildDataset(
 
         logger.info(f"Loaded {len(questions)} questions from extraction checkpoint")
 
+        # Publish dataset build started event
+        await self.event_bus.publish(
+            DatasetBuildStartedEvent(
+                total_questions=len(questions),
+                multilingual_enabled=request.multilingual,
+                batch_size=request.batch_size,
+                force_rebuild=request.force_rebuild,
+            )
+        )
+
         try:
             # Step 2: Skip image processing in simplified version
             # For a complete implementation, this would process images
             logger.info("Skipping image processing in simplified version...")
+
+            # Publish progress event for image processing stage
+            await self.event_bus.publish(
+                DatasetBuildProgressEvent(
+                    current_stage="images_processing",
+                    questions_processed=0,
+                    total_questions=len(questions),
+                    progress_percentage=10.0,
+                    current_operation="Processing images and creating mappings",
+                    estimated_time_remaining_minutes=5,
+                )
+            )
+
             question_image_mapping: dict[int, list[str]] = {}
             image_descriptions: dict[str, ImageDescription] = {}
             checkpoint_data["images_processed"] = True
             checkpoint_data["state"] = DatasetBuildState.IMAGES_PROCESSING.value
 
             # Step 3: Skip multilingual answer generation in simplified version
+            # Publish progress event for answer generation stage
+            await self.event_bus.publish(
+                DatasetBuildProgressEvent(
+                    current_stage="answers_generating",
+                    questions_processed=0,
+                    total_questions=len(questions),
+                    progress_percentage=50.0,
+                    current_operation="Generating multilingual answers",
+                    estimated_time_remaining_minutes=3,
+                )
+            )
+
             answers: list[MultilingualAnswer] = []
             if request.multilingual:
                 logger.info(
@@ -303,6 +344,19 @@ class BuildDataset(
 
             # Step 4: Create simplified dataset structure
             logger.info("Creating simplified dataset structure...")
+
+            # Publish progress event for finalization stage
+            await self.event_bus.publish(
+                DatasetBuildProgressEvent(
+                    current_stage="finalizing",
+                    questions_processed=len(questions),
+                    total_questions=len(questions),
+                    progress_percentage=90.0,
+                    current_operation="Finalizing dataset structure",
+                    estimated_time_remaining_minutes=1,
+                )
+            )
+
             checkpoint_data["state"] = DatasetBuildState.FINALIZING.value
 
             # Create a basic dataset representation
@@ -328,6 +382,18 @@ class BuildDataset(
                 else 0,
             }
 
+            # Publish dataset build completed event
+            await self.event_bus.publish(
+                DatasetBuildCompletedEvent(
+                    total_questions=int(statistics["total_questions"]),
+                    questions_with_answers=int(statistics["questions_with_answers"]),
+                    questions_with_images=int(statistics["questions_with_images"]),
+                    build_duration_seconds=int(statistics["build_duration_seconds"]),
+                    completion_rate=float(statistics["completion_rate"]),
+                    final_dataset_path=final_dataset_path,
+                )
+            )
+
             logger.info("✓ Successfully built complete multilingual dataset")
             logger.info(
                 f"Build completed in {statistics['build_duration_minutes']} minutes"
@@ -344,6 +410,17 @@ class BuildDataset(
             # Mark as failed
             checkpoint_data["state"] = DatasetBuildState.FAILED.value
             checkpoint_data["error_message"] = str(e)
+
+            # Publish dataset build failed event
+            await self.event_bus.publish(
+                DatasetBuildFailedEvent(
+                    error_message=str(e),
+                    failed_at_stage=checkpoint_data.get("state", "unknown"),
+                    questions_processed=checkpoint_data.get("completed_answers", 0),
+                    total_questions=checkpoint_data.get("total_questions", 0),
+                )
+            )
+
             logger.error(f"Dataset build failed: {e}")
             raise BusinessRuleViolationError(f"Dataset build failed: {e}") from e
 

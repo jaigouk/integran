@@ -6,7 +6,7 @@ import logging
 
 from src.application.events import EventHandler
 from src.domain.learning.events.card_events import CardScheduledEvent
-from src.infrastructure.database.database import DatabaseManager
+from src.domain.shared.repositories import LearningRepository
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 class CardScheduledHandler(EventHandler[CardScheduledEvent]):
     """Handles CardScheduledEvent for analytics and cross-context updates."""
 
-    def __init__(self, db_manager: DatabaseManager):
-        self.db_manager = db_manager
+    def __init__(self, learning_repository: LearningRepository):
+        self.learning_repository = learning_repository
 
     async def handle(self, event: CardScheduledEvent) -> None:
         """Handle card scheduled event for analytics tracking."""

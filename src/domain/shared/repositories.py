@@ -110,6 +110,48 @@ class LearningRepository(ABC):
         """Get active learning sessions for a user."""
         pass
 
+    @abstractmethod
+    async def get_fsrs_card_by_id(self, card_id: int) -> FSRSCard | None:
+        """Get FSRS card by card ID."""
+        pass
+
+    @abstractmethod
+    async def update_fsrs_card_state(
+        self,
+        card_id: int,
+        difficulty: float,
+        stability: float,
+        retrievability: float,
+        state: int,
+        next_review_date: float,
+    ) -> None:
+        """Update FSRS card state after review."""
+        pass
+
+    @abstractmethod
+    async def increment_lapse_count(self, card_id: int) -> None:
+        """Increment lapse count for a card."""
+        pass
+
+    @abstractmethod
+    async def record_review_history(
+        self,
+        card_id: int,
+        question_id: int,
+        rating: int,
+        response_time_ms: int,
+        difficulty_before: float,
+        stability_before: float,
+        retrievability_before: float,
+        difficulty_after: float,
+        stability_after: float,
+        retrievability_after: float,
+        next_interval_days: float,
+        session_id: int | None = None,
+    ) -> None:
+        """Record review in history."""
+        pass
+
 
 class AnalyticsRepository(ABC):
     """Repository interface for analytics-related data operations."""
@@ -185,4 +227,14 @@ class SessionRepository(ABC):
     @abstractmethod
     async def delete_user_sessions(self, user_id: int) -> dict[str, int]:
         """Delete all sessions for a user and return counts."""
+        pass
+
+    @abstractmethod
+    async def update_session_status(self, session_id: int, status: str) -> None:
+        """Update the status of a session."""
+        pass
+
+    @abstractmethod
+    async def get_pause_duration(self, session_id: int) -> int | None:
+        """Get total pause duration for a session in seconds."""
         pass

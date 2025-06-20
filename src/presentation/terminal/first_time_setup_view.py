@@ -362,6 +362,7 @@ Configure your learning goals and preferences for the best experience.
         """Handle language selection change."""
         if event.value:
             self.selected_language = Language(str(event.value))
+            await self._show_success(f"✅ Language set to {event.value}")
 
     @on(Select.Changed, "#theme-select")
     async def on_theme_changed(self, event: Select.Changed) -> None:
@@ -373,12 +374,28 @@ Configure your learning goals and preferences for the best experience.
     async def on_developer_changed(self, event: Switch.Changed) -> None:
         """Handle developer mode toggle."""
         self.developer_mode_enabled = event.value
+        if event.value:
+            await self._show_warning(
+                "⚠️ Developer mode enabled. External API calls may incur costs (~$50-80 for full dataset)."
+            )
+        else:
+            await self._show_success(
+                "✅ Developer mode disabled. Safe for learning with existing content."
+            )
 
     @on(Select.Changed, "#goal-select")
     async def on_goal_changed(self, event: Select.Changed) -> None:
         """Handle daily goal selection change."""
         if event.value and isinstance(event.value, int):
             self.daily_goal = event.value
+            if event.value >= 30:
+                await self._show_warning(
+                    f"🔥 Ambitious goal! {event.value} questions/day is intensive."
+                )
+            else:
+                await self._show_success(
+                    f"🎯 Daily goal set to {event.value} questions"
+                )
 
     @on(Switch.Changed, "#notifications-switch")
     async def on_notifications_changed(self, event: Switch.Changed) -> None:
@@ -394,6 +411,19 @@ Configure your learning goals and preferences for the best experience.
     @on(Button.Pressed, "#next-btn")
     async def on_next_step(self) -> None:
         """Go to next setup step or complete setup."""
+        # Add step completion feedback
+        step_names = [
+            "Welcome",
+            "Language & Theme",
+            "Developer Mode",
+            "Learning Preferences",
+            "Summary",
+        ]
+        if self.current_step <= len(step_names):
+            await self._show_success(
+                f"✅ {step_names[self.current_step - 1]} completed"
+            )
+
         if self.current_step < self.total_steps:
             await self._show_step(self.current_step + 1)
         else:
@@ -402,6 +432,10 @@ Configure your learning goals and preferences for the best experience.
     @on(Button.Pressed, "#skip-btn")
     async def on_skip_setup(self) -> None:
         """Skip setup and use defaults."""
+        await self._show_warning(
+            "⚠️ Skipping setup and using default settings. "
+            "You can change these later in the Settings screen."
+        )
         await self._complete_setup(use_defaults=True)
 
     async def _complete_setup(self, use_defaults: bool = False) -> None:
@@ -410,6 +444,9 @@ Configure your learning goals and preferences for the best experience.
             if use_defaults:
                 # Use default settings
                 user_settings = UserSettings.create_default(user_id=1)
+                await self._show_success(
+                    "⚡ Using optimized default settings for quick start"
+                )
             else:
                 # Create settings from user selections
                 preferences = UserPreferences(
@@ -441,12 +478,17 @@ Configure your learning goals and preferences for the best experience.
             result = await self.save_user_settings.call(request)
 
             if result.success:
+                await self._show_success(
+                    "🎉 Setup completed successfully! Your preferences have been saved. "
+                    "Redirecting to main menu..."
+                )
                 await self._show_completion_message()
                 # Return to main menu after a short delay
                 self.set_timer(3.0, self._return_to_main_menu)
             else:
                 await self._show_error(
-                    f"Failed to save settings: {result.error_message}"
+                    f"❌ Failed to save settings: {result.error_message}. "
+                    "Please try again or contact support."
                 )
 
         except Exception as e:
@@ -501,7 +543,17 @@ You'll be taken to the main menu where you can:
     async def _show_error(self, message: str) -> None:
         """Show error message."""
         logger.error(f"Setup Error: {message}")
-        # TODO: Implement proper error notification system
+        self.notify(message, severity="error", timeout=5.0)
+
+    async def _show_success(self, message: str) -> None:
+        """Show success notification."""
+        logger.info(f"Setup Success: {message}")
+        self.notify(message, severity="information", timeout=3.0)
+
+    async def _show_warning(self, message: str) -> None:
+        """Show warning notification."""
+        logger.warning(f"Setup Warning: {message}")
+        self.notify(message, severity="warning", timeout=4.0)
 
 
 class FirstTimeSetupScreen(Screen[None]):

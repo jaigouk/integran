@@ -99,11 +99,14 @@ class SessionProgress:
     """Current progress within a learning session."""
 
     session_id: int
+    user_id: int  # Store user_id for event publishing
     questions_total: int
     questions_completed: int
     questions_correct: int
     questions_incorrect: int
     questions_skipped: int
+    new_cards_learned: int  # Track new cards separately
+    review_cards_completed: int  # Track review cards separately
     average_response_time_ms: int
     current_retention_rate: float
     estimated_time_remaining_minutes: int
@@ -198,10 +201,41 @@ class CompleteSessionResult:
     error_message: str | None = None
 
 
+@dataclass
+class PauseSessionRequest:
+    """Request DTO for pausing or resuming a learning session."""
+
+    session_id: int
+    is_pause: bool  # True for pause, False for resume
+    user_id: int = 1
+
+    def __post_init__(self) -> None:
+        """Validate request data."""
+        if self.session_id <= 0:
+            raise ValueError("session_id must be positive")
+
+
+@dataclass
+class PauseSessionResult:
+    """Result DTO for pausing or resuming a learning session."""
+
+    success: bool
+    session_id: int
+    is_paused: bool
+    pause_duration_seconds: int | None = None
+    error_message: str | None = None
+
+
 class CompleteLearningSession(
     DomainService[
-        StartSessionRequest | SubmitAnswerRequest | CompleteSessionRequest,
-        StartSessionResult | SubmitAnswerResult | CompleteSessionResult,
+        StartSessionRequest
+        | SubmitAnswerRequest
+        | CompleteSessionRequest
+        | PauseSessionRequest,
+        StartSessionResult
+        | SubmitAnswerResult
+        | CompleteSessionResult
+        | PauseSessionResult,
     ]
 ):
     """Domain service for complete learning session management.
@@ -240,8 +274,16 @@ class CompleteLearningSession(
     @log_domain_operation
     async def call(
         self,
-        request: StartSessionRequest | SubmitAnswerRequest | CompleteSessionRequest,
-    ) -> StartSessionResult | SubmitAnswerResult | CompleteSessionResult:
+        request: StartSessionRequest
+        | SubmitAnswerRequest
+        | CompleteSessionRequest
+        | PauseSessionRequest,
+    ) -> (
+        StartSessionResult
+        | SubmitAnswerResult
+        | CompleteSessionResult
+        | PauseSessionResult
+    ):
         """Execute learning session operation based on request type.
 
         Args:
@@ -261,6 +303,8 @@ class CompleteLearningSession(
                 return await self._submit_answer(request)
             elif isinstance(request, CompleteSessionRequest):
                 return await self._complete_session(request)
+            elif isinstance(request, PauseSessionRequest):
+                return await self._pause_session(request)
             else:
                 raise ValidationError(f"Unsupported request type: {type(request)}")
 
@@ -284,10 +328,17 @@ class CompleteLearningSession(
                     updated_progress=self._create_empty_progress(),
                     error_message=str(e),
                 )
-            else:  # CompleteSessionRequest
+            elif isinstance(request, CompleteSessionRequest):
                 return CompleteSessionResult(
                     success=False,
                     session_summary={},
+                    error_message=str(e),
+                )
+            else:  # PauseSessionRequest
+                return PauseSessionResult(
+                    success=False,
+                    session_id=request.session_id,
+                    is_paused=False,
                     error_message=str(e),
                 )
 
@@ -317,11 +368,14 @@ class CompleteLearningSession(
         # Create session progress tracking
         initial_progress = SessionProgress(
             session_id=session_id,
+            user_id=request.user_id,  # Store user_id for event publishing
             questions_total=len(questions),
             questions_completed=0,
             questions_correct=0,
             questions_incorrect=0,
             questions_skipped=0,
+            new_cards_learned=0,  # Initialize new card tracking
+            review_cards_completed=0,  # Initialize review card tracking
             average_response_time_ms=0,
             current_retention_rate=0.0,
             estimated_time_remaining_minutes=self._estimate_session_time(
@@ -360,6 +414,9 @@ class CompleteLearningSession(
                 f"Session {request.session_id} not found or not active"
             )
 
+        # Get current session progress to access user_id
+        progress = self._active_sessions[request.session_id]
+
         # Get card to get question_id
         # Note: We need to get the card by ID, but repository only has get by question_id/user_id
         # For now, we'll need to work around this limitation
@@ -377,7 +434,7 @@ class CompleteLearningSession(
             # Get the card for this question
             card = await self.learning_repository.get_fsrs_card(
                 question_id=request.card_id,
-                user_id=1,  # TODO: Get user ID from session
+                user_id=progress.user_id,  # Get user ID from session
             )
 
         if not card or not question:
@@ -406,7 +463,7 @@ class CompleteLearningSession(
 
         # Update session progress
         updated_progress = self._update_session_progress(
-            request.session_id, is_correct, is_skipped, request.response_time_ms
+            request.session_id, is_correct, is_skipped, request.response_time_ms, card
         )
 
         logger.info(
@@ -436,6 +493,16 @@ class CompleteLearningSession(
         # Calculate final statistics
         session_summary = self._calculate_session_summary(progress)
 
+        # Update session with final card counts and status
+        await self.session_repository.update_card_counts(
+            session_id=request.session_id,
+            new_cards=progress.new_cards_learned,
+            review_cards=progress.review_cards_completed,
+        )
+        await self.session_repository.update_session_status(
+            session_id=request.session_id, status="completed"
+        )
+
         # End session in database
         await self.session_repository.end_session(
             session_id=request.session_id,
@@ -447,11 +514,11 @@ class CompleteLearningSession(
         await self.event_bus.publish(
             SessionCompletedEvent(
                 session_id=request.session_id,
-                user_id=1,  # TODO: Get from session data
+                user_id=progress.user_id,  # Get from session data
                 duration_seconds=progress.elapsed_time_minutes * 60,
                 questions_reviewed=progress.questions_completed,
                 questions_correct=progress.questions_correct,
-                new_cards_learned=0,  # TODO: Track new cards separately
+                new_cards_learned=progress.new_cards_learned,  # Track new cards separately
                 retention_rate=progress.current_retention_rate,
             )
         )
@@ -465,6 +532,72 @@ class CompleteLearningSession(
             success=True,
             session_summary=session_summary,
         )
+
+    async def _pause_session(self, request: PauseSessionRequest) -> PauseSessionResult:
+        """Pause or resume a learning session."""
+        logger.info(
+            f"{'Pausing' if request.is_pause else 'Resuming'} session {request.session_id}"
+        )
+
+        # Check if session exists
+        if request.session_id not in self._active_sessions:
+            logger.error(f"Session {request.session_id} not found in active sessions")
+            return PauseSessionResult(
+                success=False,
+                session_id=request.session_id,
+                is_paused=False,
+                error_message="Session not found or not active",
+            )
+
+        try:
+            # Update session status in database
+            session_status = (
+                SessionStatus.PAUSED if request.is_pause else SessionStatus.ACTIVE
+            )
+            await self.session_repository.update_session_status(
+                request.session_id, session_status.value
+            )
+
+            # Track pause duration if resuming
+            pause_duration = None
+            if not request.is_pause:  # Resuming
+                pause_duration = await self.session_repository.get_pause_duration(
+                    request.session_id
+                )
+
+            # Publish pause/resume event
+            from src.domain.shared.events import SessionPausedEvent
+
+            await self.event_bus.publish(
+                SessionPausedEvent(
+                    session_id=request.session_id,
+                    user_id=request.user_id,
+                    is_paused=request.is_pause,
+                    pause_duration_seconds=pause_duration,
+                )
+            )
+
+            logger.info(
+                f"Successfully {'paused' if request.is_pause else 'resumed'} session {request.session_id}"
+            )
+
+            return PauseSessionResult(
+                success=True,
+                session_id=request.session_id,
+                is_paused=request.is_pause,
+                pause_duration_seconds=pause_duration,
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to {'pause' if request.is_pause else 'resume'} session: {e}"
+            )
+            return PauseSessionResult(
+                success=False,
+                session_id=request.session_id,
+                is_paused=False,
+                error_message=str(e),
+            )
 
     def _determine_rating(
         self,
@@ -601,12 +734,25 @@ class CompleteLearningSession(
             return "Review"
 
     def _update_session_progress(
-        self, session_id: int, is_correct: bool, is_skipped: bool, response_time_ms: int
+        self,
+        session_id: int,
+        is_correct: bool,
+        is_skipped: bool,
+        response_time_ms: int,
+        card: FSRSCard,
     ) -> SessionProgress:
         """Update session progress after answering a question."""
         progress = self._active_sessions[session_id]
 
         progress.questions_completed += 1
+
+        # Track new vs review cards separately
+        if card.review_count == 0:  # New card
+            if is_correct and not is_skipped:
+                progress.new_cards_learned += 1
+        else:  # Review card
+            if not is_skipped:
+                progress.review_cards_completed += 1
 
         if is_skipped:
             progress.questions_skipped += 1
@@ -702,11 +848,14 @@ class CompleteLearningSession(
         """Create empty session progress for error cases."""
         return SessionProgress(
             session_id=0,
+            user_id=1,  # Default user for error cases
             questions_total=0,
             questions_completed=0,
             questions_correct=0,
             questions_incorrect=0,
             questions_skipped=0,
+            new_cards_learned=0,
+            review_cards_completed=0,
             average_response_time_ms=0,
             current_retention_rate=0.0,
             estimated_time_remaining_minutes=0,

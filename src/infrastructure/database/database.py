@@ -376,17 +376,20 @@ class DatabaseManager:
             tzinfo=None
         )
 
-    def create_session(self, mode: str) -> int:
+    def create_session(self, mode: str, user_id: int = 1) -> int:
         """Create a new practice session.
 
         Args:
             mode: Practice mode.
+            user_id: User ID for multi-user support.
 
         Returns:
             Session ID.
         """
         with self.get_session() as session:
-            practice_session = PracticeSession(mode=mode)
+            practice_session = PracticeSession(
+                mode=mode, user_id=user_id, status="active"
+            )
             session.add(practice_session)
             session.commit()
             return practice_session.id
@@ -1166,3 +1169,166 @@ class DatabaseManager:
         """
         with self.get_session() as session:
             return session.query(FSRSCard).filter_by(card_id=card_id).first()
+
+    def get_session_count(self, user_id: int = 1) -> int:  # noqa: ARG002
+        """Get total number of completed practice sessions.
+
+        Args:
+            user_id: User ID (currently unused, for future multi-user support)
+
+        Returns:
+            Total number of completed sessions
+        """
+        with self.get_session() as session:
+            return (
+                session.query(PracticeSession)
+                .filter(PracticeSession.ended_at.isnot(None))
+                .count()
+            )
+
+    def get_session_statistics(self, user_id: int = 1) -> dict[str, Any]:  # noqa: ARG002
+        """Get comprehensive session statistics.
+
+        Args:
+            user_id: User ID (currently unused, for future multi-user support)
+
+        Returns:
+            Session statistics including count, average duration, total time
+        """
+        with self.get_session() as session:
+            # Get all completed sessions
+            completed_sessions = (
+                session.query(PracticeSession)
+                .filter(PracticeSession.ended_at.isnot(None))
+                .all()
+            )
+
+            if not completed_sessions:
+                return {
+                    "total_sessions": 0,
+                    "avg_duration": 0,
+                    "total_time": 0,
+                    "total_questions": 0,
+                    "total_correct": 0,
+                }
+
+            # Calculate statistics
+            total_sessions = len(completed_sessions)
+            total_duration = 0
+            total_questions = 0
+            total_correct = 0
+
+            for session in completed_sessions:
+                if session.started_at and session.ended_at:
+                    duration = (session.ended_at - session.started_at).total_seconds()
+                    total_duration += duration
+
+                if session.total_questions:
+                    total_questions += session.total_questions
+                if session.correct_answers:
+                    total_correct += session.correct_answers
+
+            avg_duration = total_duration / total_sessions if total_sessions > 0 else 0
+
+            return {
+                "total_sessions": total_sessions,
+                "avg_duration": avg_duration,  # seconds
+                "total_time": total_duration,  # seconds
+                "total_questions": total_questions,
+                "total_correct": total_correct,
+            }
+
+    def update_session_status(self, session_id: int, status: str) -> None:
+        """Update the status of a session.
+
+        Args:
+            session_id: Session ID to update
+            status: New status (active, paused, completed)
+        """
+        with self.get_session() as session:
+            practice_session = (
+                session.query(PracticeSession).filter_by(id=session_id).first()
+            )
+            if practice_session:
+                practice_session.status = status
+                session.commit()
+
+    def start_session_pause(self, session_id: int) -> None:
+        """Start pause tracking for a session.
+
+        Args:
+            session_id: Session ID to pause
+        """
+        with self.get_session() as session:
+            practice_session = (
+                session.query(PracticeSession).filter_by(id=session_id).first()
+            )
+            if practice_session:
+                practice_session.status = "paused"
+                practice_session.pause_start_time = datetime.now(UTC).replace(
+                    tzinfo=None
+                )
+                session.commit()
+
+    def end_session_pause(self, session_id: int) -> int:
+        """End pause tracking for a session and return pause duration.
+
+        Args:
+            session_id: Session ID to resume
+
+        Returns:
+            Pause duration in seconds
+        """
+        with self.get_session() as session:
+            practice_session = (
+                session.query(PracticeSession).filter_by(id=session_id).first()
+            )
+            if practice_session and practice_session.pause_start_time:
+                pause_duration = int(
+                    (
+                        datetime.now(UTC).replace(tzinfo=None)
+                        - practice_session.pause_start_time
+                    ).total_seconds()
+                )
+                practice_session.total_pause_duration += pause_duration
+                practice_session.status = "active"
+                practice_session.pause_start_time = None
+                session.commit()
+                return pause_duration
+            return 0
+
+    def get_session_pause_duration(self, session_id: int) -> int:
+        """Get total pause duration for a session.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            Total pause duration in seconds
+        """
+        with self.get_session() as session:
+            practice_session = (
+                session.query(PracticeSession).filter_by(id=session_id).first()
+            )
+            if practice_session:
+                return practice_session.total_pause_duration or 0
+            return 0
+
+    def update_session_card_counts(
+        self, session_id: int, new_cards: int, review_cards: int
+    ) -> None:
+        """Update new and review card counts for a session.
+
+        Args:
+            session_id: Session ID
+            new_cards: Number of new cards learned
+            review_cards: Number of review cards completed
+        """
+        with self.get_session() as session:
+            practice_session = (
+                session.query(PracticeSession).filter_by(id=session_id).first()
+            )
+            if practice_session:
+                practice_session.new_cards_count = new_cards
+                practice_session.review_cards_count = review_cards
+                session.commit()

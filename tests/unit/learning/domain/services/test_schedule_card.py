@@ -213,9 +213,9 @@ class TestScheduleCardService:
         mock_learning_repository.save_fsrs_card = AsyncMock(
             return_value=sample_fsrs_card
         )
-        mock_learning_repository.db_manager.update_fsrs_card.return_value = None
-        mock_learning_repository.db_manager.record_fsrs_review.return_value = None
-        mock_learning_repository.db_manager.get_session.return_value.__enter__.return_value.query.return_value.filter_by.return_value.first.return_value = sample_fsrs_card
+        mock_learning_repository.update_fsrs_card_state = AsyncMock()
+        mock_learning_repository.record_review_history = AsyncMock()
+        mock_learning_repository.increment_lapse_count = AsyncMock()
 
         # Create request
         request = ScheduleCardRequest(
@@ -261,21 +261,13 @@ class TestScheduleCardService:
         sample_fsrs_card: FSRSCard,
     ) -> None:
         """Test that lapsed cards (rating=AGAIN) increment lapse count."""
-        # Setup mocks
+        # Setup mocks for new repository methods
         mock_learning_repository.get_fsrs_card = AsyncMock(
             return_value=sample_fsrs_card
         )
-        mock_learning_repository.db_manager.update_fsrs_card.return_value = None
-        mock_learning_repository.db_manager.record_fsrs_review.return_value = None
-
-        # Mock session for lapse count increment
-        mock_session = MagicMock()
-        mock_card = MagicMock()
-        mock_card.lapse_count = 2
-        mock_session.query.return_value.filter_by.return_value.first.return_value = (
-            mock_card
-        )
-        mock_learning_repository.db_manager.get_session.return_value.__enter__.return_value = mock_session
+        mock_learning_repository.update_fsrs_card_state = AsyncMock()
+        mock_learning_repository.increment_lapse_count = AsyncMock()
+        mock_learning_repository.record_review_history = AsyncMock()
 
         # Create request with AGAIN rating
         request = ScheduleCardRequest(
@@ -290,8 +282,7 @@ class TestScheduleCardService:
         # Verify lapse count was updated
         assert result.success is True
         assert result.lapse_count_updated is True
-        assert mock_card.lapse_count == 3
-        mock_session.commit.assert_called_once()
+        mock_learning_repository.increment_lapse_count.assert_called_once_with(123)
 
     @pytest.mark.asyncio
     async def test_card_not_found_raises_business_rule_violation(
@@ -362,8 +353,9 @@ class TestScheduleCardService:
         mock_learning_repository.get_fsrs_card = AsyncMock(
             return_value=sample_fsrs_card
         )
-        mock_learning_repository.db_manager.update_fsrs_card.return_value = None
-        mock_learning_repository.db_manager.record_fsrs_review.return_value = None
+        mock_learning_repository.update_fsrs_card_state = AsyncMock()
+        mock_learning_repository.record_review_history = AsyncMock()
+        mock_learning_repository.increment_lapse_count = AsyncMock()
 
         # Test different ratings and their effect on difficulty
         test_cases = [
@@ -407,8 +399,9 @@ class TestScheduleCardService:
         mock_learning_repository.get_fsrs_card = AsyncMock(
             return_value=sample_fsrs_card
         )
-        mock_learning_repository.db_manager.update_fsrs_card.return_value = None
-        mock_learning_repository.db_manager.record_fsrs_review.return_value = None
+        mock_learning_repository.update_fsrs_card_state = AsyncMock()
+        mock_learning_repository.record_review_history = AsyncMock()
+        mock_learning_repository.increment_lapse_count = AsyncMock()
 
         # Test that successful ratings increase stability
         for rating in [FSRSRating.HARD, FSRSRating.GOOD, FSRSRating.EASY]:
@@ -448,8 +441,9 @@ class TestScheduleCardService:
 
         # Setup mocks
         mock_learning_repository.get_fsrs_card = AsyncMock(return_value=new_card)
-        mock_learning_repository.db_manager.update_fsrs_card.return_value = None
-        mock_learning_repository.db_manager.record_fsrs_review.return_value = None
+        mock_learning_repository.update_fsrs_card_state = AsyncMock()
+        mock_learning_repository.record_review_history = AsyncMock()
+        mock_learning_repository.increment_lapse_count = AsyncMock()
 
         request = ScheduleCardRequest(
             card_id=123,
@@ -509,8 +503,9 @@ class TestScheduleCardService:
         mock_learning_repository.get_fsrs_card = AsyncMock(
             return_value=sample_fsrs_card
         )
-        mock_learning_repository.db_manager.update_fsrs_card.return_value = None
-        mock_learning_repository.db_manager.record_fsrs_review.return_value = None
+        mock_learning_repository.update_fsrs_card_state = AsyncMock()
+        mock_learning_repository.record_review_history = AsyncMock()
+        mock_learning_repository.increment_lapse_count = AsyncMock()
 
         request = ScheduleCardRequest(
             card_id=123,
@@ -543,12 +538,12 @@ class TestScheduleCardService:
         sample_fsrs_card: FSRSCard,
     ) -> None:
         """Test that database errors are handled gracefully."""
-        # Setup mocks with database error
+        # Setup mocks with database error in repository method
         mock_learning_repository.get_fsrs_card = AsyncMock(
             return_value=sample_fsrs_card
         )
-        mock_learning_repository.db_manager.update_fsrs_card.side_effect = Exception(
-            "Database error"
+        mock_learning_repository.update_fsrs_card_state = AsyncMock(
+            side_effect=Exception("Database error")
         )
 
         request = ScheduleCardRequest(
@@ -581,8 +576,9 @@ class TestScheduleCardService:
         mock_learning_repository.get_fsrs_card = AsyncMock(
             return_value=sample_fsrs_card
         )
-        mock_learning_repository.db_manager.update_fsrs_card.return_value = None
-        mock_learning_repository.db_manager.record_fsrs_review.return_value = None
+        mock_learning_repository.update_fsrs_card_state = AsyncMock()
+        mock_learning_repository.record_review_history = AsyncMock()
+        mock_learning_repository.increment_lapse_count = AsyncMock()
 
         request = ScheduleCardRequest(
             card_id=123,

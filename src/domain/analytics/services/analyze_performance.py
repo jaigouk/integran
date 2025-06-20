@@ -90,6 +90,9 @@ class LearningInsights:
     average_session_length: int  # Minutes
     total_study_time_hours: float
 
+    # Session statistics
+    total_sessions: int
+
 
 class ProgressAnalytics:
     """Comprehensive learning progress analytics engine."""
@@ -204,6 +207,7 @@ class ProgressAnalytics:
             best_study_times=["14:00", "15:00", "16:00"],  # Simplified
             average_session_length=session_stats["avg_length"],
             total_study_time_hours=session_stats["total_hours"],
+            total_sessions=session_stats["total_sessions"],
         )
 
     async def get_retention_over_time(
@@ -527,4 +531,7 @@ class ProgressAnalytics:
             "avg_length": session_progress.get("avg_duration", 0),
             "total_hours": session_progress.get("total_time", 0)
             / 3600,  # Convert to hours
+            "total_sessions": session_progress.get("total_sessions", 0),
+            "total_questions": session_progress.get("total_questions", 0),
+            "total_correct": session_progress.get("total_correct", 0),
         }

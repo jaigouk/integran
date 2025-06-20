@@ -180,13 +180,21 @@ class PracticeSession(Base):
     __tablename__ = "practice_sessions"
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, default=1, nullable=False)  # Multi-user support
     mode = Column(String(20), nullable=False)
+    status = Column(
+        String(20), default="active", nullable=False
+    )  # active, paused, completed
     started_at = Column(
         DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
     )
     ended_at = Column(DateTime)
+    pause_start_time = Column(DateTime)  # When session was paused
+    total_pause_duration = Column(Integer, default=0)  # Total pause time in seconds
     total_questions = Column(Integer, default=0)
     correct_answers = Column(Integer, default=0)
+    new_cards_count = Column(Integer, default=0)  # Track new cards separately
+    review_cards_count = Column(Integer, default=0)  # Track review cards separately
 
     # Relationships
     attempts = relationship("QuestionAttempt", back_populates="session")

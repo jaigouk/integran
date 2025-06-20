@@ -69,3 +69,68 @@ class SQLAlchemyLearningRepository(LearningRepository):
         raise NotImplementedError(
             "get_active_sessions not implemented in DatabaseManager"
         )
+
+    async def get_fsrs_card_by_id(self, card_id: int) -> FSRSCard | None:
+        """Get FSRS card by card ID."""
+        return self.db_manager.get_fsrs_card_by_id(card_id)
+
+    async def update_fsrs_card_state(
+        self,
+        card_id: int,
+        difficulty: float,
+        stability: float,
+        retrievability: float,
+        state: int,
+        next_review_date: float,
+    ) -> None:
+        """Update FSRS card state after review."""
+        self.db_manager.update_fsrs_card(
+            card_id=card_id,
+            difficulty=difficulty,
+            stability=stability,
+            retrievability=retrievability,
+            state=state,
+            next_review_date=next_review_date,
+        )
+
+    async def increment_lapse_count(self, card_id: int) -> None:
+        """Increment lapse count for a card."""
+        # Get current card from database
+        with self.db_manager.get_session() as session:
+            from src.domain.learning.models.learning_models import FSRSCard
+
+            card = session.query(FSRSCard).filter_by(card_id=card_id).first()
+            if card:
+                card.lapse_count = card.lapse_count + 1  # type: ignore[assignment]
+                session.commit()
+
+    async def record_review_history(
+        self,
+        card_id: int,
+        question_id: int,
+        rating: int,
+        response_time_ms: int,
+        difficulty_before: float,
+        stability_before: float,
+        retrievability_before: float,
+        difficulty_after: float,
+        stability_after: float,
+        retrievability_after: float,
+        next_interval_days: float,
+        session_id: int | None = None,
+    ) -> None:
+        """Record review in history."""
+        self.db_manager.record_fsrs_review(
+            card_id=card_id,
+            question_id=question_id,
+            rating=rating,
+            response_time_ms=response_time_ms,
+            difficulty_before=difficulty_before,
+            stability_before=stability_before,
+            retrievability_before=retrievability_before,
+            difficulty_after=difficulty_after,
+            stability_after=stability_after,
+            retrievability_after=retrievability_after,
+            next_interval_days=next_interval_days,
+            session_id=session_id,
+        )

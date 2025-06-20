@@ -101,11 +101,6 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
         self.learning_repository = learning_repository
         self._parameters: FSRSParameters | None = None
 
-        # TEMPORARY: Access db_manager through repository for backward compatibility
-        # TODO: Remove these direct database calls and use repository methods instead
-        if hasattr(learning_repository, "db_manager"):
-            self.db_manager = learning_repository.db_manager
-
     @property
     def parameters(self) -> FSRSParameters:
         """Get FSRS parameters, loading from database if needed."""
@@ -294,7 +289,7 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
 
     async def _get_card_by_id(self, card_id: int) -> FSRSCard | None:
         """Get FSRS card by ID."""
-        return self.db_manager.get_fsrs_card_by_id(card_id)
+        return await self.learning_repository.get_fsrs_card_by_id(card_id)
 
     async def _schedule_card_fsrs(
         self, state: FSRSCardState, rating: FSRSRating
@@ -335,7 +330,7 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
     ) -> None:
         """Update card state in database."""
         next_review_timestamp = schedule_result.next_review_date.timestamp()
-        self.db_manager.update_fsrs_card(
+        await self.learning_repository.update_fsrs_card_state(
             card_id=card_id,
             difficulty=schedule_result.difficulty,
             stability=schedule_result.stability,
@@ -346,11 +341,7 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
 
     async def _increment_lapse_count(self, card_id: int) -> None:
         """Increment lapse count for a card."""
-        with self.db_manager.get_session() as session:
-            card = session.query(FSRSCard).filter_by(card_id=card_id).first()
-            if card:
-                card.lapse_count += 1
-                session.commit()
+        await self.learning_repository.increment_lapse_count(card_id)
 
     async def _record_review_history(
         self,
@@ -360,7 +351,7 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
         schedule_result: ScheduleResult,
     ) -> None:
         """Record review in history."""
-        self.db_manager.record_fsrs_review(
+        await self.learning_repository.record_review_history(
             card_id=card.card_id,
             question_id=card.question_id,
             rating=int(request.rating),

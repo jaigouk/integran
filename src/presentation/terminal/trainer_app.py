@@ -117,10 +117,10 @@ class MainMenuScreen(Screen):
         practice_screen = PracticeScreen(
             practice_mode="random",
             user_repository=self.app.user_repository,
-            schedule_card_service=self.app.container.get_schedule_card_service()
+            submit_answer_command_handler=self.app.container.get_submit_answer_command_handler()
             if hasattr(self.app, "container")
             else None,
-            questions_query_service=self.app.container.get_questions_query_service()
+            start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
             if hasattr(self.app, "container")
             else None,
         )
@@ -132,10 +132,10 @@ class MainMenuScreen(Screen):
         practice_screen = PracticeScreen(
             practice_mode="sequential",
             user_repository=self.app.user_repository,
-            schedule_card_service=self.app.container.get_schedule_card_service()
+            submit_answer_command_handler=self.app.container.get_submit_answer_command_handler()
             if hasattr(self.app, "container")
             else None,
-            questions_query_service=self.app.container.get_questions_query_service()
+            start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
             if hasattr(self.app, "container")
             else None,
         )
@@ -147,10 +147,10 @@ class MainMenuScreen(Screen):
         practice_screen = PracticeScreen(
             practice_mode="category",
             user_repository=self.app.user_repository,
-            schedule_card_service=self.app.container.get_schedule_card_service()
+            submit_answer_command_handler=self.app.container.get_submit_answer_command_handler()
             if hasattr(self.app, "container")
             else None,
-            questions_query_service=self.app.container.get_questions_query_service()
+            start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
             if hasattr(self.app, "container")
             else None,
         )
@@ -162,10 +162,10 @@ class MainMenuScreen(Screen):
         practice_screen = PracticeScreen(
             practice_mode="review",
             user_repository=self.app.user_repository,
-            schedule_card_service=self.app.container.get_schedule_card_service()
+            submit_answer_command_handler=self.app.container.get_submit_answer_command_handler()
             if hasattr(self.app, "container")
             else None,
-            questions_query_service=self.app.container.get_questions_query_service()
+            start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
             if hasattr(self.app, "container")
             else None,
         )
@@ -175,8 +175,9 @@ class MainMenuScreen(Screen):
     def action_show_stats(self) -> None:
         """Show statistics screen."""
         stats_screen = ProgressScreen(
-            query_service=self.app.query_service,
-            analytics_service=self.app.analytics_service,
+            learning_stats_query_handler=self.app.container.get_learning_stats_query_handler()
+            if hasattr(self.app, "container")
+            else None,
             reset_command_handler=self.app.container.get_reset_progress_command_handler()
             if hasattr(self.app, "container")
             else None,
@@ -191,7 +192,8 @@ class MainMenuScreen(Screen):
     def action_show_settings(self) -> None:
         """Show settings screen (keyboard shortcut 't')."""
         settings_screen = SettingsScreen(
-            event_bus=self.app.event_bus, user_repository=self.app.user_repository
+            event_bus=self.app.event_bus,
+            user_repository=self.app.user_repository,
         )
         self.app.push_screen(settings_screen)
 
@@ -301,14 +303,13 @@ class TrainerApp(EventAwareApp):
 
     async def setup_event_handlers(self) -> None:
         """Setup global event handlers for the app."""
-        from src.domain.analytics.events.analytics_events import LeechDetectedEvent
-        from src.domain.learning.events.card_events import CardScheduledEvent
+        from src.domain.shared.events import CardScheduledEvent, LeechDetectedEvent
 
         # Subscribe to card scheduled events for UI updates
-        await self.event_bus.subscribe(CardScheduledEvent, self._handle_card_scheduled)
+        self.event_bus.subscribe(CardScheduledEvent, self._handle_card_scheduled)
 
         # Subscribe to leech detection for notifications
-        await self.event_bus.subscribe(LeechDetectedEvent, self._handle_leech_detected)
+        self.event_bus.subscribe(LeechDetectedEvent, self._handle_leech_detected)
 
         logger.info("Event handlers setup complete")
 
