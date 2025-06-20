@@ -218,6 +218,17 @@ src/
 └── main.py        # Entry point
 ```
 
+Architecture Flow:
+```
+  Domain Layer (defines interfaces)
+       ↓ depends on
+  Infrastructure Layer (implements interfaces)
+       ↓ injected via
+  Application Layer (uses dependency injection)
+       ↓ called by
+  Presentation Layer (uses commands/queries)
+```
+
 ## 📝 License
 
 This project is licensed under the Apache License 2.0 
