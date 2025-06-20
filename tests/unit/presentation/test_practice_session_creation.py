@@ -51,14 +51,21 @@ class TestPracticeSessionCreation:
         """Test that practice session is created when container is available."""
         # Arrange
         # Patch the app property to return our mock
-        with patch.object(type(practice_screen), 'app', new_callable=PropertyMock, return_value=mock_app):
+        with patch.object(
+            type(practice_screen),
+            "app",
+            new_callable=PropertyMock,
+            return_value=mock_app,
+        ):
             # Act
             await practice_screen._create_practice_session()
 
             # Assert
             session_repository = mock_app.container.get_session_repository.return_value
             session_repository.create_session.assert_called_once_with(
-                user_id=1, session_type="sequential", configuration={"mode": "sequential"}
+                user_id=1,
+                session_type="sequential",
+                configuration={"mode": "sequential"},
             )
             assert practice_screen.session_id == 123
 
@@ -72,10 +79,17 @@ class TestPracticeSessionCreation:
         mock_app.container = None
 
         # Mock DatabaseManager
-        with patch(
-            "src.infrastructure.database.database.DatabaseManager"
-        ) as mock_db_class, \
-        patch.object(type(practice_screen), 'app', new_callable=PropertyMock, return_value=mock_app):
+        with (
+            patch(
+                "src.infrastructure.database.database.DatabaseManager"
+            ) as mock_db_class,
+            patch.object(
+                type(practice_screen),
+                "app",
+                new_callable=PropertyMock,
+                return_value=mock_app,
+            ),
+        ):
             mock_db_manager = Mock()
             mock_db_manager.create_session.return_value = 456
             mock_db_class.return_value = mock_db_manager
@@ -101,8 +115,15 @@ class TestPracticeSessionCreation:
             "Database error"
         )
 
-        with caplog.at_level(logging.WARNING), \
-             patch.object(type(practice_screen), 'app', new_callable=PropertyMock, return_value=mock_app):
+        with (
+            caplog.at_level(logging.WARNING),
+            patch.object(
+                type(practice_screen),
+                "app",
+                new_callable=PropertyMock,
+                return_value=mock_app,
+            ),
+        ):
             # Act
             await practice_screen._create_practice_session()
 
@@ -115,9 +136,14 @@ class TestPracticeSessionCreation:
         self, practice_screen, mock_app
     ):
         """Test that on_mount creates a practice session before loading questions."""
-        # Arrange        
+        # Arrange
         with (
-            patch.object(type(practice_screen), 'app', new_callable=PropertyMock, return_value=mock_app),
+            patch.object(
+                type(practice_screen),
+                "app",
+                new_callable=PropertyMock,
+                return_value=mock_app,
+            ),
             patch.object(
                 practice_screen, "_create_practice_session", new_callable=AsyncMock
             ) as mock_create,
@@ -154,6 +180,7 @@ class TestQuestionWidgetSessionTracking:
     def sample_question(self):
         """Create a sample question."""
         import json
+
         return Question(
             id=1,
             question="Test question?",

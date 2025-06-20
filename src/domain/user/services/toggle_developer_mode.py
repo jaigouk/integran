@@ -69,7 +69,7 @@ class ToggleDeveloperMode(
 
         try:
             # Load current settings
-            current_settings = await self.user_repository.load_user_settings(
+            current_settings = await self.user_repository.get_user_settings(
                 request.user_id
             )
             if not current_settings:
@@ -137,7 +137,7 @@ class ToggleDeveloperMode(
 
             # Try to return current settings if available
             try:
-                current_settings = await self.user_repository.load_user_settings(
+                current_settings = await self.user_repository.get_user_settings(
                     request.user_id
                 )
                 if current_settings:

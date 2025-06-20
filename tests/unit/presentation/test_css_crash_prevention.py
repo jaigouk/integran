@@ -270,10 +270,11 @@ class TestCSSRegressionPrevention:
 
     def test_question_widget_session_id_compatibility(self):
         """Test that QuestionWidget accepts session_id parameter without breaking."""
+        import json
+
         from src.domain.content.models.question_models import Question
         from src.presentation.terminal.question_view import QuestionWidget
 
-        import json
         question = Question(
             id=1,
             question="Test?",

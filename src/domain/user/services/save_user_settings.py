@@ -68,7 +68,7 @@ class SaveUserSettings(DomainService[SaveUserSettingsRequest, SaveUserSettingsRe
 
         try:
             # Load existing settings for comparison
-            existing_settings = await self.user_repository.load_user_settings(
+            existing_settings = await self.user_repository.get_user_settings(
                 request.user_settings.user_id
             )
 
