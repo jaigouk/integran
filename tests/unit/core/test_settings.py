@@ -325,20 +325,28 @@ class TestAdvancedGeminiConfig:
 
     def test_vertex_ai_with_default_credentials(self):
         """Test Vertex AI with default application credentials."""
-        env_vars = {
-            "GCP_PROJECT_ID": "my-real-project-456",
-            "USE_VERTEX_AI": "true",
-            # No GOOGLE_APPLICATION_CREDENTIALS set
-        }
+        from unittest.mock import Mock
 
         with (
-            patch.dict(os.environ, env_vars, clear=True),
-            patch("os.getenv") as mock_getenv,
+            patch(
+                "src.infrastructure.config.settings.get_settings"
+            ) as mock_get_settings,
+            patch("src.infrastructure.config.settings.os.getenv") as mock_getenv,
         ):
-            mock_getenv.return_value = "/default/path/to/creds.json"
-            assert has_gemini_config() is True
+            # Mock settings where google_application_credentials is empty
+            mock_settings = Mock()
+            mock_settings.use_vertex_ai = True
+            mock_settings.gcp_project_id = "my-real-project-456"
+            mock_settings.google_application_credentials = (
+                ""  # Empty, so should call os.getenv
+            )
 
-            # Verify it checks for GOOGLE_APPLICATION_CREDENTIALS
+            mock_get_settings.return_value = mock_settings
+            mock_getenv.return_value = "/default/path/to/creds.json"
+
+            result = has_gemini_config()
+
+            assert result is True
             mock_getenv.assert_called_with("GOOGLE_APPLICATION_CREDENTIALS")
 
     def test_vertex_ai_no_default_credentials(self):

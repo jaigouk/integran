@@ -34,8 +34,8 @@ try:
     GENAI_AVAILABLE = True
 except ImportError:
     GENAI_AVAILABLE = False
-    genai = None  # type: ignore[assignment]
-    types = None  # type: ignore[assignment]
+    genai = None
+    types = None
 
 logger = logging.getLogger(__name__)
 

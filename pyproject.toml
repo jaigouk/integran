@@ -45,6 +45,11 @@ dev = [
     "pre-commit>=3.6.0",
     "ipython>=8.19.0",
 ]
+test = [
+    "pytest>=7.4.4",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.23.3",
+]
 docs = [
     "sphinx>=7.2.6",
     "sphinx-rtd-theme>=2.0.0",
@@ -158,6 +163,7 @@ disable_error_code = ["assignment", "call-overload", "return-value", "arg-type",
 module = [
     "src.infrastructure.database.database",
     "src.infrastructure.external.gemini_client",
+    "src.infrastructure.repositories.learning_repository",
     "src.domain.analytics.services.*",
     "src.domain.learning.services.*",
     "src.application_services.learning.session_manager",
@@ -182,6 +188,9 @@ module = [
     "src.presentation.terminal.question_view",
     "src.presentation.terminal.session_view",
     "src.presentation.terminal.progress_view",
+    "src.infrastructure.processors.pdf_processor",
+    "src.domain.content.services.process_image",
+    "src.domain.content.services.generate_answer",
 ]
 ignore_errors = true
 

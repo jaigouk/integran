@@ -179,7 +179,9 @@ class TestBase:
         """Test that Base is a SQLAlchemy declarative base."""
         from sqlalchemy.orm import DeclarativeBase
 
+        # With SQLAlchemy 2.0, Base inherits from DeclarativeBase
         assert issubclass(Base, DeclarativeBase)
+        assert hasattr(Base, "metadata")
 
     def test_base_can_be_inherited(self):
         """Test that Base can be inherited by model classes."""

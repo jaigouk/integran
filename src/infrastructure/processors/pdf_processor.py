@@ -188,7 +188,7 @@ Return JSON with proper German characters:
                 try:
                     response = self.client.models.generate_content(
                         model=self.model_id,
-                        contents=contents,  # type: ignore[arg-type]
+                        contents=contents,
                         config=config,
                     )
 

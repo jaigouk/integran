@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
-from typing import Any
 
 import click
 from rich.console import Console
 from rich.text import Text
 
+from src.domain.content.models.question_models import Question
 from src.infrastructure.database.database import DatabaseManager
 
 console = Console()
@@ -81,14 +81,50 @@ def main(
 
         # Check if questions are loaded
         questions_file = Path("data/final_dataset.json")
+        db_file = Path("data/trainer.db")
+
+        # Check if database exists and has questions
+        needs_setup = False
         if not questions_file.exists():
             console.print(
-                "[red]Error: Questions file not found at data/final_dataset.json[/red]"
+                "[yellow]Questions file not found at data/final_dataset.json[/yellow]"
             )
-            console.print(
-                "[yellow]Please run 'integran-setup' first to initialize the database.[/yellow]"
-            )
-            sys.exit(1)
+            needs_setup = True
+        elif not db_file.exists():
+            console.print("[yellow]Database not found at data/trainer.db[/yellow]")
+            needs_setup = True
+        else:
+            # Check if database has questions loaded
+            try:
+                with db_manager.get_session() as session:
+                    question_count = session.query(Question).count()
+                    if question_count == 0:
+                        console.print(
+                            "[yellow]Database exists but contains no questions[/yellow]"
+                        )
+                        needs_setup = True
+            except Exception as e:
+                console.print(f"[yellow]Error checking database: {e}[/yellow]")
+                needs_setup = True
+
+        if needs_setup:
+            console.print("[blue]🚀 Running first-time setup...[/blue]")
+            console.print()
+            try:
+                # Import and run setup with force=True to avoid confirmation
+                import asyncio
+
+                from src.application.setup.database_setup_service import main_async
+
+                asyncio.run(main_async(force=True, questions_file=None, language="en"))
+                console.print("[green]✅ Setup completed successfully![/green]")
+                console.print()
+            except Exception as e:
+                console.print(f"[red]Setup failed: {e}[/red]")
+                console.print(
+                    "[yellow]Please run 'integran-setup' manually to fix this issue.[/yellow]"
+                )
+                sys.exit(1)
 
         # Start the trainer application
         _start_trainer(db_manager, mode, category, review)
@@ -659,12 +695,12 @@ def _handle_reset_confirmation(db_manager: DatabaseManager) -> None:
     console.input("[dim]Press Enter to continue...[/dim]")
 
 
-def _get_random_questions(db_manager: DatabaseManager, limit: int = 5) -> list[Any]:
+def _get_random_questions(
+    db_manager: DatabaseManager, limit: int = 5
+) -> list[Question]:
     """Get random questions for practice (simplified implementation)."""
     # For now, just get first few questions - will improve later
     with db_manager.get_session() as session:
-        from src.domain.content.models.question_models import Question
-
         return session.query(Question).limit(limit).all()
 
 

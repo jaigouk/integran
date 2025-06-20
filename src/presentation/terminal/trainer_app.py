@@ -39,13 +39,15 @@ class ConfirmQuitScreen(Screen[bool]):
     def compose(self) -> ComposeResult:
         """Compose the quit confirmation dialog."""
         yield Container(
-            Static("Are you sure you want to exit Integran?", classes="confirm-title"),
+            Static(
+                "🚪 Are you sure you want to exit Integran?", classes="confirm-title"
+            ),
             Static(
                 "Press Y for Yes, N for No, or Escape to cancel", classes="confirm-help"
             ),
             Horizontal(
-                Button("Yes (Y) - Exit App", id="yes", variant="error"),
-                Button("No (N) - Stay in App", id="no", variant="primary"),
+                Button("YES - Exit Application", id="yes", variant="error"),
+                Button("NO - Continue Learning", id="no", variant="primary"),
                 classes="confirm-buttons",
             ),
             classes="confirm-dialog",
@@ -233,36 +235,42 @@ class TrainerApp(EventAwareApp):
     /* Confirm dialog specific styling */
     .confirm-dialog {
         align: center middle;
-        width: 60;
-        height: 12;
+        width: 95vw;
+        max-width: 100;
+        height: auto;
         background: $surface;
         border: solid white;
-        padding: 2;
+        padding: 3;
     }
 
     .confirm-title {
         text-align: center;
         text-style: bold;
         color: $warning;
-        margin-bottom: 1;
+        margin-bottom: 2;
+        width: 100%;
     }
 
     .confirm-help {
         text-align: center;
         color: $text-muted;
-        margin-bottom: 2;
+        margin-bottom: 3;
+        width: 100%;
     }
 
     .confirm-buttons {
         align: center middle;
         width: 100%;
+        height: auto;
     }
 
     .confirm-buttons Button {
         width: 1fr;
-        height: 3;
-        margin: 0 1;
+        height: 5;
+        margin: 0 2;
         text-style: bold;
+        min-width: 20;
+        padding: 1 2;
     }
     """
     )

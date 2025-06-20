@@ -23,19 +23,19 @@ class SQLAlchemyLearningRepository(LearningRepository):
         if hasattr(card, "card_id") and getattr(card, "card_id", None):
             # Update existing card
             self.db_manager.update_fsrs_card(
-                card.card_id,  # type: ignore[arg-type]
-                card.difficulty,  # type: ignore[arg-type]
-                card.stability,  # type: ignore[arg-type]
-                card.retrievability,  # type: ignore[arg-type]
-                card.state,  # type: ignore[arg-type]
-                card.next_review_date,  # type: ignore[arg-type]
+                card.card_id,
+                card.difficulty,
+                card.stability,
+                card.retrievability,
+                card.state,
+                card.next_review_date,
             )
             return card
         else:
             # Create new card
             return self.db_manager.create_fsrs_card(
-                card.question_id,  # type: ignore[arg-type]
-                card.user_id,  # type: ignore[arg-type]
+                card.question_id,
+                card.user_id,
             )
 
     async def get_due_cards(self, user_id: int, limit: int = 10) -> list[FSRSCard]:
@@ -101,7 +101,7 @@ class SQLAlchemyLearningRepository(LearningRepository):
 
             card = session.query(FSRSCard).filter_by(card_id=card_id).first()
             if card:
-                card.lapse_count = card.lapse_count + 1  # type: ignore[assignment]
+                card.lapse_count = card.lapse_count + 1
                 session.commit()
 
     async def record_review_history(

@@ -87,9 +87,12 @@ async def test_wrong_answer_analysis():
 
     # Verify each wrong answer has proper structure
     for analysis in wrong_analysis:
-        assert analysis.option_letter in ["A", "B", "C", "D"], (
-            f"Invalid option letter: {analysis.option_letter}"
-        )
+        assert analysis.option_letter in [
+            "A",
+            "B",
+            "C",
+            "D",
+        ], f"Invalid option letter: {analysis.option_letter}"
         assert len(analysis.option_text) > 0, "Empty option text"
         assert len(analysis.explanation) > 10, (
             f"Explanation too short: {len(analysis.explanation)} chars"

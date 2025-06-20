@@ -208,12 +208,33 @@ class TestMainEntryPointIntegration:
     ):
         """Test that main function calls _start_trainer with correct parameters."""
         # Arrange
-        mock_path = Mock()
-        mock_path.exists.return_value = True
-        mock_path_class.return_value = mock_path
+        mock_questions_file = Mock()
+        mock_questions_file.exists.return_value = True
+        mock_db_file = Mock()
+        mock_db_file.exists.return_value = True
+
+        # Mock Path to return different mocks based on the path string
+        def path_side_effect(path_str):
+            if "final_dataset.json" in str(path_str):
+                return mock_questions_file
+            elif "trainer.db" in str(path_str):
+                return mock_db_file
+            return Mock()
+
+        mock_path_class.side_effect = path_side_effect
 
         mock_db_manager = Mock()
         mock_db_class.return_value = mock_db_manager
+
+        # Mock database query to return some questions (so no setup needed)
+        from unittest.mock import MagicMock
+
+        mock_session = Mock()
+        mock_session.query.return_value.count.return_value = 100
+        mock_context_manager = MagicMock()
+        mock_context_manager.__enter__.return_value = mock_session
+        mock_context_manager.__exit__.return_value = None
+        mock_db_manager.get_session.return_value = mock_context_manager
 
         # Act - Call main with CLI arguments
         from click.testing import CliRunner
@@ -229,20 +250,42 @@ class TestMainEntryPointIntegration:
             mock_db_manager, "sequential", "Politics", False
         )
 
+    @patch("src.main._start_trainer")
+    @patch("src.main.asyncio.run")
+    @patch("src.application.setup.database_setup_service.main_async")
     @patch("src.main.console")
     @patch("src.main.DatabaseManager")
     @patch("src.main.Path")
     def test_main_function_handles_missing_questions_file(
-        self, mock_path_class, mock_db_class, mock_console
+        self,
+        mock_path_class,
+        mock_db_class,
+        mock_console,
+        mock_main_async,
+        mock_asyncio_run,
+        mock_start_trainer,
     ):
-        """Test that main function handles missing questions file gracefully."""
+        """Test that main function triggers auto-setup when questions file is missing."""
         # Arrange
-        mock_path = Mock()
-        mock_path.exists.return_value = False
-        mock_path_class.return_value = mock_path
+        mock_questions_file = Mock()
+        mock_questions_file.exists.return_value = False
+
+        def path_side_effect(path_str):
+            if "final_dataset.json" in str(path_str):
+                return mock_questions_file
+            return Mock()
+
+        mock_path_class.side_effect = path_side_effect
 
         mock_db_manager = Mock()
         mock_db_class.return_value = mock_db_manager
+
+        # Mock successful setup - main_async returns a coroutine
+        mock_main_async.return_value = AsyncMock()()
+        # Mock asyncio.run to not actually run the coroutine
+        mock_asyncio_run.return_value = None
+        # Mock _start_trainer to prevent it from running
+        mock_start_trainer.return_value = None
 
         # Act - Call main with CLI arguments
         from click.testing import CliRunner
@@ -250,15 +293,24 @@ class TestMainEntryPointIntegration:
         from src.main import main
 
         runner = CliRunner()
-        result = runner.invoke(main, ["--mode", "random"])
+        runner.invoke(main, ["--mode", "random"])
 
-        # Assert - Should exit with error code due to missing questions file
-        assert result.exit_code != 0, (
-            "Expected CLI command to fail with missing questions file"
-        )
-
+        # Assert - Should trigger auto-setup
         mock_console.print.assert_any_call(
-            "[red]Error: Questions file not found at data/final_dataset.json[/red]"
+            "[yellow]Questions file not found at data/final_dataset.json[/yellow]"
+        )
+        mock_console.print.assert_any_call(
+            "[blue]🚀 Running first-time setup...[/blue]"
+        )
+        # Auto-setup should be called
+        mock_main_async.assert_called_once_with(
+            force=True, questions_file=None, language="en"
+        )
+        # asyncio.run should be called once for the setup
+        mock_asyncio_run.assert_called_once()
+        # _start_trainer should be called after setup
+        mock_start_trainer.assert_called_once_with(
+            mock_db_manager, "random", None, False
         )
 
 
