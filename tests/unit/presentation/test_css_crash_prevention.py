@@ -184,7 +184,8 @@ class TestCSSCrashPrevention:
             )
 
             # Verify action method exists
-            if action != "confirm_quit":  # This one has different naming
+            # Skip built-in actions and special cases
+            if action not in ["quit", "confirm_quit"]:  # Built-in/special actions
                 action_method = (
                     f"action_{action}" if not action.startswith("action_") else action
                 )

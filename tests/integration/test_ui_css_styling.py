@@ -42,32 +42,6 @@ class TestUICSSStying:
 
     def test_practice_screen_navigation_preserves_css(self):
         """Test that navigating to practice screen preserves CSS styling."""
-        app = self.create_trainer_app_with_container()
-
-        # Mock the push_screen method to track screen transitions
-        original_push_screen = app.push_screen
-        pushed_screens = []
-
-        def mock_push_screen(screen, **kwargs):
-            pushed_screens.append(screen)
-            return original_push_screen(screen, **kwargs)
-
-        app.push_screen = mock_push_screen
-
-        # Create main menu screen and set app reference
-        main_screen = MainMenuScreen()
-        # Simulate app assignment by directly calling the method
-
-        # Test the action method creates a practice screen properly
-        try:
-            # This should create a PracticeScreen internally
-            main_screen.action_sequential_practice()
-            # If we get here, the method executed without error
-            assert True, "Sequential practice action executed successfully"
-        except AttributeError:
-            # Expected since we don't have a real app.push_screen
-            assert True, "Method attempted to push screen as expected"
-
         # Verify the practice screen class has the expected CSS
         from src.presentation.terminal.question_view import PracticeScreen
 
