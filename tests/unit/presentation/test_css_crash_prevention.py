@@ -273,10 +273,11 @@ class TestCSSRegressionPrevention:
         from src.domain.content.models.question_models import Question
         from src.presentation.terminal.question_view import QuestionWidget
 
+        import json
         question = Question(
             id=1,
             question="Test?",
-            options_list=["A", "B"],
+            options=json.dumps(["A", "B"]),
             correct="A",
             category="Test",
         )

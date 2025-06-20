@@ -1,7 +1,7 @@
 """Tests for practice session creation and progress tracking."""
 
 import logging
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, PropertyMock, patch
 
 import pytest
 
@@ -22,8 +22,8 @@ class TestPracticeSessionCreation:
 
         # Mock container and session repository
         container = Mock()
-        session_repository = AsyncMock()
-        session_repository.create_session.return_value = 123
+        session_repository = Mock()
+        session_repository.create_session = AsyncMock(return_value=123)
         container.get_session_repository.return_value = session_repository
 
         app.container = container
@@ -50,17 +50,17 @@ class TestPracticeSessionCreation:
     ):
         """Test that practice session is created when container is available."""
         # Arrange
-        practice_screen.app = mock_app
+        # Patch the app property to return our mock
+        with patch.object(type(practice_screen), 'app', new_callable=PropertyMock, return_value=mock_app):
+            # Act
+            await practice_screen._create_practice_session()
 
-        # Act
-        await practice_screen._create_practice_session()
-
-        # Assert
-        session_repository = mock_app.container.get_session_repository.return_value
-        session_repository.create_session.assert_called_once_with(
-            user_id=1, session_type="sequential", configuration={"mode": "sequential"}
-        )
-        assert practice_screen.session_id == 123
+            # Assert
+            session_repository = mock_app.container.get_session_repository.return_value
+            session_repository.create_session.assert_called_once_with(
+                user_id=1, session_type="sequential", configuration={"mode": "sequential"}
+            )
+            assert practice_screen.session_id == 123
 
     @pytest.mark.asyncio
     async def test_create_practice_session_fallback_without_container(
@@ -70,12 +70,12 @@ class TestPracticeSessionCreation:
         # Arrange
         mock_app = Mock()
         mock_app.container = None
-        practice_screen.app = mock_app
 
         # Mock DatabaseManager
         with patch(
-            "src.presentation.terminal.question_view.DatabaseManager"
-        ) as mock_db_class:
+            "src.infrastructure.database.database.DatabaseManager"
+        ) as mock_db_class, \
+        patch.object(type(practice_screen), 'app', new_callable=PropertyMock, return_value=mock_app):
             mock_db_manager = Mock()
             mock_db_manager.create_session.return_value = 456
             mock_db_class.return_value = mock_db_manager
@@ -100,9 +100,9 @@ class TestPracticeSessionCreation:
         mock_app.container.get_session_repository.side_effect = Exception(
             "Database error"
         )
-        practice_screen.app = mock_app
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.WARNING), \
+             patch.object(type(practice_screen), 'app', new_callable=PropertyMock, return_value=mock_app):
             # Act
             await practice_screen._create_practice_session()
 
@@ -115,10 +115,9 @@ class TestPracticeSessionCreation:
         self, practice_screen, mock_app
     ):
         """Test that on_mount creates a practice session before loading questions."""
-        # Arrange
-        practice_screen.app = mock_app
-
+        # Arrange        
         with (
+            patch.object(type(practice_screen), 'app', new_callable=PropertyMock, return_value=mock_app),
             patch.object(
                 practice_screen, "_create_practice_session", new_callable=AsyncMock
             ) as mock_create,
@@ -154,10 +153,11 @@ class TestQuestionWidgetSessionTracking:
     @pytest.fixture
     def sample_question(self):
         """Create a sample question."""
+        import json
         return Question(
             id=1,
             question="Test question?",
-            options_list=["A", "B", "C", "D"],
+            options=json.dumps(["A", "B", "C", "D"]),
             correct="A",
             category="Test",
         )

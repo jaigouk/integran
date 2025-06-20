@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from src.domain.shared.repositories import UserRepository
+from src.domain.shared.repositories import RepositoryError, UserRepository
 from src.domain.user.models.user_models import UserSettings, UserSettingsDB
 from src.infrastructure.database.database import DatabaseManager
 
@@ -239,15 +239,6 @@ class SQLAlchemyUserRepository(UserRepository):
     async def user_settings_exist(self, user_id: int) -> bool:
         """Alias for user_exists."""
         return await self.user_exists(user_id)
-
-
-class RepositoryError(Exception):
-    """Exception raised by repository operations."""
-
-    def __init__(self, message: str, error_code: str | None = None):
-        """Initialize repository error."""
-        super().__init__(message)
-        self.error_code = error_code
 
 
 # Backward compatibility alias

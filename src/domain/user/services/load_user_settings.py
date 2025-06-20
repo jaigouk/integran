@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from src.domain.shared.repositories import UserRepository
+from src.domain.shared.repositories import RepositoryError, UserRepository
 from src.domain.shared.services import (
     DomainService,
     ValidationError,
@@ -20,7 +20,6 @@ from src.domain.user.models.user_models import (
     UserSettings,
 )
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
-from src.infrastructure.repositories.user_repository import RepositoryError
 
 logger = logging.getLogger(__name__)
 

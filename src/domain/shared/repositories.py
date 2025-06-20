@@ -17,6 +17,15 @@ if TYPE_CHECKING:
     from src.domain.user.models.user_models import UserSettings
 
 
+class RepositoryError(Exception):
+    """Exception raised by repository operations."""
+
+    def __init__(self, message: str, error_code: str | None = None):
+        """Initialize repository error."""
+        super().__init__(message)
+        self.error_code = error_code
+
+
 class QuestionRepository(ABC):
     """Repository interface for question-related data operations."""
 
