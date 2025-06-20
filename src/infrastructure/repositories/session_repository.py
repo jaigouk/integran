@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -14,6 +16,11 @@ class SQLAlchemySessionRepository(SessionRepository):
 
     def __init__(self, db_manager: DatabaseManager):
         self.db_manager = db_manager
+
+    async def _run_in_executor[T](self, func: Callable[[], T]) -> T:
+        """Run a blocking database operation in thread pool."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, func)
 
     async def create_session(
         self,
@@ -41,10 +48,41 @@ class SQLAlchemySessionRepository(SessionRepository):
 
     async def delete_user_sessions(self, user_id: int) -> dict[str, int]:
         """Delete all sessions for a user and return counts."""
-        # NOTE: DatabaseManager doesn't have delete_user_sessions method
-        raise NotImplementedError(
-            "delete_user_sessions not implemented in DatabaseManager"
-        )
+
+        def _delete_user_sessions() -> dict[str, int]:
+            with self.db_manager.get_session() as session:
+                from src.domain.content.models.question_models import (
+                    PracticeSession,
+                    QuestionAttempt,
+                )
+
+                # Count items before deletion
+                practice_sessions_count = (
+                    session.query(PracticeSession).filter_by(user_id=user_id).count()
+                )
+
+                # Count attempts in sessions belonging to this user
+                question_attempts_count = (
+                    session.query(QuestionAttempt)
+                    .join(PracticeSession)
+                    .filter(PracticeSession.user_id == user_id)
+                    .count()
+                )
+
+                # Delete in proper order (respecting foreign keys)
+                session.query(QuestionAttempt).join(PracticeSession).filter(
+                    PracticeSession.user_id == user_id
+                ).delete(synchronize_session=False)
+                session.query(PracticeSession).filter_by(user_id=user_id).delete()
+
+                session.commit()
+
+                return {
+                    "practice_sessions": practice_sessions_count,
+                    "question_attempts": question_attempts_count,
+                }
+
+        return await self._run_in_executor(_delete_user_sessions)
 
     async def update_session_status(self, session_id: int, status: str) -> None:
         """Update the status of a session."""

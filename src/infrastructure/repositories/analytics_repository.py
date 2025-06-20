@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Callable
 from typing import Any
 
 from src.domain.shared.repositories import AnalyticsRepository
@@ -13,6 +15,11 @@ class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
 
     def __init__(self, db_manager: DatabaseManager):
         self.db_manager = db_manager
+
+    async def _run_in_executor[T](self, func: Callable[[], T]) -> T:
+        """Run a blocking database operation in thread pool."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, func)
 
     async def get_learning_stats(self, user_id: int) -> dict[str, Any]:  # noqa: ARG002
         """Get comprehensive learning statistics for a user."""
@@ -43,36 +50,115 @@ class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
         self, user_id: int, progress_data: dict[str, Any]
     ) -> None:
         """Save user progress data."""
-        # NOTE: DatabaseManager doesn't have save_user_progress method
-        raise NotImplementedError(
-            "save_user_progress not implemented in DatabaseManager"
-        )
+
+        def _save_user_progress() -> None:
+            with self.db_manager.get_session() as session:
+                from src.domain.analytics.models.analytics_models import UserProgress
+
+                # Check if user progress exists
+                existing = (
+                    session.query(UserProgress).filter_by(user_id=user_id).first()
+                )
+                if existing:
+                    # Update existing progress (updated_at will be set automatically)
+                    for key, value in progress_data.items():
+                        if hasattr(existing, key):
+                            setattr(existing, key, value)
+                else:
+                    # Create new progress record
+                    progress = UserProgress(user_id=user_id, **progress_data)
+                    session.add(progress)
+
+                session.commit()
+
+        await self._run_in_executor(_save_user_progress)
 
     async def delete_user_analytics(self, user_id: int) -> dict[str, int]:
         """Delete all analytics data for a user and return counts."""
-        # NOTE: DatabaseManager doesn't have delete_user_analytics method
-        raise NotImplementedError(
-            "delete_user_analytics not implemented in DatabaseManager"
-        )
 
-    async def get_category_progress(self, user_id: int) -> dict[str, Any]:
+        def _delete_user_analytics() -> dict[str, int]:
+            with self.db_manager.get_session() as session:
+                from src.domain.analytics.models.analytics_models import (
+                    UserProgress,
+                )
+
+                # Count items before deletion
+                user_progress_count = (
+                    session.query(UserProgress).filter_by(user_id=user_id).count()
+                )
+                # Note: CategoryProgress is global and QuestionAttempt deletion handled by session management
+
+                # Delete user-specific analytics data
+                session.query(UserProgress).filter_by(user_id=user_id).delete()
+                # Note: CategoryProgress is global and typically not deleted per user
+                # QuestionAttempt deletion should be handled carefully - depends on session management
+
+                session.commit()
+
+                return {
+                    "user_progress": user_progress_count,
+                    "category_progress": 0,  # Not deleted
+                    "question_attempts": 0,  # Not deleted to preserve session data integrity
+                }
+
+        return await self._run_in_executor(_delete_user_analytics)
+
+    async def get_category_progress(self, user_id: int) -> dict[str, Any]:  # noqa: ARG002
         """Get progress by category for a user."""
-        # NOTE: DatabaseManager doesn't have get_category_progress method
-        raise NotImplementedError(
-            "get_category_progress not implemented in DatabaseManager"
-        )
+
+        def _get_category_progress() -> dict[str, Any]:
+            with self.db_manager.get_session() as session:
+                from src.domain.analytics.models.analytics_models import (
+                    CategoryProgress,
+                )
+
+                # Get all category progress data
+                categories = session.query(CategoryProgress).all()
+
+                progress_by_category: dict[str, Any] = {}
+                for category in categories:
+                    progress_by_category[str(category.category)] = {
+                        "total_questions": int(category.total_questions),
+                        "questions_seen": int(category.questions_seen),
+                        "correct_answers": int(category.correct_answers),
+                        "accuracy": float(
+                            category.correct_answers / category.questions_seen
+                        )
+                        if category.questions_seen > 0
+                        else 0.0,
+                        "average_time": float(category.average_time or 0.0),
+                        "last_practiced": category.last_practiced.isoformat()
+                        if category.last_practiced
+                        else None,
+                    }
+
+                return progress_by_category
+
+        return await self._run_in_executor(_get_category_progress)
 
     async def record_question_attempt(
         self,
-        user_id: int,
+        user_id: int,  # noqa: ARG002
         question_id: int,
         is_correct: bool,
         response_time_ms: int,
         session_id: int | None = None,
     ) -> None:
         """Record a question attempt."""
-        # NOTE: DatabaseManager doesn't have record_question_attempt method
-        # It has record_attempt which takes different parameters
-        raise NotImplementedError(
-            "record_question_attempt not implemented in DatabaseManager"
+        if session_id is None:
+            # Cannot record attempt without session_id
+            return
+
+        # Use DatabaseManager's record_attempt method with appropriate AnswerStatus
+        from src.domain.shared.models import AnswerStatus
+
+        status = AnswerStatus.CORRECT if is_correct else AnswerStatus.INCORRECT
+        time_taken = response_time_ms / 1000.0  # Convert to seconds
+
+        self.db_manager.record_attempt(
+            session_id=session_id,
+            question_id=question_id,
+            status=status,
+            user_answer=None,  # Not provided in this interface
+            time_taken=time_taken,
         )

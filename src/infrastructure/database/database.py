@@ -6,7 +6,7 @@ import json
 import logging
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +31,6 @@ from src.domain.content.models.question_models import (
 from src.domain.learning.models.learning_models import (
     AlgorithmConfig,
     FSRSCard,
-    LearningData,
     LearningSession,
     LearningStats,
     LeechCard,
@@ -231,9 +230,18 @@ class DatabaseManager:
                 session.add(question)
                 session.flush()  # Force the question to be written before learning data
 
-                # Initialize learning data
-                learning = LearningData(question_id=item["id"])
-                session.add(learning)
+                # Initialize FSRS card for new question
+                now = datetime.now(UTC).timestamp()
+                fsrs_card = FSRSCard(
+                    question_id=item["id"],
+                    user_id=1,
+                    difficulty=5.0,  # Default initial difficulty
+                    stability=1.0,  # Default initial stability
+                    retrievability=1.0,  # Perfect initial retrievability
+                    state=0,  # New card state
+                    next_review_date=now,  # New cards are immediately available for study
+                )
+                session.add(fsrs_card)
 
             # Update category progress
             categories = {item["category"] for item in questions_data}
@@ -285,13 +293,13 @@ class DatabaseManager:
             List of questions due for review.
         """
         with self.get_session() as session:
-            # Use naive datetime for comparison since SQLite stores naive datetimes
-            now = datetime.now()
+            # Use UTC timestamp for FSRS scheduling
+            now = datetime.now(UTC).timestamp()
             return (
                 session.query(Question)
-                .join(LearningData)
-                .filter(LearningData.next_review <= now)
-                .order_by(LearningData.next_review)
+                .join(FSRSCard)
+                .filter(FSRSCard.next_review_date <= now)
+                .order_by(FSRSCard.next_review_date)
                 .limit(limit)
                 .all()
             )
@@ -322,59 +330,7 @@ class DatabaseManager:
                 time_taken=time_taken,
             )
             session.add(attempt)
-
-            # Update learning data if answered
-            if status != AnswerStatus.SKIPPED:
-                self._update_learning_data(session, question_id, status)
-
             session.commit()
-
-    def _update_learning_data(
-        self, session: Session, question_id: int, status: AnswerStatus
-    ) -> None:
-        """Update spaced repetition data using SM-2 algorithm.
-
-        Args:
-            session: Database session.
-            question_id: Question ID.
-            status: Answer status.
-        """
-        learning = (
-            session.query(LearningData).filter_by(question_id=question_id).first()
-        )
-        if not learning:
-            return
-
-        # SM-2 algorithm implementation
-        if status == AnswerStatus.CORRECT:
-            # Increase repetitions
-            learning.repetitions += 1
-
-            # Update easiness factor (minimum 1.3)
-            learning.easiness_factor = max(
-                1.3,
-                learning.easiness_factor + 0.1 - (5 - 4) * (0.08 + (5 - 4) * 0.02),
-            )
-
-            # Calculate new interval
-            if learning.repetitions == 1:
-                learning.interval = 1
-            elif learning.repetitions == 2:
-                learning.interval = 6
-            else:
-                learning.interval = int(learning.interval * learning.easiness_factor)
-        else:
-            # Reset on incorrect answer
-            learning.repetitions = 0
-            learning.interval = 1
-            learning.easiness_factor = max(1.3, learning.easiness_factor - 0.2)
-
-        # Update review dates (use naive datetime for SQLite compatibility)
-        now_utc = datetime.now(UTC)
-        learning.last_reviewed = now_utc.replace(tzinfo=None)
-        learning.next_review = (now_utc + timedelta(days=learning.interval)).replace(
-            tzinfo=None
-        )
 
     def create_session(self, mode: str, user_id: int = 1) -> int:
         """Create a new practice session.
@@ -501,29 +457,36 @@ class DatabaseManager:
         with self.get_session() as session:
             stats = LearningStats()
 
-            # Count questions by learning status
-            # Use naive datetime for comparison since SQLite stores naive datetimes
-            now = datetime.now()
-            learning_data = session.query(LearningData).all()
+            # Count questions by learning status using FSRS cards
+            now = datetime.now(UTC).timestamp()
+            fsrs_cards = session.query(FSRSCard).all()
 
-            for ld in learning_data:
-                if ld.repetitions >= 5:
-                    stats.total_mastered += 1
-                elif ld.repetitions > 0:
-                    stats.total_learning += 1
-                else:
+            for card in fsrs_cards:
+                # Map FSRS states to learning statistics
+                if card.state == 0:  # New
                     stats.total_new += 1
+                elif card.state == 1:  # Learning
+                    stats.total_learning += 1
+                elif card.state == 2:  # Review (mastered)
+                    stats.total_mastered += 1
 
-                if ld.next_review <= now:
+                # Check if card is due for review
+                if card.next_review_date and card.next_review_date <= now:
                     stats.overdue_count += 1
-                elif ld.next_review <= now + timedelta(days=1):
+                elif (
+                    card.next_review_date and card.next_review_date <= now + 86400
+                ):  # 24 hours
                     stats.next_review_count += 1
 
-            # Calculate average easiness
-            if learning_data:
-                stats.average_easiness = sum(
-                    ld.easiness_factor for ld in learning_data
-                ) / len(learning_data)
+            # Calculate average easiness from FSRS difficulty
+            if fsrs_cards:
+                avg_difficulty = sum(card.difficulty for card in fsrs_cards) / len(
+                    fsrs_cards
+                )
+                # Convert difficulty (1-10) to easiness factor equivalent
+                stats.average_easiness = max(
+                    1.3, float(3.5 - (avg_difficulty - 5.0) * 0.2)
+                )
 
             # Get current streak
             progress = session.query(UserProgress).first()
@@ -554,7 +517,10 @@ class DatabaseManager:
             # Delete all tracking data
             session.query(QuestionAttempt).delete()
             session.query(PracticeSession).delete()
-            session.query(LearningData).delete()
+            session.query(
+                FSRSCard
+            ).delete()  # Use FSRS cards instead of legacy LearningData
+            session.query(ReviewHistory).delete()  # Clear FSRS review history
             session.query(UserProgress).delete()
             session.query(CategoryProgress).update(
                 {
@@ -565,11 +531,20 @@ class DatabaseManager:
                 }
             )
 
-            # Reinitialize learning data
+            # Reinitialize FSRS cards for all questions
             questions = session.query(Question).all()
+            now = datetime.now(UTC).timestamp()
             for question in questions:
-                learning = LearningData(question_id=question.id)
-                session.add(learning)
+                fsrs_card = FSRSCard(
+                    question_id=question.id,
+                    user_id=1,
+                    difficulty=5.0,  # Default initial difficulty
+                    stability=1.0,  # Default initial stability
+                    retrievability=1.0,  # Perfect initial retrievability
+                    state=0,  # New card state
+                    next_review_date=now,  # New cards are immediately available for study
+                )
+                session.add(fsrs_card)
 
             session.commit()
             logger.info("Progress reset successfully")
@@ -710,40 +685,25 @@ class DatabaseManager:
             # but we need to migrate existing learning data
             logger.info("Creating FSRS schema...")
 
-            # Migrate existing learning data to FSRS cards
-            existing_learning = session.query(LearningData).all()
-            for ld in existing_learning:
-                # Check if FSRS card already exists
-                existing_card = (
-                    session.query(FSRSCard)
-                    .filter_by(question_id=ld.question_id)
-                    .first()
-                )
+            # Initialize FSRS cards for questions without cards
+            questions_without_cards = (
+                session.query(Question)
+                .outerjoin(FSRSCard, Question.id == FSRSCard.question_id)
+                .filter(FSRSCard.question_id.is_(None))
+                .all()
+            )
 
-                if not existing_card:
-                    # Convert SM-2 to initial FSRS state
-                    fsrs_card = FSRSCard(
-                        question_id=ld.question_id,
-                        user_id=1,
-                        difficulty=max(
-                            1.0, min(10.0, 11 - ld.easiness_factor)
-                        ),  # Convert EF to difficulty
-                        stability=max(
-                            0.1, float(ld.interval)
-                        ),  # Use interval as initial stability
-                        retrievability=0.9 if ld.repetitions > 0 else 1.0,
-                        state=2
-                        if ld.repetitions >= 2
-                        else (1 if ld.repetitions > 0 else 0),
-                        review_count=ld.repetitions,
-                        last_review_date=ld.last_reviewed.timestamp()
-                        if ld.last_reviewed
-                        else None,
-                        next_review_date=ld.next_review.timestamp()
-                        if ld.next_review
-                        else datetime.now(UTC).timestamp(),
-                    )
-                    session.add(fsrs_card)
+            for question in questions_without_cards:
+                # Create new FSRS card with default initial state
+                fsrs_card = FSRSCard(
+                    question_id=question.id,
+                    user_id=1,
+                    difficulty=5.0,  # Default initial difficulty
+                    stability=1.0,  # Default initial stability
+                    retrievability=1.0,  # Perfect initial retrievability
+                    state=0,  # New card state
+                )
+                session.add(fsrs_card)
 
             # Initialize default algorithm config if it doesn't exist
             config = session.query(AlgorithmConfig).filter_by(user_id=1).first()
@@ -1061,44 +1021,46 @@ class DatabaseManager:
 
             session.commit()
 
-    def detect_leech_cards(
+    def get_cards_by_lapse_threshold(
         self, user_id: int = 1, threshold: int = 8
-    ) -> list[LeechCard]:
-        """Detect cards that qualify as leeches.
+    ) -> list[FSRSCard]:
+        """Get cards that meet a lapse threshold (pure data access).
 
         Args:
             user_id: User ID
-            threshold: Lapse threshold for leech detection
+            threshold: Lapse threshold
 
         Returns:
-            List of leech cards
+            List of cards meeting threshold
         """
         with self.get_session() as session:
-            # Find cards with high lapse count that aren't already marked as leeches
-            cards = (
+            return (
                 session.query(FSRSCard)
                 .filter(FSRSCard.user_id == user_id, FSRSCard.lapse_count >= threshold)
                 .all()
             )
 
-            leeches = []
-            for card in cards:
-                existing_leech = (
-                    session.query(LeechCard).filter_by(card_id=card.card_id).first()
-                )
-                if not existing_leech:
-                    leech = LeechCard(
-                        card_id=card.card_id,
-                        question_id=card.question_id,
-                        lapse_count=card.lapse_count,
-                        leech_threshold=threshold,
-                        detected_at=datetime.now(UTC).timestamp(),
-                    )
-                    session.add(leech)
-                    leeches.append(leech)
+    def save_leech_card(self, leech_card: LeechCard) -> None:
+        """Save a leech card to database (pure data access).
 
+        Args:
+            leech_card: Leech card to save
+        """
+        with self.get_session() as session:
+            session.add(leech_card)
             session.commit()
-            return leeches
+
+    def get_existing_leech_card(self, card_id: int) -> LeechCard | None:
+        """Get existing leech card by card ID (pure data access).
+
+        Args:
+            card_id: Card ID
+
+        Returns:
+            Existing leech card if found
+        """
+        with self.get_session() as session:
+            return session.query(LeechCard).filter_by(card_id=card_id).first()
 
     def get_fsrs_learning_stats(self, user_id: int = 1) -> dict[str, Any]:
         """Get comprehensive FSRS learning statistics.
@@ -1139,24 +1101,38 @@ class DatabaseManager:
                 .count(),
             }
 
-            # Calculate retention rate from recent reviews
-            recent_reviews = (
+            # Note: Retention rate calculation moved to analytics domain service
+            stats["retention_rate"] = (
+                0.0  # Default value, should be calculated in domain service
+            )
+
+            return stats
+
+    def get_recent_review_history(
+        self, user_id: int = 1, days: int = 30
+    ) -> list[ReviewHistory]:
+        """Get recent review history for analytics (pure data access).
+
+        Args:
+            user_id: User ID
+            days: Number of days back to retrieve
+
+        Returns:
+            List of recent review history records
+        """
+        with self.get_session() as session:
+            now = datetime.now(UTC).timestamp()
+            cutoff_date = now - (days * 24 * 60 * 60)  # Convert days to seconds
+
+            return (
                 session.query(ReviewHistory)
                 .join(FSRSCard)
                 .filter(
                     FSRSCard.user_id == user_id,
-                    ReviewHistory.review_date >= now - 2592000,  # 30 days
+                    ReviewHistory.review_date >= cutoff_date,
                 )
                 .all()
             )
-
-            if recent_reviews:
-                successful_reviews = sum(1 for r in recent_reviews if r.rating >= 3)
-                stats["retention_rate"] = successful_reviews / len(recent_reviews)
-            else:
-                stats["retention_rate"] = 0.0
-
-            return stats
 
     def get_fsrs_card_by_id(self, card_id: int) -> FSRSCard | None:
         """Get FSRS card by ID.

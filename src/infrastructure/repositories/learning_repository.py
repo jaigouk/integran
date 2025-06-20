@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Callable
+
 from src.domain.learning.models.learning_models import FSRSCard, LearningSession
 from src.domain.shared.repositories import LearningRepository
 from src.infrastructure.database.database import DatabaseManager
@@ -12,6 +15,11 @@ class SQLAlchemyLearningRepository(LearningRepository):
 
     def __init__(self, db_manager: DatabaseManager):
         self.db_manager = db_manager
+
+    async def _run_in_executor[T](self, func: Callable[[], T]) -> T:
+        """Run a blocking database operation in thread pool."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, func)
 
     async def get_fsrs_card(self, question_id: int, user_id: int) -> FSRSCard | None:
         """Get FSRS card for a specific question and user."""
@@ -44,31 +52,119 @@ class SQLAlchemyLearningRepository(LearningRepository):
 
     async def delete_user_learning_data(self, user_id: int) -> dict[str, int]:
         """Delete all learning data for a user and return counts."""
-        # NOTE: DatabaseManager doesn't have delete_user_learning_data method
-        raise NotImplementedError(
-            "delete_user_learning_data not implemented in DatabaseManager"
-        )
+
+        def _delete_user_learning_data() -> dict[str, int]:
+            with self.db_manager.get_session() as session:
+                from src.domain.learning.models.learning_models import (
+                    FSRSCard,
+                    LearningSession,
+                    ReviewHistory,
+                )
+
+                # Count items before deletion
+                fsrs_cards_count = (
+                    session.query(FSRSCard).filter_by(user_id=user_id).count()
+                )
+                review_history_count = (
+                    session.query(ReviewHistory)
+                    .join(FSRSCard)
+                    .filter(FSRSCard.user_id == user_id)
+                    .count()
+                )
+                sessions_count = (
+                    session.query(LearningSession).filter_by(user_id=user_id).count()
+                )
+
+                # Delete data in proper order (respecting foreign keys)
+                session.query(ReviewHistory).join(FSRSCard).filter(
+                    FSRSCard.user_id == user_id
+                ).delete(synchronize_session=False)
+                session.query(FSRSCard).filter_by(user_id=user_id).delete()
+                session.query(LearningSession).filter_by(user_id=user_id).delete()
+
+                session.commit()
+
+                return {
+                    "fsrs_cards": fsrs_cards_count,
+                    "review_history": review_history_count,
+                    "learning_sessions": sessions_count,
+                }
+
+        return await self._run_in_executor(_delete_user_learning_data)
 
     async def get_learning_session(self, session_id: int) -> LearningSession | None:
         """Get a learning session by ID."""
-        # NOTE: DatabaseManager doesn't have get_learning_session method
-        raise NotImplementedError(
-            "get_learning_session not implemented in DatabaseManager"
-        )
+
+        def _get_learning_session() -> LearningSession | None:
+            with self.db_manager.get_session() as session:
+                return (
+                    session.query(LearningSession)
+                    .filter_by(session_id=session_id)
+                    .first()
+                )
+
+        return await self._run_in_executor(_get_learning_session)
 
     async def save_learning_session(self, session: LearningSession) -> LearningSession:
         """Save or update a learning session."""
-        # NOTE: DatabaseManager doesn't have save_learning_session method
-        raise NotImplementedError(
-            "save_learning_session not implemented in DatabaseManager"
-        )
+
+        def _save_learning_session() -> LearningSession:
+            with self.db_manager.get_session() as db_session:
+                # Check if session exists (has session_id)
+                if hasattr(session, "session_id") and session.session_id:
+                    # Update existing session
+                    existing = (
+                        db_session.query(LearningSession)
+                        .filter_by(session_id=session.session_id)
+                        .first()
+                    )
+                    if existing:
+                        # Update fields
+                        for field in [
+                            "user_id",
+                            "start_time",
+                            "end_time",
+                            "duration_seconds",
+                            "questions_reviewed",
+                            "questions_correct",
+                            "new_cards_learned",
+                            "session_type",
+                            "target_retention",
+                            "max_reviews",
+                            "average_response_time_ms",
+                            "retention_rate",
+                        ]:
+                            if hasattr(session, field):
+                                setattr(existing, field, getattr(session, field))
+                        db_session.commit()
+                        return existing
+                    else:
+                        # Add as new session
+                        db_session.add(session)
+                        db_session.commit()
+                        return session
+                else:
+                    # Add as new session
+                    db_session.add(session)
+                    db_session.commit()
+                    return session
+
+        return await self._run_in_executor(_save_learning_session)
 
     async def get_active_sessions(self, user_id: int) -> list[LearningSession]:
         """Get active learning sessions for a user."""
-        # NOTE: DatabaseManager doesn't have get_active_sessions method
-        raise NotImplementedError(
-            "get_active_sessions not implemented in DatabaseManager"
-        )
+
+        def _get_active_sessions() -> list[LearningSession]:
+            with self.db_manager.get_session() as session:
+                # Active sessions are those without an end_time
+                return (
+                    session.query(LearningSession)
+                    .filter_by(user_id=user_id)
+                    .filter(LearningSession.end_time.is_(None))
+                    .all()
+                )
+
+        return await self._run_in_executor(_get_active_sessions)
 
     async def get_fsrs_card_by_id(self, card_id: int) -> FSRSCard | None:
         """Get FSRS card by card ID."""
@@ -95,14 +191,18 @@ class SQLAlchemyLearningRepository(LearningRepository):
 
     async def increment_lapse_count(self, card_id: int) -> None:
         """Increment lapse count for a card."""
-        # Get current card from database
-        with self.db_manager.get_session() as session:
-            from src.domain.learning.models.learning_models import FSRSCard
 
-            card = session.query(FSRSCard).filter_by(card_id=card_id).first()
-            if card:
-                card.lapse_count = card.lapse_count + 1
-                session.commit()
+        def _increment_lapse_count() -> None:
+            # Get current card from database
+            with self.db_manager.get_session() as session:
+                from src.domain.learning.models.learning_models import FSRSCard
+
+                card = session.query(FSRSCard).filter_by(card_id=card_id).first()
+                if card:
+                    card.lapse_count = card.lapse_count + 1
+                    session.commit()
+
+        await self._run_in_executor(_increment_lapse_count)
 
     async def record_review_history(
         self,

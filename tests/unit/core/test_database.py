@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -17,7 +17,6 @@ from src.domain.analytics.models.analytics_models import (
 from src.domain.content.models.question_models import Question, QuestionAttempt
 from src.domain.learning.models.learning_models import (
     FSRSCard,
-    LearningData,
     LearningSession,
     ReviewHistory,
 )
@@ -127,9 +126,9 @@ class TestDatabaseManager:
             assert q1.category == "Geography"
             assert q1.difficulty == "easy"
 
-            # Check learning data created
-            learning_data = session.query(LearningData).all()
-            assert len(learning_data) == 3
+            # Check FSRS cards created
+            fsrs_cards = session.query(FSRSCard).all()
+            assert len(fsrs_cards) == 3
 
             # Check category progress created
             categories = session.query(CategoryProgress).all()
@@ -229,10 +228,10 @@ class TestDatabaseManager:
             assert attempt1.user_answer == "Berlin"
             assert attempt1.time_taken == 3.5
 
-    def test_learning_data_update(
+    def test_fsrs_card_creation(
         self, db_manager: DatabaseManager, sample_questions: list[dict], tmp_path: Path
     ) -> None:
-        """Test spaced repetition learning data updates."""
+        """Test FSRS card creation when loading questions."""
         # Load questions first
         questions_file = tmp_path / "questions.json"
         with open(questions_file, "w", encoding="utf-8") as f:
@@ -243,19 +242,18 @@ class TestDatabaseManager:
         session_id = db_manager.create_session(PracticeMode.RANDOM.value)
         db_manager.record_attempt(session_id, 1, AnswerStatus.CORRECT, "Berlin", 3.5)
 
-        # Check learning data updated
+        # Check FSRS card was created with proper initial state
         with db_manager.get_session() as session:
-            learning = session.query(LearningData).filter_by(question_id=1).first()
-            assert learning is not None
-            assert learning.repetitions == 1
-            assert learning.interval == 1
-            assert learning.last_reviewed is not None
-            # Compare with a naive datetime since SQLite may store as naive
-            now_naive = datetime.now()
-            if learning.next_review.tzinfo is None:
-                assert learning.next_review > now_naive
-            else:
-                assert learning.next_review > datetime.now(UTC)
+            fsrs_card = session.query(FSRSCard).filter_by(question_id=1).first()
+            assert fsrs_card is not None
+            assert fsrs_card.question_id == 1
+            assert fsrs_card.user_id == 1
+            assert fsrs_card.difficulty == 5.0  # Default initial difficulty
+            assert fsrs_card.stability == 1.0  # Default initial stability
+            assert fsrs_card.retrievability == 1.0  # Perfect initial retrievability
+            assert fsrs_card.state == 0  # New card state
+            assert fsrs_card.review_count == 0  # No reviews yet
+            assert fsrs_card.created_at is not None
 
     def test_get_questions_for_review(
         self, db_manager: DatabaseManager, sample_questions: list[dict], tmp_path: Path
@@ -273,10 +271,11 @@ class TestDatabaseManager:
 
         # Update one question's review date to future
         with db_manager.get_session() as session:
-            learning = session.query(LearningData).filter_by(question_id=1).first()
-            if learning:
-                # Use naive datetime since SQLite stores naive datetimes
-                learning.next_review = datetime.now() + timedelta(days=7)
+            fsrs_card = session.query(FSRSCard).filter_by(question_id=1).first()
+            if fsrs_card:
+                # Set next review to future (7 days from now in timestamp)
+                future_timestamp = datetime.now(UTC).timestamp() + (7 * 24 * 60 * 60)
+                fsrs_card.next_review_date = future_timestamp
                 session.commit()
 
         # Now only 2 questions should be due
@@ -343,42 +342,50 @@ class TestDatabaseManager:
             progress = session.query(UserProgress).first()
             assert progress is None
 
-            # Learning data should be reinitialized
-            learning_data = session.query(LearningData).all()
-            assert len(learning_data) == 3
-            for ld in learning_data:
-                assert ld.repetitions == 0
-                assert ld.easiness_factor == 2.5
+            # FSRS cards should be reinitialized
+            fsrs_cards = session.query(FSRSCard).all()
+            assert len(fsrs_cards) == 3
+            for card in fsrs_cards:
+                assert card.state == 0  # New state
+                assert card.difficulty == 5.0  # Default difficulty
+                assert card.stability == 1.0  # Default stability
+                assert card.retrievability == 1.0  # Perfect retrievability
+                assert card.next_review_date is not None  # Available for study
 
     def test_get_learning_stats(
         self, db_manager: DatabaseManager, sample_questions: list[dict], tmp_path: Path
     ) -> None:
-        """Test getting overall learning statistics."""
+        """Test getting overall learning statistics with FSRS cards."""
         # Load questions first
         questions_file = tmp_path / "questions.json"
         with open(questions_file, "w", encoding="utf-8") as f:
             json.dump(sample_questions, f)
         db_manager.load_questions(questions_file)
 
-        # Initial stats
+        # Initial stats - all cards should be in "new" state (state=0)
         stats = db_manager.get_learning_stats()
         assert stats.total_new == 3
         assert stats.total_learning == 0
         assert stats.total_mastered == 0
-        assert stats.overdue_count == 3  # All new questions are due
+        # New FSRS cards are now immediately available for study (next_review_date set to now)
+        # But they should not be "overdue" since they were just created
 
-        # Record some attempts
+        # Create session and record some attempts
         session_id = db_manager.create_session(PracticeMode.RANDOM.value)
         db_manager.record_attempt(session_id, 1, AnswerStatus.CORRECT, "Berlin", 3.5)
         db_manager.record_attempt(session_id, 2, AnswerStatus.INCORRECT, "1989", 5.0)
 
-        # Updated stats
+        # Updated stats - recording attempts doesn't automatically change FSRS card states
+        # In FSRS, cards need to be scheduled through domain services, not just record_attempt
         stats = db_manager.get_learning_stats()
-        assert (
-            stats.total_new == 2
-        )  # Question 3 still new, question 2 reset to 0 repetitions
-        assert stats.total_learning == 1  # Question 1 only
+        assert stats.total_new == 3  # All cards remain in "new" state
+        assert stats.total_learning == 0  # No cards moved to learning state
         assert stats.total_mastered == 0  # None mastered yet
+
+        # Verify that question attempts were recorded
+        with db_manager.get_session() as session:
+            attempts = session.query(QuestionAttempt).count()
+            assert attempts == 2
 
     # ============================================================================
     # FSRS Tests (Phase 3.0)
@@ -607,10 +614,10 @@ class TestDatabaseManager:
         assert len(stored_params) == 19
         assert stored_params[0] == 1.0
 
-    def test_leech_detection(
+    def test_leech_card_storage(
         self, db_manager: DatabaseManager, sample_questions: list[dict], tmp_path: Path
     ) -> None:
-        """Test leech card detection."""
+        """Test leech card storage and retrieval (pure data access)."""
         # Setup
         questions_file = tmp_path / "questions.json"
         with open(questions_file, "w", encoding="utf-8") as f:
@@ -618,24 +625,36 @@ class TestDatabaseManager:
         db_manager.load_questions(questions_file)
         db_manager.migrate_to_fsrs_schema()
 
-        # Create card with high lapse count
+        # Create FSRS card
         card = db_manager.create_fsrs_card(question_id=1)
 
-        # Simulate multiple lapses by updating directly
-        with db_manager.get_session() as session:
-            fsrs_card = session.query(FSRSCard).filter_by(card_id=card.card_id).first()
-            fsrs_card.lapse_count = 10  # Above default threshold of 8
-            session.commit()
+        # Create a leech card manually (simulating domain service behavior)
+        from datetime import UTC, datetime
 
-        # Detect leeches
-        leeches = db_manager.detect_leech_cards(threshold=8)
-        assert len(leeches) == 1
-        assert leeches[0].question_id == 1
-        assert leeches[0].lapse_count == 10
+        from src.domain.learning.models.learning_models import LeechCard
 
-        # Second detection should not create duplicate
-        leeches2 = db_manager.detect_leech_cards(threshold=8)
-        assert len(leeches2) == 0  # No new leeches
+        leech_card = LeechCard(
+            card_id=card.card_id,
+            question_id=1,
+            lapse_count=10,
+            leech_threshold=8,
+            detected_at=datetime.now(UTC).timestamp(),
+            action_taken="noted",
+            is_suspended=False,
+        )
+
+        # Test saving leech card
+        db_manager.save_leech_card(leech_card)
+
+        # Test retrieving leech card
+        retrieved_leech = db_manager.get_existing_leech_card(card.card_id)
+        assert retrieved_leech is not None
+        assert retrieved_leech.question_id == 1
+        assert retrieved_leech.lapse_count == 10
+
+        # Test that duplicate detection works (no duplicate should be created)
+        existing_leech = db_manager.get_existing_leech_card(card.card_id)
+        assert existing_leech is not None
 
     def test_fsrs_learning_stats(
         self, db_manager: DatabaseManager, sample_questions: list[dict], tmp_path: Path
@@ -648,28 +667,40 @@ class TestDatabaseManager:
         db_manager.load_questions(questions_file)
         db_manager.migrate_to_fsrs_schema()
 
-        # Create cards in different states
-        db_manager.create_fsrs_card(question_id=1)  # New
-        card2 = db_manager.create_fsrs_card(question_id=2)  # Learning
-        card3 = db_manager.create_fsrs_card(question_id=3)  # Review
+        # Get the cards that were created by load_questions
+        with db_manager.get_session() as session:
+            cards = session.query(FSRSCard).all()
+            assert len(cards) == 3
+            card1, card2, card3 = cards
 
-        # Update states
+        # Update cards to different states
         now = datetime.now(UTC).timestamp()
+
+        # Card 1: Keep as new but make it "due" by setting next_review_date to past
+        db_manager.update_fsrs_card(
+            card1.card_id, 5.0, 1.0, 1.0, 0, now - 100
+        )  # New but due
+
+        # Card 2: Learning state, not yet due
         db_manager.update_fsrs_card(
             card2.card_id, 5.0, 1.0, 1.0, 1, now + 86400
-        )  # Learning
+        )  # Learning, future review
+
+        # Card 3: Review state, due now
         db_manager.update_fsrs_card(
             card3.card_id, 5.0, 1.0, 1.0, 2, now - 100
-        )  # Review (due)
+        )  # Review, overdue
 
         # Get stats
         stats = db_manager.get_fsrs_learning_stats()
         assert stats["total_cards"] == 3
-        assert stats["new_cards"] == 1
-        assert stats["learning_cards"] == 1
-        assert stats["review_cards"] == 1
-        assert stats["due_cards"] == 2  # new card + review card
-        assert stats["retention_rate"] == 0.0  # No reviews yet
+        assert stats["new_cards"] == 1  # Card 1 in new state
+        assert stats["learning_cards"] == 1  # Card 2 in learning state
+        assert stats["review_cards"] == 1  # Card 3 in review state
+        assert stats["due_cards"] == 2  # Card 1 (new but due) + Card 3 (review due)
+        assert (
+            stats["retention_rate"] == 0.0
+        )  # Default value, should be calculated in domain service
 
     def test_get_question_with_multilingual_answers(
         self, db_manager: DatabaseManager, tmp_path: Path

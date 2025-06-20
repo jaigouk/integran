@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -22,6 +24,11 @@ class SQLAlchemyUserRepository(UserRepository):
         self.database_manager = database_manager
         self.logger = logging.getLogger(self.__class__.__name__)
 
+    async def _run_in_executor[T](self, func: Callable[[], T]) -> T:
+        """Run a blocking database operation in thread pool."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, func)
+
     async def get_user_settings(self, user_id: int) -> UserSettings | None:
         """Load user settings from database.
 
@@ -34,28 +41,36 @@ class SQLAlchemyUserRepository(UserRepository):
         Raises:
             RepositoryError: If database operation fails
         """
-        try:
-            with self.database_manager.get_session() as session:
-                db_settings = (
-                    session.query(UserSettingsDB)
-                    .filter(UserSettingsDB.user_id == user_id)
-                    .first()
-                )
 
-                if not db_settings:
-                    self.logger.info(f"No user settings found for user_id={user_id}")
-                    return None
+        def _get_user_settings() -> UserSettings | None:
+            try:
+                with self.database_manager.get_session() as session:
+                    db_settings = (
+                        session.query(UserSettingsDB)
+                        .filter(UserSettingsDB.user_id == user_id)
+                        .first()
+                    )
 
-                user_settings = UserSettings.from_database_model(db_settings)
-                self.logger.info(f"Loaded user settings for user_id={user_id}")
-                return user_settings
+                    if not db_settings:
+                        self.logger.info(
+                            f"No user settings found for user_id={user_id}"
+                        )
+                        return None
 
-        except SQLAlchemyError as e:
-            self.logger.error(f"Database error loading user settings: {e}")
-            raise RepositoryError(f"Failed to load user settings: {e}") from e
-        except Exception as e:
-            self.logger.error(f"Unexpected error loading user settings: {e}")
-            raise RepositoryError(f"Unexpected error loading user settings: {e}") from e
+                    user_settings = UserSettings.from_database_model(db_settings)
+                    self.logger.info(f"Loaded user settings for user_id={user_id}")
+                    return user_settings
+
+            except SQLAlchemyError as e:
+                self.logger.error(f"Database error loading user settings: {e}")
+                raise RepositoryError(f"Failed to load user settings: {e}") from e
+            except Exception as e:
+                self.logger.error(f"Unexpected error loading user settings: {e}")
+                raise RepositoryError(
+                    f"Unexpected error loading user settings: {e}"
+                ) from e
+
+        return await self._run_in_executor(_get_user_settings)
 
     async def save_user_settings(self, user_settings: UserSettings) -> UserSettings:
         """Save user settings to database.
@@ -69,49 +84,55 @@ class SQLAlchemyUserRepository(UserRepository):
         Raises:
             RepositoryError: If database operation fails
         """
-        try:
-            with self.database_manager.get_session() as session:
-                # Check if settings already exist
-                existing = (
-                    session.query(UserSettingsDB)
-                    .filter(UserSettingsDB.user_id == user_settings.user_id)
-                    .first()
-                )
 
-                if existing:
-                    # Update existing settings
-                    db_model = user_settings.to_database_model()
-                    for attr, value in db_model.__dict__.items():
-                        if not attr.startswith("_") and attr != "id":
-                            setattr(existing, attr, value)
-
-                    session.flush()
-                    updated_settings = UserSettings.from_database_model(existing)
-                    self.logger.info(
-                        f"Updated user settings for user_id={user_settings.user_id}"
+        def _save_user_settings() -> UserSettings:
+            try:
+                with self.database_manager.get_session() as session:
+                    # Check if settings already exist
+                    existing = (
+                        session.query(UserSettingsDB)
+                        .filter(UserSettingsDB.user_id == user_settings.user_id)
+                        .first()
                     )
-                    return updated_settings
-                else:
-                    # Create new settings
-                    db_model = user_settings.to_database_model()
-                    session.add(db_model)
-                    session.flush()
 
-                    new_settings = UserSettings.from_database_model(db_model)
-                    self.logger.info(
-                        f"Created new user settings for user_id={user_settings.user_id}"
-                    )
-                    return new_settings
+                    if existing:
+                        # Update existing settings
+                        db_model = user_settings.to_database_model()
+                        for attr, value in db_model.__dict__.items():
+                            if not attr.startswith("_") and attr != "id":
+                                setattr(existing, attr, value)
 
-        except IntegrityError as e:
-            self.logger.error(f"Integrity error saving user settings: {e}")
-            raise RepositoryError(f"Database constraint violation: {e}") from e
-        except SQLAlchemyError as e:
-            self.logger.error(f"Database error saving user settings: {e}")
-            raise RepositoryError(f"Failed to save user settings: {e}") from e
-        except Exception as e:
-            self.logger.error(f"Unexpected error saving user settings: {e}")
-            raise RepositoryError(f"Unexpected error saving user settings: {e}") from e
+                        session.flush()
+                        updated_settings = UserSettings.from_database_model(existing)
+                        self.logger.info(
+                            f"Updated user settings for user_id={user_settings.user_id}"
+                        )
+                        return updated_settings
+                    else:
+                        # Create new settings
+                        db_model = user_settings.to_database_model()
+                        session.add(db_model)
+                        session.flush()
+
+                        new_settings = UserSettings.from_database_model(db_model)
+                        self.logger.info(
+                            f"Created new user settings for user_id={user_settings.user_id}"
+                        )
+                        return new_settings
+
+            except IntegrityError as e:
+                self.logger.error(f"Integrity error saving user settings: {e}")
+                raise RepositoryError(f"Database constraint violation: {e}") from e
+            except SQLAlchemyError as e:
+                self.logger.error(f"Database error saving user settings: {e}")
+                raise RepositoryError(f"Failed to save user settings: {e}") from e
+            except Exception as e:
+                self.logger.error(f"Unexpected error saving user settings: {e}")
+                raise RepositoryError(
+                    f"Unexpected error saving user settings: {e}"
+                ) from e
+
+        return await self._run_in_executor(_save_user_settings)
 
     async def delete_user_data(self, user_id: int) -> int:
         """Delete user settings from database.
@@ -125,27 +146,31 @@ class SQLAlchemyUserRepository(UserRepository):
         Raises:
             RepositoryError: If database operation fails
         """
-        try:
-            with self.database_manager.get_session() as session:
-                deleted_count = (
-                    session.query(UserSettingsDB)
-                    .filter(UserSettingsDB.user_id == user_id)
-                    .delete()
-                )
 
-                self.logger.info(
-                    f"Deleted {deleted_count} user settings for user_id={user_id}"
-                )
-                return deleted_count
+        def _delete_user_data() -> int:
+            try:
+                with self.database_manager.get_session() as session:
+                    deleted_count = (
+                        session.query(UserSettingsDB)
+                        .filter(UserSettingsDB.user_id == user_id)
+                        .delete()
+                    )
 
-        except SQLAlchemyError as e:
-            self.logger.error(f"Database error deleting user settings: {e}")
-            raise RepositoryError(f"Failed to delete user settings: {e}") from e
-        except Exception as e:
-            self.logger.error(f"Unexpected error deleting user settings: {e}")
-            raise RepositoryError(
-                f"Unexpected error deleting user settings: {e}"
-            ) from e
+                    self.logger.info(
+                        f"Deleted {deleted_count} user settings for user_id={user_id}"
+                    )
+                    return deleted_count
+
+            except SQLAlchemyError as e:
+                self.logger.error(f"Database error deleting user settings: {e}")
+                raise RepositoryError(f"Failed to delete user settings: {e}") from e
+            except Exception as e:
+                self.logger.error(f"Unexpected error deleting user settings: {e}")
+                raise RepositoryError(
+                    f"Unexpected error deleting user settings: {e}"
+                ) from e
+
+        return await self._run_in_executor(_delete_user_data)
 
     async def user_exists(self, user_id: int) -> bool:
         """Check if user settings exist in database.
@@ -159,29 +184,37 @@ class SQLAlchemyUserRepository(UserRepository):
         Raises:
             RepositoryError: If database operation fails
         """
-        try:
-            with self.database_manager.get_session() as session:
-                exists = (
-                    session.query(UserSettingsDB)
-                    .filter(UserSettingsDB.user_id == user_id)
-                    .first()
-                ) is not None
 
-                self.logger.debug(
-                    f"User settings exist for user_id={user_id}: {exists}"
+        def _user_exists() -> bool:
+            try:
+                with self.database_manager.get_session() as session:
+                    exists = (
+                        session.query(UserSettingsDB)
+                        .filter(UserSettingsDB.user_id == user_id)
+                        .first()
+                    ) is not None
+
+                    self.logger.debug(
+                        f"User settings exist for user_id={user_id}: {exists}"
+                    )
+                    return exists
+
+            except SQLAlchemyError as e:
+                self.logger.error(
+                    f"Database error checking user settings existence: {e}"
                 )
-                return exists
+                raise RepositoryError(
+                    f"Failed to check user settings existence: {e}"
+                ) from e
+            except Exception as e:
+                self.logger.error(
+                    f"Unexpected error checking user settings existence: {e}"
+                )
+                raise RepositoryError(
+                    f"Unexpected error checking user settings existence: {e}"
+                ) from e
 
-        except SQLAlchemyError as e:
-            self.logger.error(f"Database error checking user settings existence: {e}")
-            raise RepositoryError(
-                f"Failed to check user settings existence: {e}"
-            ) from e
-        except Exception as e:
-            self.logger.error(f"Unexpected error checking user settings existence: {e}")
-            raise RepositoryError(
-                f"Unexpected error checking user settings existence: {e}"
-            ) from e
+        return await self._run_in_executor(_user_exists)
 
     async def get_user_setting_value(
         self, user_id: int, setting_key: str
