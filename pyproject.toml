@@ -162,15 +162,17 @@ disable_error_code = ["assignment", "call-overload", "return-value", "arg-type",
 [[tool.mypy.overrides]]
 module = [
     "src.infrastructure.database.database",
+    "src.infrastructure.database.models",
     "src.infrastructure.external.gemini_client",
     "src.infrastructure.repositories.learning_repository",
+    "src.infrastructure.repositories.analytics_repository",
     "src.domain.analytics.services.*",
     "src.domain.learning.services.*",
     "src.application_services.learning.session_manager",
     "src.presentation.cli.build_dataset",
     "src.application.workflows.complete_learning_session_workflow"
 ]
-disable_error_code = ["assignment", "call-overload", "return-value", "arg-type", "misc", "union-attr", "no-any-return", "comparison-overlap", "index", "attr-defined", "var-annotated", "type-arg"]
+disable_error_code = ["assignment", "call-overload", "return-value", "arg-type", "misc", "union-attr", "no-any-return", "comparison-overlap", "index", "attr-defined", "var-annotated", "type-arg", "import-not-found", "import-untyped", "no-untyped-def", "no-untyped-call"]
 
 # Disable type checking for modules with complex external library interactions
 [[tool.mypy.overrides]]

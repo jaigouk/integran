@@ -1,378 +1,301 @@
-import os
-import json
-import time
-import sys
-import re
-import hashlib
-from datetime import datetime
-from tqdm import tqdm
+"""SQLAlchemy implementation of the Analytics repository."""
 
-# --- CORRECTED IMPORTS for Vertex AI ---
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig, Part
+from __future__ import annotations
 
-from comfy_api_simplified import ComfyApiWrapper, ComfyWorkflowWrapper
-from PIL import Image
-import io
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
-# --- Main Configuration ---
-# V V V - TUNE YOUR SETTINGS HERE - V V V
+from sqlalchemy import and_, func
 
-# -- Style Configuration: The heart of your "single designer" look --
-STYLE_GUIDE = {
-    "ARTIST_SIGNATURE": "Studio Mnemonic style",
-    "TRIGGER_WORD": "book page", # LoRA trigger word
-    "STYLE_KEYWORDS": "charming characters, clean lines, vibrant but harmonious colors, detailed textures, whimsical atmosphere, professional illustration, high quality artwork",
-    "NEGATIVE_PROMPT": (
-        "photorealistic, ugly, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, "
-        "out of frame, extra limbs, disfigured, deformed, body out of frame, bad anatomy, "
-        "watermark, signature, cut off, low contrast, underexposed, overexposed, bad art, "
-        "beginner, amateur, distorted face, cluttered, scary, dark, boring, text errors, mutated"
-    )
-}
+from src.domain.analytics.entities.performance_metrics import (
+    DifficultyDistribution,
+    PerformanceInsights,
+    PerformanceMetrics,
+)
+from src.domain.shared.repositories import AnalyticsRepository
+from src.infrastructure.database.models import (
+    LearningProgressDB,
+    SessionDB,
+    UserDB,
+)
 
-# -- ComfyUI & Model Configuration --
-COMFYUI_CONFIG = {
-    "SERVER_ADDRESS": "127.0.0.1:8188", # Your server address
-    # --- IMPORTANT: Match these node titles to your workflow_api.json file ---
-    "NODE_CHECKPOINT_LOADER": "CheckpointLoader",
-    "NODE_LORA_LOADER": "LoraLoader",
-    "NODE_POSITIVE_PROMPT": "PositivePrompt",
-    "NODE_NEGATIVE_PROMPT": "NegativePrompt",
-    "NODE_KSAMPLER": "KSampler",
-    "NODE_EMPTY_LATENT": "EmptyLatentImage",
-    "NODE_IMAGE_OUTPUT": "ImageOutput"
-}
-CHECKPOINT_MODEL_NAME = "sd_xl_base_1.0.safetensors"
-LORA_MODEL_NAME = "children_book2.safetensors"
-LORA_STRENGTH = 0.75 # Tuned for a stronger artistic style
-
-# -- Gemini API Configuration --
-GEMINI_MODEL_ID = "gemini-1.5-pro-001" # Use a specific model version for Vertex
-GEMINI_CACHE_FILE = "gemini_childrens_book_cache.json"
-RATE_LIMIT_DELAY = 2.0  # Seconds between Gemini API calls
-MAX_RETRIES = 3
-
-# -- File & Path Configuration --
-DATASET_PATH = "data/final_dataset.json"
-WORKFLOW_API_PATH = "workflow_api_childrens_book.json"
-OUTPUT_DIRECTORY = "output_images_childrens_book"
-BATCH_SAVE_INTERVAL = 5
-
-# -- Image Optimization Configuration --
-TARGET_FILE_SIZE_KB = 150
-JPEG_QUALITY_START = 90 # Start higher for better quality
-JPEG_QUALITY_MIN = 75
-
-# ^ ^ ^ - END OF CONFIGURATION - ^ ^ ^
+if TYPE_CHECKING:
+    from src.infrastructure.database.database import DatabaseManager
 
 
-# --- CORRECTED Gemini Client Initialization for Vertex AI ---
-try:
-    project_id = os.environ.get("GCP_PROJECT_ID")
-    location = os.environ.get("GCP_REGION", "europe-west3") # Default location
+class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
+    """SQLAlchemy implementation of the analytics repository."""
 
-    if not project_id:
-        raise ValueError("GCP_PROJECT_ID environment variable is not set.")
+    def __init__(self, db_manager: DatabaseManager) -> None:
+        """Initialize the repository with database manager."""
+        self._db_manager = db_manager
 
-    vertexai.init(project=project_id, location=location)
-    
-    GEMINI_MODEL = GenerativeModel(GEMINI_MODEL_ID)
-    
-    print(f"✅ Vertex AI initialized for project '{project_id}' in '{location}'.")
+    async def get_learning_stats(self, user_id: int) -> dict[str, Any]:
+        """Get comprehensive learning statistics for a user."""
+        metrics = await self.get_performance_metrics(user_id)
 
-except Exception as e:
-    print(f"❌ Critical Error: Could not initialize Vertex AI.")
-    print(f"   Ensure 'gcloud auth application-default login' is run and the 'google-cloud-aiplatform' library is installed.")
-    print(f"   Error details: {e}")
-    sys.exit(1)
+        return {
+            "total_cards": metrics.total_cards_studied,
+            "cards_mastered": int(
+                metrics.total_cards_studied * metrics.mastery_percentage / 100
+            ),
+            "cards_learning": metrics.total_cards_studied
+            - int(metrics.total_cards_studied * metrics.mastery_percentage / 100),
+            "cards_new": 0,  # TODO: Track new cards separately
+            "due_today": metrics.cards_due_today,
+            "due_tomorrow": 0,  # TODO: Calculate tomorrow's due cards
+            "due_week": 0,  # TODO: Calculate week's due cards
+            "average_accuracy": metrics.average_accuracy,
+            "study_streak": metrics.study_streak,
+            "total_study_time_minutes": metrics.total_study_time_minutes,
+        }
 
+    async def get_session_progress(self, user_id: int) -> dict[str, Any]:
+        """Get session progress data for a user."""
+        with self._db_manager.get_session() as session:
+            # Get user's current and longest streak
+            user = session.query(UserDB).filter_by(id=user_id).first()
+            if not user:
+                return {
+                    "current_streak": 0,
+                    "longest_streak": 0,
+                    "total_sessions": 0,
+                }
 
-def get_deterministic_seed(seed_string: str) -> int:
-    """
-    Generates a deterministic, consistent integer seed from a string (like a question_id).
-    This ensures that running the script again for the same question yields the *exact* same image.
-    """
-    hash_bytes = hashlib.sha256(seed_string.encode('utf-8')).digest()
-    seed = int.from_bytes(hash_bytes[:8], 'little', signed=False)
-    return seed
+            # Count total sessions
+            total_sessions = session.query(SessionDB).filter_by(user_id=user_id).count()
 
+            return {
+                "current_streak": user.study_streak,
+                "longest_streak": user.study_streak,  # TODO: Track longest separately
+                "total_sessions": total_sessions,
+            }
 
-def load_gemini_cache() -> dict:
-    """Load Gemini API response cache from file."""
-    if os.path.exists(GEMINI_CACHE_FILE):
-        try:
-            with open(GEMINI_CACHE_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"  - Warning: Could not load cache file: {e}. Starting with an empty cache.")
-    return {}
+    async def save_user_progress(
+        self, user_id: int, progress_data: dict[str, Any]
+    ) -> None:
+        """Save user progress data."""
+        # TODO: Implement progress saving
+        pass
 
-
-def save_gemini_cache(cache: dict) -> None:
-    """Save Gemini API response cache to file."""
-    try:
-        with open(GEMINI_CACHE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(cache, f, ensure_ascii=False, indent=2)
-    except IOError as e:
-        print(f"  - Error saving cache: {e}")
-
-
-def is_question_processed(question_id: str, cache: dict) -> bool:
-    """Check if a question has already been successfully processed."""
-    entry = cache.get(question_id)
-    return entry and entry.get('status') == 'success' and entry.get('data', {}).get('image_generated', False)
-
-
-def add_to_cache(cache: dict, question_id: str, data: dict, status: str = 'success') -> None:
-    """Add a response to the cache with a timestamp."""
-    cache[question_id] = {'status': status, 'data': data, 'timestamp': datetime.now().isoformat()}
-
-def generate_childrens_book_prompt(question_data: dict, cache: dict, question_id: str) -> dict | None:
-    if cache.get(question_id, {}).get('status') == 'success':
-        cached_prompt_data = cache[question_id].get('data', {}).get('prompt_data')
-        if cached_prompt_data:
-            print(f"  - Using cached Gemini response for question {question_id}")
-            return cached_prompt_data
-
-    question = question_data.get("question", "")
-    correct_answer = question_data.get("correct", "")
-    existing_mnemonic = question_data.get("mnemonic", {}).get("en", "")
-    explanation_en = question_data.get("explanations", {}).get("en", "")
-    is_image_question = question_data.get("is_image_question", False)
-
-    if not existing_mnemonic:
-        existing_mnemonic = f"A visual way to remember the answer: {correct_answer}"
-
-    if is_image_question:
-        correct_answer_letter = question_data.get("correct_answer_letter", "")
-        image_descriptions = question_data.get("image_descriptions", [])
-        correct_image_description = ""
-        if correct_answer_letter and image_descriptions:
-            try:
-                correct_index = ord(correct_answer_letter.upper()) - ord('A')
-                if 0 <= correct_index < len(image_descriptions):
-                    correct_image_description = image_descriptions[correct_index]
-            except (ValueError, TypeError): pass
-
-        question_type_info = f"""
-- **Task Type**: This is an IMAGE IDENTIFICATION question. The illustration must teach the user how to IDENTIFY the correct image based on the mnemonic.
-- **Correct Image Description**: "{correct_image_description}"
-"""
-    else:
-        question_type_info = f"""
-- **Task Type**: This is a TEXT-BASED question. The illustration must help the user REMEMBER the correct text answer via the mnemonic.
-- **Correct Answer**: "{correct_answer}"
-"""
-    meta_prompt = f"""
-You are an expert prompt engineer for the "children_book2.safetensors" LoRA model on SDXL.
-Your task is to create a JSON object with prompts to generate a high-quality, mnemonic illustration.
-**DESIGNER STYLE GUIDE (FOR CONSISTENCY):**
-Your PRIMARY GOAL is to ensure all images look like they were made by ONE talented designer.
-- **Artist Signature**: The desired style is "{STYLE_GUIDE['ARTIST_SIGNATURE']}". It is whimsical, artistic, and professional.
-- **Core Style Keywords**: "{STYLE_GUIDE['STYLE_KEYWORDS']}".
-- **Composition**: Focus on a clear, central mnemonic symbol. The background should be supportive but not distracting.
-**INPUT DATA:**
-- **Mnemonic to Visualize**: "{existing_mnemonic}"
-- **Original Question**: "{question}"
-- **Explanation**: "{explanation_en[:250]}..."
-{question_type_info}
-**LoRA & PROMPT BEST PRACTICES:**
-1.  **Trigger Word**: The positive prompt MUST start with "{STYLE_GUIDE['TRIGGER_WORD']}".
-2.  **Mnemonic Emphasis**: Key mnemonic symbols should be weighted like `(symbol:1.3)` for focus. Avoid over-weighting.
-3.  **German Text Integration**: To render German text (like in the mnemonic), describe it as a physical object.
-    - Example: "...with the German word 'Wahl' written on a wooden sign in clear, bold letters."
-    - Use phrases like "clear text label", "high-contrast text", "bold sans-serif font", "billboard-style lettering".
-4.  **Composition**: Create a simple, uncluttered scene a child can easily understand. The mnemonic must be the hero of the image.
-**OUTPUT FORMAT (Strictly JSON):**
-Generate ONLY a valid JSON object based on the following template. Do not add any text before or after the JSON block.
-{{
-  "positive_prompt": "book page, [A detailed description of the scene that visualizes the mnemonic, incorporating the '{STYLE_GUIDE['ARTIST_SIGNATURE']}' and using keywords like '{STYLE_GUIDE['STYLE_KEYWORDS']}']. The scene should clearly feature elements from the mnemonic '{existing_mnemonic}'.",
-  "negative_prompt": "{STYLE_GUIDE['NEGATIVE_PROMPT']}",
-  "story_connection": "[Explain in one sentence how the generated artistic scene creates an unforgettable connection to the mnemonic.]"
-}}
-"""
-    retries = 0
-    while retries < MAX_RETRIES:
-        try:
-            time.sleep(RATE_LIMIT_DELAY)
-            
-            # --- CORRECTED API Call for Vertex AI SDK ---
-            config = GenerationConfig(
-                temperature=0.8,
-                max_output_tokens=768,
-                response_mime_type="application/json",
+    async def delete_user_analytics(self, user_id: int) -> dict[str, int]:
+        """Delete all analytics data for a user and return counts."""
+        with self._db_manager.get_session() as session:
+            # Count and delete learning progress
+            progress_count = (
+                session.query(LearningProgressDB).filter_by(user_id=user_id).count()
             )
-            response = GEMINI_MODEL.generate_content(
-                [meta_prompt],
-                generation_config=config,
+            session.query(LearningProgressDB).filter_by(user_id=user_id).delete()
+
+            # Count and delete sessions
+            session_count = session.query(SessionDB).filter_by(user_id=user_id).count()
+            session.query(SessionDB).filter_by(user_id=user_id).delete()
+
+            session.commit()
+
+            return {
+                "learning_progress": progress_count,
+                "sessions": session_count,
+            }
+
+    async def get_category_progress(self, user_id: int) -> dict[str, Any]:  # noqa: ARG002
+        """Get progress by category for a user."""
+        # TODO: Implement when categories are added to the schema
+        return {}
+
+    async def record_question_attempt(
+        self,
+        user_id: int,
+        question_id: int,
+        is_correct: bool,
+        response_time_ms: int,
+        session_id: int | None = None,
+    ) -> None:
+        """Record a question attempt."""
+        # TODO: Implement question attempt recording
+        pass
+
+    async def get_performance_metrics(self, user_id: int) -> PerformanceMetrics:
+        """Get performance metrics for a user."""
+        with self._db_manager.get_session() as session:
+            # Get user stats
+            user = session.query(UserDB).filter_by(id=user_id).first()
+            if not user:
+                # Return default metrics for non-existent user
+                return PerformanceMetrics(
+                    total_cards_studied=0,
+                    average_accuracy=0.0,
+                    study_streak=0,
+                    total_study_time_minutes=0,
+                    cards_due_today=0,
+                    mastery_percentage=0.0,
+                )
+
+            # Get learning progress stats
+            progress_query = session.query(LearningProgressDB).filter_by(
+                user_id=user_id
             )
-            response_text = response.text.strip()
-            parsed_response = json.loads(response_text)
+            total_cards = progress_query.count()
 
-            if all(field in parsed_response for field in ['positive_prompt', 'negative_prompt']):
-                add_to_cache(cache, question_id, {'prompt_data': parsed_response})
-                print(f"  - Cached new Gemini response for question {question_id}")
-                return parsed_response
-            else:
-                raise ValueError("Response missing required fields.")
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"  - ⚠️ Gemini response parsing failed (Attempt {retries + 1}/{MAX_RETRIES}): {e}")
-            retries += 1
-            time.sleep(RATE_LIMIT_DELAY * 2)
-        except Exception as e:
-            print(f"  - ❌ Error calling Vertex AI API (Attempt {retries + 1}/{MAX_RETRIES}): {e}")
-            retries += 1
-            time.sleep(RATE_LIMIT_DELAY * 2)
+            # Calculate mastered cards (stability > 30 days)
+            mastered_cards = progress_query.filter(
+                LearningProgressDB.stability >= 30.0
+            ).count()
 
-    print(f"  - ❌ Failed to get a valid response from Gemini for {question_id} after {MAX_RETRIES} attempts.")
-    add_to_cache(cache, question_id, {'error': 'Failed to generate prompt'}, status='error')
-    return None
+            # Calculate average accuracy from recent sessions
+            recent_sessions = (
+                session.query(SessionDB)
+                .filter_by(user_id=user_id)
+                .order_by(SessionDB.started_at.desc())
+                .limit(10)
+                .all()
+            )
 
-def optimize_image_size(image_path: str, target_size_kb: int = TARGET_FILE_SIZE_KB) -> bool:
-    try:
-        with Image.open(image_path) as img:
-            if img.mode in ('RGBA', 'LA', 'P'):
-                background = Image.new('RGB', img.size, (255, 255, 255))
-                if img.mode == 'P': img = img.convert('RGBA')
-                background.paste(img, mask=img.split()[-1])
-                img = background
-            elif img.mode != 'RGB':
-                img = img.convert('RGB')
-            quality = JPEG_QUALITY_START
-            while quality >= JPEG_QUALITY_MIN:
-                buffer = io.BytesIO()
-                img.save(buffer, format='JPEG', quality=quality, optimize=True, progressive=True)
-                size_kb = len(buffer.getvalue()) / 1024
-                if size_kb <= target_size_kb:
-                    new_path = os.path.splitext(image_path)[0] + '.jpg'
-                    with open(new_path, 'wb') as f:
-                        f.write(buffer.getvalue())
-                    if new_path != image_path:
-                        os.remove(image_path)
-                    print(f"    - Optimized to {size_kb:.1f}KB at {quality}% quality -> {os.path.basename(new_path)}")
-                    return True
-                quality -= 5
-            return False
-    except Exception as e:
-        print(f"    - Error optimizing image: {e}")
-        return False
+            total_accuracy = 0.0
+            session_count = 0
+            for sess in recent_sessions:
+                if sess.total_questions > 0:
+                    accuracy = (sess.correct_answers / sess.total_questions) * 100
+                    total_accuracy += accuracy
+                    session_count += 1
 
-def generate_image_with_comfyui(prompt_data: dict, question_id: str, question_data: dict, api: ComfyApiWrapper, wf: ComfyWorkflowWrapper):
-    print(f"  - Setting up ComfyUI workflow for question {question_id}...")
-    try:
-        cfg = COMFYUI_CONFIG
-        wf.set_node_param(cfg["NODE_CHECKPOINT_LOADER"], "ckpt_name", CHECKPOINT_MODEL_NAME)
-        wf.set_node_param(cfg["NODE_LORA_LOADER"], "lora_name", LORA_MODEL_NAME)
-        # ... (rest of the function is unchanged)
-        wf.set_node_param(cfg["NODE_LORA_LOADER"], "strength_model", LORA_STRENGTH)
-        wf.set_node_param(cfg["NODE_LORA_LOADER"], "strength_clip", LORA_STRENGTH)
-        wf.set_node_param(cfg["NODE_POSITIVE_PROMPT"], "text", prompt_data["positive_prompt"])
-        wf.set_node_param(cfg["NODE_NEGATIVE_PROMPT"], "text", prompt_data["negative_prompt"])
-        actual_id = question_data.get('id', question_id)
-        wf.set_node_param(cfg["NODE_IMAGE_OUTPUT"], "filename_prefix", f"story_q{actual_id}_mnemonic")
-        wf.set_node_param(cfg["NODE_EMPTY_LATENT"], "width", 768)
-        wf.set_node_param(cfg["NODE_EMPTY_LATENT"], "height", 768)
-        wf.set_node_param(cfg["NODE_EMPTY_LATENT"], "batch_size", 1)
-        seed_value = get_deterministic_seed(question_id)
-        wf.set_node_param(cfg["NODE_KSAMPLER"], "seed", seed_value)
-        print(f"  - Using deterministic seed {seed_value} for consistency.")
-        print(f"  - Story Connection: {prompt_data.get('story_connection', 'N/A')}")
-        print(f"  - Positive Prompt: {prompt_data['positive_prompt'][:150]}...")
-        print(f"  - Queueing illustration for question {question_id}...")
-        results = api.queue_and_wait_images(wf, cfg["NODE_IMAGE_OUTPUT"])
-        if not results:
-            print(f"  - ❌ No images returned from ComfyUI for question {question_id}")
-            return False
-        for filename, image_data in results.items():
-            output_path = os.path.join(OUTPUT_DIRECTORY, filename)
-            with open(output_path, "wb") as f:
-                f.write(image_data)
-            print(f"  - Image saved: {output_path} ({len(image_data)/1024:.1f}KB)")
-            optimize_image_size(output_path, TARGET_FILE_SIZE_KB)
-        return True
-    except Exception as e:
-        print(f"  - ❌ Error in ComfyUI generation for question {question_id}: {e}")
-        import traceback
-        print(f"  - Traceback: {traceback.format_exc()}")
-        return False
+            average_accuracy = (
+                total_accuracy / session_count if session_count > 0 else 0.0
+            )
 
-def main():
-    """Main function to generate consistent, high-quality mnemonic images."""
-    num_questions_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    print(f"🎨 Starting HIGH-QUALITY mnemonic generation with '{STYLE_GUIDE['ARTIST_SIGNATURE']}' style...")
-    os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
-    gemini_cache = load_gemini_cache()
-    try:
-        api = ComfyApiWrapper(f"http://{COMFYUI_CONFIG['SERVER_ADDRESS']}")
-        wf = ComfyWorkflowWrapper(WORKFLOW_API_PATH)
-        print("✅ ComfyUI API and workflow initialized successfully.")
-    except Exception as e:
-        print(f"❌ Critical Error: Could not connect to ComfyUI or load workflow.")
-        print(f"   Please check your server address and that '{WORKFLOW_API_PATH}' is correct.")
-        print(f"   Error details: {e}")
-        return
-    try:
-        with open(DATASET_PATH, "r", encoding="utf-8") as f:
-            dataset = json.load(f)
-        questions = dataset.get("questions", {})
-        if not questions:
-            print("❌ Error: No questions found in the dataset.")
-            return
-        print(f"✅ Dataset loaded with {len(questions)} questions from {DATASET_PATH}")
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"❌ Critical Error: Could not load or parse dataset at '{DATASET_PATH}'.")
-        print(f"   Error details: {e}")
-        return
-    questions_to_process = list(questions.items())
-    if num_questions_arg:
-        try:
-            num_to_process = int(num_questions_arg)
-            questions_to_process = questions_to_process[:num_to_process]
-            print(f"🎯 Processing the first {len(questions_to_process)} questions as requested.")
-        except ValueError:
-            print(f"⚠️ Warning: Invalid number '{num_questions_arg}'. Processing all questions.")
-    unprocessed_items = [
-        (qid, qdata) for qid, qdata in questions_to_process
-        if not is_question_processed(qid, gemini_cache)
-    ]
-    if not unprocessed_items:
-        print("\n🎉 All requested questions have already been processed! Check the output directory.")
-        return
-    print(f"📊 Found {len(unprocessed_items)} new/unprocessed questions to generate.")
-    successful_generations = 0
-    failed_generations = 0
-    try:
-        with tqdm(unprocessed_items, desc=f"Generating in '{STYLE_GUIDE['ARTIST_SIGNATURE']}' style") as pbar:
-            for question_id, question_data in pbar:
-                pbar.set_postfix_str(f"ID: {question_id}", refresh=True)
-                print(f"\n\n📖 Processing Question ID: {question_id}")
-                print(f"   Mnemonic: {question_data.get('mnemonic', {}).get('en', 'N/A')}")
-                prompt_data = generate_childrens_book_prompt(question_data, gemini_cache, question_id)
-                if not prompt_data:
-                    print(f"❌ Skipping {question_id} due to prompt generation error.")
-                    failed_generations += 1
-                    continue
-                if generate_image_with_comfyui(prompt_data, question_id, question_data, api, wf):
-                    successful_generations += 1
-                    add_to_cache(gemini_cache, question_id, {'prompt_data': prompt_data, 'image_generated': True})
-                else:
-                    failed_generations += 1
-                if successful_generations > 0 and successful_generations % BATCH_SAVE_INTERVAL == 0:
-                    save_gemini_cache(gemini_cache)
-    except KeyboardInterrupt:
-        print("\n🛑 Interrupted by user.")
-    finally:
-        print("\n💾 Performing final cache save...")
-        save_gemini_cache(gemini_cache)
-        print("\n" + "="*50)
-        print("✨ GENERATION SUMMARY ✨")
-        print("="*50)
-        print(f"✅ Successful generations: {successful_generations}")
-        print(f"❌ Failed generations: {failed_generations}")
-        print(f"🎨 Style: '{STYLE_GUIDE['ARTIST_SIGNATURE']}'")
-        print(f"📂 Images saved in: '{OUTPUT_DIRECTORY}'")
-        print("\n🎉 Process complete!")
+            # Calculate cards due today
+            now = datetime.now(UTC)
+            cards_due = progress_query.filter(
+                LearningProgressDB.next_review <= now
+            ).count()
 
-if __name__ == "__main__":
-    main()
+            # Calculate total study time from sessions
+            total_time_result = (
+                session.query(func.sum(SessionDB.duration_seconds))
+                .filter_by(user_id=user_id)
+                .scalar()
+            )
+            total_study_minutes = (total_time_result or 0) // 60
+
+            return PerformanceMetrics(
+                total_cards_studied=total_cards,
+                average_accuracy=average_accuracy,
+                study_streak=user.study_streak,
+                total_study_time_minutes=total_study_minutes,
+                cards_due_today=cards_due,
+                mastery_percentage=(mastered_cards / total_cards * 100)
+                if total_cards > 0
+                else 0.0,
+            )
+
+    async def get_difficulty_distribution(self, user_id: int) -> DifficultyDistribution:
+        """Get distribution of card difficulties for a user."""
+        with self._db_manager.get_session() as session:
+            # Get difficulty counts
+            progress_records = (
+                session.query(LearningProgressDB).filter_by(user_id=user_id).all()
+            )
+
+            easy_count = sum(1 for p in progress_records if p.difficulty >= 2.5)
+            medium_count = sum(1 for p in progress_records if 1.5 <= p.difficulty < 2.5)
+            hard_count = sum(1 for p in progress_records if p.difficulty < 1.5)
+
+            total = len(progress_records)
+
+            return DifficultyDistribution(
+                easy_count=easy_count,
+                medium_count=medium_count,
+                hard_count=hard_count,
+                easy_percentage=(easy_count / total * 100) if total > 0 else 0.0,
+                medium_percentage=(medium_count / total * 100) if total > 0 else 0.0,
+                hard_percentage=(hard_count / total * 100) if total > 0 else 0.0,
+            )
+
+    async def get_performance_insights(self, user_id: int) -> PerformanceInsights:
+        """Get AI-generated performance insights."""
+        # For now, return basic insights based on metrics
+        metrics = await self.get_performance_metrics(user_id)
+
+        strengths = []
+        weaknesses = []
+        recommendations = []
+
+        # Analyze performance
+        if metrics.average_accuracy >= 80:
+            strengths.append("High accuracy rate in recent sessions")
+        else:
+            weaknesses.append("Accuracy below target level")
+            recommendations.append("Review incorrect answers more carefully")
+
+        if metrics.study_streak >= 7:
+            strengths.append(
+                f"Consistent study habit ({metrics.study_streak} day streak)"
+            )
+        else:
+            weaknesses.append("Irregular study pattern")
+            recommendations.append("Try to study daily for better retention")
+
+        if metrics.mastery_percentage >= 50:
+            strengths.append(f"{metrics.mastery_percentage:.0f}% of cards mastered")
+        else:
+            recommendations.append(
+                "Focus on mastering more cards through consistent review"
+            )
+
+        if metrics.cards_due_today > 20:
+            weaknesses.append(f"{metrics.cards_due_today} cards overdue for review")
+            recommendations.append("Clear your backlog of due cards")
+
+        # Default recommendations if none generated
+        if not recommendations:
+            recommendations.append("Keep up the great work!")
+
+        return PerformanceInsights(
+            strengths=strengths or ["Building knowledge steadily"],
+            weaknesses=weaknesses or ["No major weaknesses identified"],
+            recommendations=recommendations,
+            focus_areas=[],  # TODO: Implement category-based focus areas
+        )
+
+    async def record_study_session(
+        self,
+        user_id: int,
+        duration_minutes: int,
+        cards_studied: int,
+        accuracy: float,
+    ) -> None:
+        """Record a study session for analytics."""
+        # This is typically handled by the session repository
+        # But we can add analytics-specific recording here if needed
+        pass
+
+    async def get_learning_velocity(self, user_id: int, days: int = 30) -> float:
+        """Calculate learning velocity (cards mastered per day)."""
+        with self._db_manager.get_session() as session:
+            # Get cards mastered in the last N days
+            cutoff_date = datetime.now(UTC).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+
+            # Count cards that reached mastery (stability >= 30) in the period
+            mastered_count = (
+                session.query(LearningProgressDB)
+                .filter(
+                    and_(
+                        LearningProgressDB.user_id == user_id,
+                        LearningProgressDB.stability >= 30.0,
+                        LearningProgressDB.last_reviewed >= cutoff_date,
+                    )
+                )
+                .count()
+            )
+
+            return mastered_count / days if days > 0 else 0.0
+
+    async def get_category_performance(
+        self,
+        user_id: int,  # noqa: ARG002
+    ) -> dict[str, tuple[int, float]]:
+        """Get performance by category."""
+        # TODO: Implement when categories are added to the schema
+        return {}

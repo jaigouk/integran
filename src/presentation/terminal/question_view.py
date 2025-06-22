@@ -564,7 +564,7 @@ class PracticeScreen(Screen):
     .question-container {
         width: 100%;
         height: auto;
-        max-height: 75vh;
+        max-height: 65vh;
         padding: 1;
         overflow-y: auto;
         scrollbar-gutter: stable;
@@ -573,7 +573,7 @@ class PracticeScreen(Screen):
     .learn-container {
         width: 100%;
         height: auto;
-        max-height: 75vh;
+        max-height: 65vh;
         padding: 1;
         overflow-y: auto;
         scrollbar-gutter: stable;
@@ -718,7 +718,7 @@ class PracticeScreen(Screen):
         dock: bottom;
         width: 100%;
         height: auto;
-        min-height: 6;
+        min-height: 8;
         max-height: 10;
         padding: 1;
         background: $accent 20%;
