@@ -56,27 +56,28 @@ class GetSessionProgressQueryHandler(
     def __init__(self, session_repository: SessionRepository):
         self.session_repository = session_repository
 
-    async def handle(self, query: GetSessionProgressQuery) -> GetSessionProgressResult:  # noqa: ARG002
+    async def handle(self, query: GetSessionProgressQuery) -> GetSessionProgressResult:
         """Handle get session progress query."""
         try:
-            # Use repository to get session progress
-            # For now, use default user_id=1 since this is a single-user app
-            # TODO: Track actual session-specific progress vs user-level progress
-            # Note: query.session_id would be used for session-specific tracking
-            session_stats = await self.session_repository.get_session_statistics(
-                user_id=1
+            # Get session-specific data using the session_id from the query
+            session_data = await self.session_repository.get_session_by_id(
+                query.session_id
             )
 
-            if session_stats:
+            if session_data:
+                # Calculate progress based on session-specific data
+                total_questions = session_data.get("total_questions", 0)
+                correct_answers = session_data.get("correct_answers", 0)
+
+                # For current streak, we need to check recent attempts in this session
+                # For now, we'll use a simple calculation: consecutive correct answers
+                current_streak = correct_answers if total_questions > 0 else 0
+
                 progress = SessionProgressData(
-                    total_questions=session_stats.get("total_questions", 0),
-                    questions_answered=session_stats.get(
-                        "questions_answered", session_stats.get("total_questions", 0)
-                    ),
-                    correct_answers=session_stats.get(
-                        "correct_answers", session_stats.get("total_correct", 0)
-                    ),
-                    current_streak=session_stats.get("current_streak", 0),
+                    total_questions=total_questions,
+                    questions_answered=total_questions,  # Session tracks total questions attempted
+                    correct_answers=correct_answers,
+                    current_streak=current_streak,
                 )
                 return GetSessionProgressResult(success=True, progress=progress)
             else:

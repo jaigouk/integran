@@ -187,7 +187,9 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
             )
 
             # Update card in database
-            await self._update_card_state(request.card_id, schedule_result, now)
+            new_state = await self._update_card_state(
+                request.card_id, schedule_result, card, request.rating
+            )
 
             # Update lapse count if needed
             lapse_count_updated = False
@@ -212,7 +214,7 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
                 difficulty_after=schedule_result.difficulty,
                 stability_after=schedule_result.stability,
                 retrievability_after=schedule_result.retrievability,
-                state_after=FSRSState.REVIEW,  # Simplified for now
+                state_after=FSRSState(new_state),
                 next_review_date=schedule_result.next_review_date,
                 next_interval_days=schedule_result.next_interval,
                 lapse_count_updated=lapse_count_updated,
@@ -326,18 +328,63 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
         )
 
     async def _update_card_state(
-        self, card_id: int, schedule_result: ScheduleResult, review_time: datetime
-    ) -> None:
-        """Update card state in database."""
+        self,
+        card_id: int,
+        schedule_result: ScheduleResult,
+        card: FSRSCard,
+        rating: FSRSRating,
+    ) -> int:
+        """Update card state in database with proper FSRS state transitions."""
+        # Calculate new state based on FSRS algorithm
+        new_state = self._calculate_new_state(card.state, rating, card.review_count)
+
         next_review_timestamp = schedule_result.next_review_date.timestamp()
         await self.learning_repository.update_fsrs_card_state(
             card_id=card_id,
             difficulty=schedule_result.difficulty,
             stability=schedule_result.stability,
             retrievability=schedule_result.retrievability,
-            state=int(schedule_result.next_review_date > review_time),
+            state=new_state,
             next_review_date=next_review_timestamp,
         )
+        return new_state
+
+    def _calculate_new_state(
+        self, current_state: int, rating: FSRSRating, review_count: int
+    ) -> int:
+        """Calculate new FSRS state based on current state and rating."""
+        from src.domain.shared.models import FSRSState
+
+        # Handle failure case (AGAIN rating)
+        if rating == FSRSRating.AGAIN:
+            if current_state == FSRSState.REVIEW:
+                return FSRSState.RELEARNING  # Review card failed -> Relearning
+            else:
+                return (
+                    FSRSState.NEW
+                )  # Learning/New card failed -> stay New or back to New
+
+        # Handle success cases (HARD, GOOD, EASY)
+        if current_state == FSRSState.NEW:
+            # New card answered correctly -> move to Learning
+            return FSRSState.LEARNING
+        elif current_state == FSRSState.LEARNING:
+            # Learning card answered correctly
+            # Graduate to Review after a few successful reviews (typically 2-3)
+            # Handle case where review_count might be None
+            review_count_safe = review_count or 0
+            if (
+                review_count_safe >= 1
+            ):  # Graduate after 2nd review (review_count starts at 0)
+                return FSRSState.REVIEW
+            else:
+                return FSRSState.LEARNING  # Stay in learning
+        elif current_state == FSRSState.RELEARNING:
+            # Relearning card answered correctly -> back to Review
+            return FSRSState.REVIEW
+        else:  # current_state == FSRSState.REVIEW
+            # Review card answered correctly -> stay in Review
+            return FSRSState.REVIEW
 
     async def _increment_lapse_count(self, card_id: int) -> None:
         """Increment lapse count for a card."""

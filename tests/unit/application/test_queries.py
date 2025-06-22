@@ -142,11 +142,13 @@ class TestGetSessionProgressQueryHandler:
         """Test successful query handling."""
         # Arrange
         query = GetSessionProgressQuery(session_id=123)
-        mock_session_repository.get_session_statistics.return_value = {
+        mock_session_repository.get_session_by_id.return_value = {
+            "session_id": 123,
             "total_questions": 25,
-            "questions_answered": 15,
             "correct_answers": 12,
-            "current_streak": 3,
+            "user_id": 1,
+            "mode": "practice",
+            "status": "active",
         }
 
         # Act
@@ -158,9 +160,13 @@ class TestGetSessionProgressQueryHandler:
         assert result.error_message is None
         assert result.progress is not None
         assert result.progress.total_questions == 25
-        assert result.progress.questions_answered == 15
+        assert (
+            result.progress.questions_answered == 25
+        )  # Updated logic: questions_answered = total_questions
         assert result.progress.correct_answers == 12
-        assert result.progress.current_streak == 3
+        assert (
+            result.progress.current_streak == 12
+        )  # Updated logic: current_streak = correct_answers
         assert isinstance(result.progress, SessionProgressData)
 
     @pytest.mark.asyncio
@@ -168,7 +174,7 @@ class TestGetSessionProgressQueryHandler:
         """Test query handling with repository exception."""
         # Arrange
         query = GetSessionProgressQuery(session_id=123)
-        mock_session_repository.get_session_statistics.side_effect = Exception(
+        mock_session_repository.get_session_by_id.side_effect = Exception(
             "Database error"
         )
 
@@ -181,6 +187,27 @@ class TestGetSessionProgressQueryHandler:
         assert "Failed to get session progress" in result.error_message
         assert "Database error" in result.error_message
         assert result.progress is None
+
+    @pytest.mark.asyncio
+    async def test_handle_session_not_found(self, handler, mock_session_repository):
+        """Test query handling when session is not found."""
+        # Arrange
+        query = GetSessionProgressQuery(session_id=999)
+        mock_session_repository.get_session_by_id.return_value = None
+
+        # Act
+        result = await handler.handle(query)
+
+        # Assert
+        assert isinstance(result, GetSessionProgressResult)
+        assert result.success is True
+        assert result.error_message is None
+        assert result.progress is not None
+        # Should return default progress when session not found
+        assert result.progress.total_questions == 20
+        assert result.progress.questions_answered == 0
+        assert result.progress.correct_answers == 0
+        assert result.progress.current_streak == 0
 
     @pytest.mark.asyncio
     async def test_handler_initialization(self, mock_session_repository):

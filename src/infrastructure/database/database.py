@@ -85,6 +85,10 @@ class DatabaseManager:
             logger.warning(f"Could not import User domain models: {e}")
 
         Base.metadata.create_all(bind=self.engine)
+
+        # Run schema migrations for existing databases
+        self.migrate_practice_sessions_schema()
+
         logger.info(f"Database initialized at {self.db_path}")
 
     @contextmanager
@@ -284,22 +288,35 @@ class DatabaseManager:
             return session.query(Question).filter_by(category=category).all()
 
     def get_questions_for_review(self, limit: int = 20) -> list[Question]:
-        """Get questions due for review.
+        """Get questions that have failed and need review.
+
+        This method finds questions that the user has answered incorrectly
+        and need to be reviewed again. It looks for:
+        - Questions with lapse_count > 0 (have been failed)
+        - Questions in RELEARNING state (failed from review state)
 
         Args:
             limit: Maximum number of questions to return.
 
         Returns:
-            List of questions due for review.
+            List of questions that have failed and need review.
         """
         with self.get_session() as session:
-            # Use UTC timestamp for FSRS scheduling
-            now = datetime.now(UTC).timestamp()
+            from sqlalchemy import or_
+
+            from src.domain.shared.models import FSRSState
+
             return (
                 session.query(Question)
                 .join(FSRSCard)
-                .filter(FSRSCard.next_review_date <= now)
-                .order_by(FSRSCard.next_review_date)
+                .filter(
+                    or_(
+                        FSRSCard.lapse_count > 0,  # Questions that have been failed
+                        FSRSCard.state
+                        == FSRSState.RELEARNING.value,  # Questions currently relearning
+                    )
+                )
+                .order_by(FSRSCard.lapse_count.desc())  # Most failed questions first
                 .limit(limit)
                 .all()
             )
@@ -740,6 +757,102 @@ class DatabaseManager:
 
             session.commit()
             logger.info("FSRS schema migration completed")
+
+    def migrate_practice_sessions_schema(self) -> None:
+        """Migrate practice_sessions table to include missing columns.
+
+        This method adds missing columns that were added in later versions:
+        - user_id: for multi-user support
+        - status: session status (active, paused, completed)
+        - pause_start_time: when session was paused
+        - total_pause_duration: total pause time in seconds
+        - new_cards_count: count of new cards in session
+        - review_cards_count: count of review cards in session
+        """
+        logger.info("Starting practice_sessions schema migration")
+
+        # Use raw SQL for schema changes
+        with self.engine.connect() as conn:
+            # Check which columns are missing
+            from sqlalchemy import text
+
+            result = conn.execute(text("PRAGMA table_info(practice_sessions)"))
+            existing_columns = {row[1] for row in result}
+
+            required_columns = {
+                "user_id": "INTEGER NOT NULL DEFAULT 1",
+                "status": 'VARCHAR(20) NOT NULL DEFAULT "active"',
+                "pause_start_time": "DATETIME",
+                "total_pause_duration": "INTEGER DEFAULT 0",
+                "new_cards_count": "INTEGER DEFAULT 0",
+                "review_cards_count": "INTEGER DEFAULT 0",
+            }
+
+            # Add missing columns one by one
+            for column_name, column_def in required_columns.items():
+                if column_name not in existing_columns:
+                    try:
+                        conn.execute(
+                            text(
+                                f"ALTER TABLE practice_sessions ADD COLUMN {column_name} {column_def}"
+                            )
+                        )
+                        logger.info(
+                            f"Added column {column_name} to practice_sessions table"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to add column {column_name}: {e}")
+
+            conn.commit()
+
+        logger.info("Practice sessions schema migration completed")
+
+    def ensure_all_questions_have_fsrs_cards(self) -> int:
+        """Ensure all questions have corresponding FSRS cards.
+
+        This is a helper method to fix databases where FSRS cards are missing.
+
+        Returns:
+            Number of FSRS cards created
+        """
+        with self.get_session() as session:
+            # Find questions without FSRS cards
+            questions_without_cards = (
+                session.query(Question)
+                .outerjoin(FSRSCard, Question.id == FSRSCard.question_id)
+                .filter(FSRSCard.question_id.is_(None))
+                .all()
+            )
+
+            created_count = 0
+            now = datetime.now(UTC).timestamp()
+
+            for question in questions_without_cards:
+                # Create new FSRS card
+                fsrs_card = FSRSCard(
+                    question_id=question.id,
+                    user_id=1,
+                    difficulty=5.0,  # Default initial difficulty
+                    stability=1.0,  # Default initial stability
+                    retrievability=1.0,  # Perfect initial retrievability
+                    state=0,  # New card state
+                    next_review_date=now,  # Immediately available
+                    created_at=now,
+                    updated_at=now,
+                    last_review_date=None,
+                    review_count=0,
+                    lapse_count=0,
+                )
+                session.add(fsrs_card)
+                created_count += 1
+
+            if created_count > 0:
+                session.commit()
+                logger.info(
+                    f"Created {created_count} FSRS cards for existing questions"
+                )
+
+            return created_count
 
     def create_fsrs_card(self, question_id: int, user_id: int = 1) -> FSRSCard:
         """Create a new FSRS card for a question.

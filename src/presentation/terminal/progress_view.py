@@ -72,38 +72,38 @@ class StatsWidget(Static):
 
             if result.success and result.insights:
                 insights = result.insights
-                # Create comprehensive analytics content
-                content = f"""Learning Statistics
+                # Create comprehensive analytics content with Rich markup styling
+                content = f"""[bold cyan]Learning Statistics[/bold cyan]
 
-CARD COUNTS:
-Mastered: {insights.cards_mastered} ({insights.overall_progress_percentage:.1f}%)
-Learning: {insights.cards_learning}
-New: {insights.cards_new}
-Due Today: {insights.study_forecast.reviews_due_today}
+[bold yellow]CARD COUNTS:[/bold yellow]
+Mastered: [green]{insights.cards_mastered}[/green] ([green]{insights.overall_progress_percentage:.1f}%[/green])
+Learning: [yellow]{insights.cards_learning}[/yellow]
+New: [blue]{insights.cards_new}[/blue]
+Due Today: [red]{insights.study_forecast.reviews_due_today}[/red]
 
-RETENTION ANALYSIS:
-Overall: {insights.retention_analysis.overall_retention * 100:.1f}%
+[bold yellow]RETENTION ANALYSIS:[/bold yellow]
+Overall: [green]{insights.retention_analysis.overall_retention * 100:.1f}%[/green]
 7-Day: {insights.retention_analysis.last_7_days_retention * 100:.1f}%
 30-Day: {insights.retention_analysis.last_30_days_retention * 100:.1f}%
-Trend: {insights.retention_analysis.retention_trend.title()}
+Trend: [cyan]{insights.retention_analysis.retention_trend.title()}[/cyan]
 
-STUDY PROGRESS:
-Current Streak: {insights.learning_streak.current_streak} days
-Longest Streak: {insights.learning_streak.longest_streak} days
+[bold yellow]STUDY PROGRESS:[/bold yellow]
+Current Streak: [magenta]{insights.learning_streak.current_streak} days[/magenta]
+Longest Streak: [magenta]{insights.learning_streak.longest_streak} days[/magenta]
 Total Sessions: {insights.total_sessions}
-Study Time: {insights.total_study_time_hours:.1f}h
+Study Time: [cyan]{insights.total_study_time_hours:.1f}h[/cyan]
 
-UPCOMING WORKLOAD:
+[bold yellow]UPCOMING WORKLOAD:[/bold yellow]
 Tomorrow: {insights.study_forecast.reviews_due_tomorrow} reviews
 This Week: {insights.study_forecast.reviews_due_week} reviews
-Est. Time: {insights.study_forecast.estimated_study_time_minutes} min
-Peak Day: {insights.study_forecast.peak_review_day}
+Est. Time: [yellow]{insights.study_forecast.estimated_study_time_minutes} min[/yellow]
+Peak Day: [cyan]{insights.study_forecast.peak_review_day}[/cyan]
 
-RECOMMENDATIONS:
-Daily Goal: {insights.recommended_daily_reviews} reviews
-Focus Areas: {", ".join(insights.recommended_focus_categories[:3]) if insights.recommended_focus_categories else "None"}
+[bold yellow]RECOMMENDATIONS:[/bold yellow]
+Daily Goal: [green]{insights.recommended_daily_reviews} reviews[/green]
+Focus Areas: [yellow]{", ".join(insights.recommended_focus_categories[:3]) if insights.recommended_focus_categories else "None"}[/yellow]
 
-LEECH DETECTION:
+[bold yellow]LEECH DETECTION:[/bold yellow]
 {self._get_leech_summary()}
 """
 
@@ -188,12 +188,12 @@ No difficult cards detected
     def _get_leech_summary(self) -> str:
         """Get summary of leech detection results."""
         try:
-            # For now, return a placeholder that will be enhanced
+            # For now, return a styled placeholder that will be enhanced
             # with real leech detection when the service is fully integrated
-            return "Checking for difficult cards... (Feature coming soon)"
+            return "[dim]Checking for difficult cards... (Feature coming soon)[/dim]"
         except Exception as e:
             logger.error(f"Failed to get leech summary: {e}")
-            return "Leech detection unavailable"
+            return "[red]Leech detection unavailable[/red]"
 
 
 class CategoryProgressWidget(EventAwareWidget):
@@ -378,7 +378,7 @@ class ProgressScreen(Screen):
         width: 95vw;
         max-width: 120;
         height: auto;
-        max-height: 85vh;
+        max-height: 90vh;
         background: $surface;
         border: solid white;
         padding: 1;
@@ -389,7 +389,7 @@ class ProgressScreen(Screen):
 
     #stats-widget {
         width: 100%;
-        height: 1fr;
+        height: auto;
         min-height: 15;
         background: $surface;
         border: solid white;

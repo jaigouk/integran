@@ -102,17 +102,31 @@ class TestDatabaseManager:
         questions_data: list[dict],
         temp_db_file: Path,
     ) -> None:
-        """Test getting questions for review."""
+        """Test getting questions for review (failed questions)."""
         # Load questions first
         questions_file = temp_db_file.parent / "questions.json"
         with open(questions_file, "w") as f:
             json.dump(questions_data, f)
         db_manager.load_questions(questions_file)
 
-        # Get questions for review
-        questions = db_manager.get_questions_for_review(limit=1)
+        # Initially no questions should need review (all are new, never failed)
+        questions = db_manager.get_questions_for_review(limit=10)
+        assert len(questions) == 0
+
+        # Simulate a failed question by updating FSRS card
+        with db_manager.get_session() as session:
+            from src.domain.learning.models.learning_models import FSRSCard
+
+            # Make question 1 a failed question
+            fsrs_card = session.query(FSRSCard).filter_by(question_id=1).first()
+            if fsrs_card:
+                fsrs_card.lapse_count = 1  # Mark as failed once
+                session.commit()
+
+        # Now one question should need review
+        questions = db_manager.get_questions_for_review(limit=10)
         assert len(questions) == 1
-        assert questions[0].id in [1, 2]
+        assert questions[0].id == 1
 
     def test_get_questions_by_category(
         self,

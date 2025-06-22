@@ -545,7 +545,7 @@ class PracticeScreen(Screen):
         width: 95vw;
         max-width: 120;
         height: auto;
-        max-height: 70vh;
+        max-height: 88vh;
         background: $surface;
         border: solid white;
         margin: 1;
@@ -564,7 +564,7 @@ class PracticeScreen(Screen):
     .question-container {
         width: 100%;
         height: auto;
-        max-height: 65vh;
+        max-height: 75vh;
         padding: 1;
         overflow-y: auto;
         scrollbar-gutter: stable;
@@ -573,7 +573,7 @@ class PracticeScreen(Screen):
     .learn-container {
         width: 100%;
         height: auto;
-        max-height: 65vh;
+        max-height: 75vh;
         padding: 1;
         overflow-y: auto;
         scrollbar-gutter: stable;
@@ -713,13 +713,13 @@ class PracticeScreen(Screen):
         text-style: italic;
     }
 
-    /* FSRS rating buttons - ensure visibility */
+    /* FSRS rating buttons - ensure visibility and consistency */
     .fsrs-rating {
         dock: bottom;
         width: 100%;
         height: auto;
-        min-height: 8;
-        max-height: 12;
+        min-height: 6;
+        max-height: 10;
         padding: 1;
         background: $accent 20%;
         border: solid white;

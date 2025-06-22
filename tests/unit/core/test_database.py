@@ -258,29 +258,43 @@ class TestDatabaseManager:
     def test_get_questions_for_review(
         self, db_manager: DatabaseManager, sample_questions: list[dict], tmp_path: Path
     ) -> None:
-        """Test getting questions due for review."""
+        """Test getting questions that have failed and need review."""
         # Load questions first
         questions_file = tmp_path / "questions.json"
         with open(questions_file, "w", encoding="utf-8") as f:
             json.dump(sample_questions, f)
         db_manager.load_questions(questions_file)
 
-        # Initially all questions should be due for review
+        # Initially no questions should be due for review (all are new, never failed)
         due_questions = db_manager.get_questions_for_review()
-        assert len(due_questions) == 3
+        assert len(due_questions) == 0
 
-        # Update one question's review date to future
+        # Simulate some failed questions by setting lapse_count > 0
         with db_manager.get_session() as session:
-            fsrs_card = session.query(FSRSCard).filter_by(question_id=1).first()
-            if fsrs_card:
-                # Set next review to future (7 days from now in timestamp)
-                future_timestamp = datetime.now(UTC).timestamp() + (7 * 24 * 60 * 60)
-                fsrs_card.next_review_date = future_timestamp
-                session.commit()
+            from src.domain.shared.models import FSRSState
 
-        # Now only 2 questions should be due
+            # Make question 1 a failed question (lapse_count > 0)
+            fsrs_card1 = session.query(FSRSCard).filter_by(question_id=1).first()
+            if fsrs_card1:
+                fsrs_card1.lapse_count = 2  # This question has failed twice
+
+            # Make question 2 a relearning question (state = RELEARNING)
+            fsrs_card2 = session.query(FSRSCard).filter_by(question_id=2).first()
+            if fsrs_card2:
+                fsrs_card2.state = FSRSState.RELEARNING.value
+                fsrs_card2.lapse_count = 1  # Also failed once
+
+            # Question 3 remains new (no failures)
+            session.commit()
+
+        # Now 2 questions should be due for review (the failed ones)
         due_questions = db_manager.get_questions_for_review()
         assert len(due_questions) == 2
+
+        question_ids = [q.id for q in due_questions]
+        assert 1 in question_ids  # Question with lapse_count > 0
+        assert 2 in question_ids  # Question in RELEARNING state
+        assert 3 not in question_ids  # Question never failed
 
     def test_session_statistics(
         self, db_manager: DatabaseManager, sample_questions: list[dict], tmp_path: Path

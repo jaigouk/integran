@@ -107,3 +107,33 @@ class SQLAlchemySessionRepository(SessionRepository):
     ) -> None:
         """Update new and review card counts for a session."""
         self.db_manager.update_session_card_counts(session_id, new_cards, review_cards)
+
+    async def get_session_by_id(self, session_id: int) -> dict[str, Any] | None:
+        """Get session data by session ID."""
+
+        def _get_session_by_id() -> dict[str, Any] | None:
+            with self.db_manager.get_session() as session:
+                from src.domain.content.models.question_models import PracticeSession
+
+                practice_session = (
+                    session.query(PracticeSession).filter_by(id=session_id).first()
+                )
+
+                if not practice_session:
+                    return None
+
+                return {
+                    "session_id": practice_session.id,
+                    "user_id": practice_session.user_id,
+                    "mode": practice_session.mode,
+                    "status": practice_session.status,
+                    "started_at": practice_session.started_at,
+                    "ended_at": practice_session.ended_at,
+                    "total_questions": practice_session.total_questions,
+                    "correct_answers": practice_session.correct_answers,
+                    "new_cards_count": practice_session.new_cards_count,
+                    "review_cards_count": practice_session.review_cards_count,
+                    "total_pause_duration": practice_session.total_pause_duration,
+                }
+
+        return await self._run_in_executor(_get_session_by_id)

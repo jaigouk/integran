@@ -247,3 +247,8 @@ class SessionRepository(ABC):
     async def get_pause_duration(self, session_id: int) -> int | None:
         """Get total pause duration for a session in seconds."""
         pass
+
+    @abstractmethod
+    async def get_session_by_id(self, session_id: int) -> dict[str, Any] | None:
+        """Get session data by session ID."""
+        pass
