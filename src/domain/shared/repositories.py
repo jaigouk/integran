@@ -204,6 +204,36 @@ class AnalyticsRepository(ABC):
         """Record a question attempt."""
         pass
 
+    @abstractmethod
+    async def get_hourly_session_stats(
+        self, user_id: int, days: int = 30
+    ) -> dict[int, dict[str, Any]]:
+        """Get session statistics grouped by hour of day for time-based analysis.
+
+        Args:
+            user_id: User ID
+            days: Number of days to look back
+
+        Returns:
+            Dict mapping hour (0-23) to session stats (count, total_duration, avg_accuracy)
+        """
+        pass
+
+    @abstractmethod
+    async def get_daily_study_patterns(
+        self, user_id: int, days: int = 30
+    ) -> list[dict[str, Any]]:
+        """Get daily study patterns with session times and performance.
+
+        Args:
+            user_id: User ID
+            days: Number of days to look back
+
+        Returns:
+            List of daily study data with timestamps, duration, and performance
+        """
+        pass
+
 
 class SessionRepository(ABC):
     """Repository interface for session-related data operations."""

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import asyncio
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import and_, func
@@ -12,6 +13,7 @@ from src.domain.analytics.entities.performance_metrics import (
     PerformanceInsights,
     PerformanceMetrics,
 )
+from src.domain.learning.models.learning_models import FSRSCard
 from src.domain.shared.repositories import AnalyticsRepository
 from src.infrastructure.database.models import (
     LearningProgressDB,
@@ -32,23 +34,85 @@ class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
 
     async def get_learning_stats(self, user_id: int) -> dict[str, Any]:
         """Get comprehensive learning statistics for a user."""
-        metrics = await self.get_performance_metrics(user_id)
 
-        return {
-            "total_cards": metrics.total_cards_studied,
-            "cards_mastered": int(
-                metrics.total_cards_studied * metrics.mastery_percentage / 100
-            ),
-            "cards_learning": metrics.total_cards_studied
-            - int(metrics.total_cards_studied * metrics.mastery_percentage / 100),
-            "cards_new": 0,  # TODO: Track new cards separately
-            "due_today": metrics.cards_due_today,
-            "due_tomorrow": 0,  # TODO: Calculate tomorrow's due cards
-            "due_week": 0,  # TODO: Calculate week's due cards
-            "average_accuracy": metrics.average_accuracy,
-            "study_streak": metrics.study_streak,
-            "total_study_time_minutes": metrics.total_study_time_minutes,
-        }
+        def _execute():
+            with self._db_manager.get_session() as session:
+                # Query FSRS cards for accurate counts
+                fsrs_query = session.query(FSRSCard).filter_by(user_id=user_id)
+
+                # Count cards by FSRS state
+                total_cards = fsrs_query.count()
+                cards_new = fsrs_query.filter(FSRSCard.state == 0).count()  # New
+                cards_learning = fsrs_query.filter(
+                    FSRSCard.state == 1
+                ).count()  # Learning
+                cards_mastered = fsrs_query.filter(
+                    FSRSCard.state == 2
+                ).count()  # Review/Mastered
+
+                # Calculate due cards
+                now = datetime.now(UTC).timestamp()
+                due_today = fsrs_query.filter(FSRSCard.next_review_date <= now).count()
+
+                # Calculate due tomorrow and due week
+                tomorrow = now + 86400  # 24 hours
+                week = now + 604800  # 7 days
+                due_tomorrow = fsrs_query.filter(
+                    FSRSCard.next_review_date > now,
+                    FSRSCard.next_review_date <= tomorrow,
+                ).count()
+                due_week = fsrs_query.filter(FSRSCard.next_review_date <= week).count()
+
+                # Get session stats for accuracy and study time
+                recent_sessions = (
+                    session.query(SessionDB)
+                    .filter_by(user_id=user_id)
+                    .order_by(SessionDB.started_at.desc())
+                    .limit(10)
+                    .all()
+                )
+
+                total_accuracy = 0.0
+                session_count = 0
+                for sess in recent_sessions:
+                    if sess.total_questions > 0:
+                        accuracy = (sess.correct_answers / sess.total_questions) * 100
+                        total_accuracy += accuracy
+                        session_count += 1
+
+                average_accuracy = (
+                    total_accuracy / session_count if session_count > 0 else 0.0
+                )
+
+                # Calculate total study time
+                total_time_result = (
+                    session.query(func.sum(SessionDB.duration_seconds))
+                    .filter_by(user_id=user_id)
+                    .scalar()
+                )
+                total_study_minutes = (total_time_result or 0) // 60
+
+                # Get study streak
+                user = session.query(UserDB).filter_by(id=user_id).first()
+                study_streak = user.study_streak if user else 0
+
+                return {
+                    "total_cards": total_cards,
+                    "cards_mastered": cards_mastered,
+                    "cards_learning": cards_learning,
+                    "cards_new": cards_new,
+                    "due_today": due_today,
+                    "due_tomorrow": due_tomorrow,
+                    "due_week": due_week,
+                    "average_accuracy": average_accuracy,
+                    "study_streak": study_streak,
+                    "total_study_time_minutes": total_study_minutes,
+                    "retention_rate": cards_mastered / total_cards
+                    if total_cards > 0
+                    else 0.0,
+                }
+
+        return await asyncio.get_event_loop().run_in_executor(None, _execute)
 
     async def get_session_progress(self, user_id: int) -> dict[str, Any]:
         """Get session progress data for a user."""
@@ -131,16 +195,12 @@ class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
                     mastery_percentage=0.0,
                 )
 
-            # Get learning progress stats
-            progress_query = session.query(LearningProgressDB).filter_by(
-                user_id=user_id
-            )
-            total_cards = progress_query.count()
+            # Get FSRS card stats (using correct table)
+            fsrs_query = session.query(FSRSCard).filter_by(user_id=user_id)
+            total_cards = fsrs_query.count()
 
-            # Calculate mastered cards (stability > 30 days)
-            mastered_cards = progress_query.filter(
-                LearningProgressDB.stability >= 30.0
-            ).count()
+            # Calculate mastered cards (state 2 = Review, which means mastered)
+            mastered_cards = fsrs_query.filter(FSRSCard.state == 2).count()
 
             # Calculate average accuracy from recent sessions
             recent_sessions = (
@@ -163,11 +223,9 @@ class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
                 total_accuracy / session_count if session_count > 0 else 0.0
             )
 
-            # Calculate cards due today
-            now = datetime.now(UTC)
-            cards_due = progress_query.filter(
-                LearningProgressDB.next_review <= now
-            ).count()
+            # Calculate cards due today (using FSRS next_review_date)
+            now = datetime.now(UTC).timestamp()  # FSRS uses timestamps
+            cards_due = fsrs_query.filter(FSRSCard.next_review_date <= now).count()
 
             # Calculate total study time from sessions
             total_time_result = (
@@ -299,3 +357,152 @@ class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
         """Get performance by category."""
         # TODO: Implement when categories are added to the schema
         return {}
+
+    async def get_hourly_session_stats(
+        self, user_id: int, days: int = 30
+    ) -> dict[int, dict[str, Any]]:
+        """Get session statistics grouped by hour of day for time-based analysis."""
+
+        def _execute():
+            with self._db_manager.get_session() as session:
+                # Calculate cutoff date
+                cutoff_date = datetime.now(UTC) - timedelta(days=days)
+
+                # Query sessions within the time period
+                sessions_query = (
+                    session.query(SessionDB)
+                    .filter(
+                        and_(
+                            SessionDB.user_id == user_id,
+                            SessionDB.started_at >= cutoff_date,
+                            SessionDB.is_completed,
+                        )
+                    )
+                    .all()
+                )
+
+                # Initialize hourly stats dictionary
+                hourly_stats = {}
+                for hour in range(24):
+                    hourly_stats[hour] = {
+                        "count": 0,
+                        "total_duration": 0,
+                        "total_questions": 0,
+                        "correct_answers": 0,
+                        "avg_accuracy": 0.0,
+                    }
+
+                # Process sessions and group by hour
+                for sess in sessions_query:
+                    hour = sess.started_at.hour
+                    hourly_stats[hour]["count"] += 1
+                    hourly_stats[hour]["total_duration"] += sess.duration_seconds
+                    hourly_stats[hour]["total_questions"] += sess.total_questions
+                    hourly_stats[hour]["correct_answers"] += sess.correct_answers
+
+                # Calculate averages
+                for hour in range(24):
+                    stats = hourly_stats[hour]
+                    if stats["total_questions"] > 0:
+                        stats["avg_accuracy"] = (
+                            stats["correct_answers"] / stats["total_questions"]
+                        ) * 100
+                    else:
+                        stats["avg_accuracy"] = 0.0
+
+                return hourly_stats
+
+        return await asyncio.get_event_loop().run_in_executor(None, _execute)
+
+    async def get_daily_study_patterns(
+        self, user_id: int, days: int = 30
+    ) -> list[dict[str, Any]]:
+        """Get daily study patterns with session times and performance."""
+
+        def _execute():
+            with self._db_manager.get_session() as session:
+                # Calculate cutoff date
+                cutoff_date = datetime.now(UTC) - timedelta(days=days)
+
+                # Query sessions within the time period
+                sessions_query = (
+                    session.query(SessionDB)
+                    .filter(
+                        and_(
+                            SessionDB.user_id == user_id,
+                            SessionDB.started_at >= cutoff_date,
+                            SessionDB.is_completed,
+                        )
+                    )
+                    .order_by(SessionDB.started_at.desc())
+                    .all()
+                )
+
+                # Group sessions by date
+                daily_patterns: dict[str, dict[str, Any]] = {}
+                for sess in sessions_query:
+                    date_key = sess.started_at.date().isoformat()
+
+                    if date_key not in daily_patterns:
+                        daily_patterns[date_key] = {
+                            "date": date_key,
+                            "session_count": 0,
+                            "total_duration": 0,
+                            "total_questions": 0,
+                            "correct_answers": 0,
+                            "sessions": [],
+                            "first_session_time": None,
+                            "last_session_time": None,
+                        }
+
+                    day_data = daily_patterns[date_key]
+                    day_data["session_count"] = day_data["session_count"] + 1
+                    day_data["total_duration"] = (
+                        day_data["total_duration"] + sess.duration_seconds
+                    )
+                    day_data["total_questions"] = (
+                        day_data["total_questions"] + sess.total_questions
+                    )
+                    day_data["correct_answers"] = (
+                        day_data["correct_answers"] + sess.correct_answers
+                    )
+
+                    # Track session details
+                    session_info = {
+                        "started_at": sess.started_at.isoformat(),
+                        "duration_seconds": sess.duration_seconds,
+                        "total_questions": sess.total_questions,
+                        "correct_answers": sess.correct_answers,
+                        "accuracy": (sess.correct_answers / sess.total_questions * 100)
+                        if sess.total_questions > 0
+                        else 0.0,
+                    }
+                    day_data["sessions"].append(session_info)
+
+                    # Update first/last session times
+                    session_time = sess.started_at.time().isoformat()
+                    first_time = day_data["first_session_time"]
+                    last_time = day_data["last_session_time"]
+
+                    if first_time is None or session_time < first_time:
+                        day_data["first_session_time"] = session_time
+                    if last_time is None or session_time > last_time:
+                        day_data["last_session_time"] = session_time
+
+                # Calculate daily accuracy and convert to list
+                result = []
+                for date_key in sorted(daily_patterns.keys(), reverse=True):
+                    day_data = daily_patterns[date_key]
+                    total_questions = day_data["total_questions"]
+                    correct_answers = day_data["correct_answers"]
+
+                    day_data["avg_accuracy"] = (
+                        (correct_answers / total_questions * 100)
+                        if total_questions > 0
+                        else 0.0
+                    )
+                    result.append(day_data)
+
+                return result
+
+        return await asyncio.get_event_loop().run_in_executor(None, _execute)

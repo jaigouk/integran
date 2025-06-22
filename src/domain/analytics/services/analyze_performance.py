@@ -159,26 +159,8 @@ class ProgressAnalytics:
             days_until_broken=7,
         )
 
-        study_forecast = StudyForecast(
-            reviews_due_today=learning_stats.get("due_today", 0),
-            reviews_due_tomorrow=learning_stats.get("due_tomorrow", 0),
-            reviews_due_week=learning_stats.get("due_week", 0),
-            new_cards_recommended=min(
-                20, max(5, 50 - learning_stats.get("due_today", 0))
-            ),
-            estimated_study_time_minutes=learning_stats.get("due_today", 0)
-            * 30,  # 30 seconds per card
-            peak_review_day="Monday",  # Simplified
-            workload_distribution={
-                "Mon": 10,
-                "Tue": 12,
-                "Wed": 8,
-                "Thu": 15,
-                "Fri": 11,
-                "Sat": 9,
-                "Sun": 13,
-            },
-        )
+        # Get time-based study forecast with real data
+        study_forecast = await self._get_study_forecast(user_id)
 
         # Calculate recommendations
         daily_reviews = await self._recommend_daily_reviews(user_id)
@@ -188,7 +170,8 @@ class ProgressAnalytics:
             [cat.category for cat in categories[:3]] if categories else []
         )
 
-        # Simplified session stats
+        # Get time-based recommendations and session stats
+        best_study_times = await self._analyze_study_times(user_id)
         session_stats = await self._get_session_statistics(user_id)
 
         return LearningInsights(
@@ -204,7 +187,7 @@ class ProgressAnalytics:
             recommended_focus_categories=focus_categories,
             recommended_daily_reviews=daily_reviews,
             estimated_completion_date=completion_date,
-            best_study_times=["14:00", "15:00", "16:00"],  # Simplified
+            best_study_times=best_study_times,
             average_session_length=session_stats["avg_length"],
             total_study_time_hours=session_stats["total_hours"],
             total_sessions=session_stats["total_sessions"],
@@ -412,13 +395,13 @@ class ProgressAnalytics:
         )
 
     async def _get_study_forecast(self, user_id: int) -> StudyForecast:
-        """Get study forecast.
+        """Get study forecast with time-based workload analysis.
 
         Args:
             user_id: User ID
 
         Returns:
-            Study forecast
+            Study forecast with real workload distribution
         """
         # Use repository for learning stats
         learning_stats = await self.analytics_repository.get_learning_stats(user_id)
@@ -430,14 +413,86 @@ class ProgressAnalytics:
         # New cards recommended (based on current workload)
         new_recommended = min(20, max(5, 50 - due_today))
 
+        # Calculate workload distribution and peak day from daily patterns
+        try:
+            daily_patterns = await self.analytics_repository.get_daily_study_patterns(
+                user_id, days=28
+            )
+            workload_distribution = {}
+
+            if daily_patterns:
+                # Group by day of week
+                day_totals = {
+                    "Mon": 0,
+                    "Tue": 0,
+                    "Wed": 0,
+                    "Thu": 0,
+                    "Fri": 0,
+                    "Sat": 0,
+                    "Sun": 0,
+                }
+                day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+                for day_data in daily_patterns:
+                    if day_data.get("session_count", 0) > 0:
+                        # Parse date and get day of week
+                        try:
+                            from datetime import datetime
+
+                            date_str = day_data["date"]
+                            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+                            day_name = day_names[date_obj.weekday()]
+
+                            # Add total questions answered that day
+                            total_questions = sum(
+                                session.get("total_questions", 0)
+                                for session in day_data.get("sessions", [])
+                            )
+                            day_totals[day_name] += total_questions
+                        except (ValueError, KeyError):
+                            continue
+
+                workload_distribution = day_totals
+                # Find peak day (day with most questions answered)
+                peak_review_day = (
+                    max(day_totals.items(), key=lambda x: x[1])[0]
+                    if any(day_totals.values())
+                    else "Monday"
+                )
+            else:
+                # Default distribution if no data
+                workload_distribution = {
+                    "Mon": 10,
+                    "Tue": 12,
+                    "Wed": 8,
+                    "Thu": 15,
+                    "Fri": 11,
+                    "Sat": 9,
+                    "Sun": 13,
+                }
+                peak_review_day = "Monday"
+
+        except Exception:
+            # Fallback to default values
+            workload_distribution = {
+                "Mon": 10,
+                "Tue": 12,
+                "Wed": 8,
+                "Thu": 15,
+                "Fri": 11,
+                "Sat": 9,
+                "Sun": 13,
+            }
+            peak_review_day = "Monday"
+
         return StudyForecast(
             reviews_due_today=due_today,
             reviews_due_tomorrow=due_tomorrow,
             reviews_due_week=due_week,
             new_cards_recommended=new_recommended,
             estimated_study_time_minutes=int((due_today + new_recommended) * 0.5),
-            peak_review_day="Monday",  # Simplified
-            workload_distribution={},  # Simplified
+            peak_review_day=peak_review_day,
+            workload_distribution=workload_distribution,
         )
 
     def _recommend_focus_categories(
@@ -503,17 +558,86 @@ class ProgressAnalytics:
 
         return datetime.now(UTC) + timedelta(days=int(days_needed))
 
-    def _analyze_study_times(self, user_id: int) -> list[str]:  # noqa: ARG002
-        """Analyze best study times.
+    async def _analyze_study_times(self, user_id: int) -> list[str]:
+        """Analyze best study times based on historical performance.
 
         Args:
             user_id: User ID
 
         Returns:
-            List of best study hours
+            List of best study hours formatted as HH:MM
         """
-        # TODO: Implement time-based performance analysis
-        return ["09:00", "14:00", "19:00"]  # Default recommendations
+        try:
+            # Get hourly session statistics for the last 30 days
+            hourly_stats = await self.analytics_repository.get_hourly_session_stats(
+                user_id, days=30
+            )
+
+            if not hourly_stats or not any(
+                stats["count"] > 0 for stats in hourly_stats.values()
+            ):
+                # No study history available, return sensible defaults
+                return ["09:00", "14:00", "19:00"]
+
+            # Score each hour based on performance metrics
+            hour_scores = {}
+            for hour, stats in hourly_stats.items():
+                if stats["count"] == 0:
+                    hour_scores[hour] = 0.0
+                    continue
+
+                # Calculate composite score based on:
+                # 1. Session count (frequency)
+                # 2. Average accuracy
+                # 3. Session duration consistency
+                session_count = stats["count"]
+                avg_accuracy = stats["avg_accuracy"]
+                total_duration = stats["total_duration"]
+                avg_duration = (
+                    total_duration / session_count if session_count > 0 else 0
+                )
+
+                # Normalize metrics (0-1 scale)
+                frequency_score = min(session_count / 10, 1.0)  # Cap at 10 sessions
+                accuracy_score = avg_accuracy  # Already 0-1
+                duration_score = min(avg_duration / 1800, 1.0)  # Cap at 30 minutes
+
+                # Weighted composite score
+                # Prioritize accuracy (50%), then frequency (30%), then duration (20%)
+                composite_score = (
+                    accuracy_score * 0.5 + frequency_score * 0.3 + duration_score * 0.2
+                )
+
+                hour_scores[hour] = composite_score
+
+            # Get top 3 hours sorted by score
+            top_hours = sorted(hour_scores.items(), key=lambda x: x[1], reverse=True)[
+                :3
+            ]
+
+            # Filter out hours with zero scores (no activity)
+            valid_hours = [(hour, score) for hour, score in top_hours if score > 0]
+
+            if not valid_hours:
+                # Fallback to defaults if no valid hours found
+                return ["09:00", "14:00", "19:00"]
+
+            # Format hours as HH:MM
+            recommended_hours = [f"{hour:02d}:00" for hour, _ in valid_hours]
+
+            # Ensure we have at least 3 recommendations, add defaults if needed
+            defaults = ["09:00", "14:00", "19:00"]
+            for default in defaults:
+                if len(recommended_hours) >= 3:
+                    break
+                if default not in recommended_hours:
+                    recommended_hours.append(default)
+
+            return recommended_hours[:3]
+
+        except Exception:
+            # Fallback to defaults on any error
+            return ["09:00", "14:00", "19:00"]
 
     async def _get_session_statistics(self, user_id: int) -> dict[str, Any]:
         """Get session statistics.
