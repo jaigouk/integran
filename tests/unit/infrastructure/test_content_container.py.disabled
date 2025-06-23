@@ -1,0 +1,167 @@
+"""Tests for ContentContainer dependency injection container."""
+
+from __future__ import annotations
+
+from unittest.mock import Mock, patch
+
+import pytest
+
+from src.application_services.content.content_builder_service import (
+    ContentBuilderService,
+)
+from src.domain.content.services.create_image_mapping import CreateImageMapping
+from src.domain.content.services.generate_answer import GenerateAnswer
+from src.domain.content.services.process_image import ProcessImage
+from src.infrastructure.containers.content_container import ContentContainer
+from src.infrastructure.messaging.event_bus import EventBus
+from src.infrastructure.repositories.content_repository import ContentRepository
+
+
+@patch("src.domain.content.services.generate_answer.GENAI_AVAILABLE", True)
+@patch("src.domain.content.services.process_image.GENAI_AVAILABLE", True)
+@patch("src.domain.content.services.generate_answer.genai")
+@patch("src.domain.content.services.process_image.genai")
+@patch("src.infrastructure.config.settings.has_gemini_config", return_value=True)
+class TestContentContainer:
+    """Test ContentContainer dependency injection."""
+
+    def test_initialization_default_event_bus(self) -> None:
+        """Test container initialization with default event bus."""
+        container = ContentContainer()
+        
+        # Verify internal components are created
+        assert hasattr(container, "_event_bus")
+        assert hasattr(container, "_repository")
+        assert hasattr(container, "_generate_answer")
+        assert hasattr(container, "_process_image")
+        assert hasattr(container, "_create_image_mapping")
+        assert hasattr(container, "_content_builder")
+
+    def test_initialization_with_provided_event_bus(self) -> None:
+        """Test container initialization with provided event bus."""
+        custom_event_bus = EventBus()
+        container = ContentContainer(event_bus=custom_event_bus)
+        
+        # Should use the provided event bus
+        assert container._event_bus is custom_event_bus
+
+    def test_get_event_bus(self) -> None:
+        """Test getting event bus instance."""
+        container = ContentContainer()
+        event_bus = container.get_event_bus()
+        
+        assert isinstance(event_bus, EventBus)
+        assert event_bus is container._event_bus
+
+    def test_get_repository(self) -> None:
+        """Test getting repository instance."""
+        container = ContentContainer()
+        repository = container.get_repository()
+        
+        assert isinstance(repository, ContentRepository)
+        assert repository is container._repository
+
+    def test_get_generate_answer_service(self) -> None:
+        """Test getting GenerateAnswer service."""
+        container = ContentContainer()
+        service = container.get_generate_answer_service()
+        
+        assert isinstance(service, GenerateAnswer)
+        assert service is container._generate_answer
+
+    def test_get_process_image_service(self) -> None:
+        """Test getting ProcessImage service."""
+        container = ContentContainer()
+        service = container.get_process_image_service()
+        
+        assert isinstance(service, ProcessImage)
+        assert service is container._process_image
+
+    def test_get_create_image_mapping_service(self) -> None:
+        """Test getting CreateImageMapping service."""
+        container = ContentContainer()
+        service = container.get_create_image_mapping_service()
+        
+        assert isinstance(service, CreateImageMapping)
+        assert service is container._create_image_mapping
+
+    def test_get_content_builder_service(self) -> None:
+        """Test getting ContentBuilderService."""
+        container = ContentContainer()
+        service = container.get_content_builder_service()
+        
+        assert isinstance(service, ContentBuilderService)
+        assert service is container._content_builder
+
+    def test_domain_services_receive_event_bus(self) -> None:
+        """Test that domain services are initialized with event bus."""
+        custom_event_bus = EventBus()
+        container = ContentContainer(event_bus=custom_event_bus)
+        
+        # Check that domain services have access to the same event bus
+        generate_answer = container.get_generate_answer_service()
+        process_image = container.get_process_image_service()
+        create_mapping = container.get_create_image_mapping_service()
+        
+        # Domain services should have event_bus attribute
+        assert hasattr(generate_answer, "event_bus")
+        assert hasattr(process_image, "event_bus")
+        assert hasattr(create_mapping, "event_bus")
+
+    def test_content_builder_receives_dependencies(self) -> None:
+        """Test that ContentBuilderService receives correct dependencies."""
+        container = ContentContainer()
+        content_builder = container.get_content_builder_service()
+        
+        # ContentBuilderService should have event_bus and repository
+        assert hasattr(content_builder, "event_bus")
+        assert hasattr(content_builder, "repository")
+        
+        # Should be the same instances from container
+        assert content_builder.event_bus is container.get_event_bus()
+        assert content_builder.repository is container.get_repository()
+
+    def test_multiple_calls_return_same_instances(self) -> None:
+        """Test that multiple calls return the same service instances."""
+        container = ContentContainer()
+        
+        # Get services twice
+        event_bus1 = container.get_event_bus()
+        event_bus2 = container.get_event_bus()
+        
+        repository1 = container.get_repository()
+        repository2 = container.get_repository()
+        
+        generate_answer1 = container.get_generate_answer_service()
+        generate_answer2 = container.get_generate_answer_service()
+        
+        # Should return same instances (singleton pattern)
+        assert event_bus1 is event_bus2
+        assert repository1 is repository2
+        assert generate_answer1 is generate_answer2
+
+    def test_container_isolation(self) -> None:
+        """Test that different container instances are isolated."""
+        container1 = ContentContainer()
+        container2 = ContentContainer()
+        
+        # Different containers should have different instances
+        assert container1.get_event_bus() is not container2.get_event_bus()
+        assert container1.get_repository() is not container2.get_repository()
+        assert (
+            container1.get_generate_answer_service()
+            is not container2.get_generate_answer_service()
+        )
+
+    def test_service_initialization_order(self) -> None:
+        """Test that services are initialized in correct order."""
+        # This should not raise any exceptions due to dependency issues
+        container = ContentContainer()
+        
+        # All services should be accessible
+        assert container.get_event_bus() is not None
+        assert container.get_repository() is not None
+        assert container.get_generate_answer_service() is not None
+        assert container.get_process_image_service() is not None
+        assert container.get_create_image_mapping_service() is not None
+        assert container.get_content_builder_service() is not None

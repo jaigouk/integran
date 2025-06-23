@@ -1,0 +1,34 @@
+{
+  "export_timestamp": "2025-06-17T22:34:36.214584",
+  "user_settings": {
+    "user_id": 1,
+    "language": "en",
+    "theme_mode": "light",
+    "developer_mode": {
+      "enabled": false,
+      "use_gemini": false,
+      "api_usage_warnings": true
+    },
+    "first_time_setup": true,
+    "onboarding_completed": false,
+    "preferences": {
+      "daily_goal": 20,
+      "session_timeout_minutes": 60,
+      "show_explanations": true,
+      "auto_advance": false,
+      "theme_mode": "light",
+      "language": "en",
+      "enable_notifications": true,
+      "reminder_time": "19:00",
+      "custom_settings": {}
+    },
+    "flow_state": {
+      "current_screen": "main_menu",
+      "session_in_progress": false,
+      "current_session_id": null,
+      "last_question_id": null,
+      "setup_step": null,
+      "flow_data": {}
+    }
+  }
+}

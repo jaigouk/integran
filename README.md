@@ -1,46 +1,70 @@
 # Integran
 
-> ⚠️ **DEVELOPMENT STATUS WARNING** ⚠️
-> 
-> **This project is currently under heavy development and the terminal application is NOT READY for end users yet.**
-> 
-> - 📋 Dataset generation and processing tools are functional
-> - 🚧 Terminal trainer interface is still being developed  
-> - 🔧 Core application features are being implemented
-> - 📱 Mobile and desktop versions are planned for future releases
->
-> **For Developers**: The dataset building tools (`integran-build-dataset`, `integran-direct-extract`) are working and can be used to generate question datasets from PDF sources.
+A comprehensive, terminal-based training application for the German Integration Exam (Leben in Deutschland Test) that helps you master all 460 exam questions through intelligent spaced repetition learning.
 
-A comprehensive, terminal-based training application for the German Integration Exam (Leben in Deutschland Test) *currently in development*. Will feature multilingual support, AI-powered explanations, and intelligent learning techniques to maximize exam success.
+🚧 **Status**: In active development - Terminal UI complete, core learning system functional
 
-## 🎯 Purpose
+## ✨ Features
 
-The "Leben in Deutschland" test consists of 460 questions (300 general + 160 state-specific) covering German society, laws, culture, and history. This trainer helps you master all questions through:
+### 🧠 Smart Learning System
+- **Scientific Spaced Repetition**: Uses FSRS algorithm to review questions at the optimal time for long-term retention
+- **Personalized Scheduling**: Adapts to your memory patterns and learning speed
+- **Automatic Reviews**: No need to decide what to study - the system knows what you need
 
-- **Multilingual Support**: Explanations in 5 languages (English, German, Turkish, Ukrainian, Arabic)
-- **Image Question Support**: Visual questions with detailed image descriptions
-- **AI-Powered Explanations**: Comprehensive explanations for all questions
-- **Interactive Practice Sessions**: Multiple learning modes
-- **Smart Failure Tracking**: Adaptive learning system
-- **Spaced Repetition Learning**: Optimize retention
-- **Progress Monitoring**: Track your improvement
+### 🌍 Complete Question Database
+- **460 Official Questions**: All 300 general + 160 state-specific questions from the official exam
+- **5 Language Support**: Explanations in English, German, Turkish, Ukrainian, and Arabic
+- **Visual Questions**: Image-based questions with detailed descriptions
+- **AI-Generated Explanations**: Comprehensive explanations with memory aids for every question
 
-## 🎮 Usage
+### 📊 Progress Tracking
+- **Real-time Analytics**: Track your retention rate, mastered questions, and learning velocity
+- **Weak Area Detection**: Identifies topics where you need more practice
+- **Study Streak Tracking**: Maintain consistent daily practice
+- **Performance Insights**: Detailed statistics by category and difficulty
 
-> **Note**: The terminal training interface is currently under development. The commands below show the planned functionality.
+### 🎯 Multiple Practice Modes
+- **Smart Review**: AI-scheduled reviews based on your memory patterns
+- **Random Practice**: Varied question selection for comprehensive coverage
+- **Category Focus**: Target specific topics like Politik, Geschichte, or Grundrechte
+- **Failed Questions**: Review only questions you got wrong
 
-### Quick Start (When Ready)
+## 🚀 Quick Start
 
-1. **Install and Setup** (see installation section below)
-2. **Start the trainer:**
+### Installation
+
+1. **Install Conda** (if not already installed):
+   ```bash
+   # Download and install Miniconda from https://docs.conda.io/en/latest/miniconda.html
+   ```
+
+2. **Clone and Setup**:
+   ```bash
+   git clone https://github.com/jaigouk/integran.git
+   cd integran
+   
+   # Create environment and install
+   conda create -n integran python=3.12 -y
+   conda activate integran
+   
+   # Install uv package manager
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # Install dependencies
+   uv pip install -e ".[dev]"
+   ```
+
+3. **Start Learning**:
    ```bash
    integran
    ```
-3. **Choose your practice mode** from the interactive menu
 
-### Interactive Menu
+That's it! The app will automatically initialize the database on first run.
 
-Upon starting, you'll see:
+### Using the App
+
+When you start Integran, you'll see an interactive menu:
+
 ```
 ╔════════════════════════════════════════╗
 ║        Integran - Exam Trainer         ║
@@ -48,213 +72,104 @@ Upon starting, you'll see:
 
 1. 📚 Practice Mode (Random)
 2. 📖 Sequential Practice
-3. 🎯 Practice by Question Number
-4. 📊 Category Practice
-5. 🔄 Review Failed Questions
-6. 📈 View Statistics
-7. ⚙️  Settings
-8. 🚪 Exit
+3. 🎯 Practice by Category
+4. 🔄 Review Failed Questions
+5. 📈 View Statistics
+6. ⚙️  Settings
+7. 🚪 Exit
 
 Select option:
 ```
 
+Simply choose your practice mode and start learning!
+
+## 🧠 How the Smart Learning System Works
+
+### The Science Behind Spaced Repetition
+
+Most people forget 50% of new information within an hour and 90% within a week. Traditional studying fights this by cramming, but that's inefficient. Our app uses **spaced repetition** - a scientifically-proven method that schedules reviews at the exact moment you're about to forget something.
+
+### What Makes Our System Special
+
+**🤖 FSRS Algorithm**: We use the Free Spaced Repetition Scheduler (FSRS), the most advanced spaced repetition algorithm available. It's 20-30% more efficient than traditional methods.
+
+**🧪 How It Works**:
+1. **Learn New Questions**: Start with any question from the 460-question database
+2. **Rate Your Performance**: After each answer, tell us how difficult it was (Again/Hard/Good/Easy)
+3. **Smart Scheduling**: The system calculates the perfect time to review each question based on:
+   - How well you knew it
+   - How many times you've seen it
+   - Your personal forgetting patterns
+4. **Adaptive Learning**: Questions you struggle with appear more often, easy ones less frequently
+5. **Long-term Retention**: Achieve 90%+ retention rate with minimal study time
+
+### Why This Works Better Than Traditional Study
+
+- **No Wasted Time**: Don't review things you already know well
+- **Perfect Timing**: Review questions just before you forget them
+- **Personalized**: Adapts to YOUR memory, not average students
+- **Proven Results**: Based on decades of memory research
+- **Efficient**: Learn more in less time
+
+### Real-World Example
+
+Instead of reviewing all 460 questions repeatedly:
+- Day 1: Learn 20 new questions
+- Day 2: Review 5 from yesterday + 15 new ones
+- Day 7: Review the questions you're starting to forget
+- Day 30: Quick review of older material to maintain retention
+
+The system handles all the scheduling automatically - you just study what it shows you!
+
 ### Command Line Options
 
 ```bash
-# Start in a specific mode
-integran --mode random
-
-# Review only failed questions
-integran --review
-
-# Practice specific category
-integran --category "Grundrechte"
-
-# Export progress report
-integran --export-stats
+# Available options:
+integran                           # Start interactive menu
+integran --mode random             # Start in random practice mode
+integran --review                  # Review only failed questions  
+integran --category "Grundrechte"  # Practice specific category
+integran --stats                   # Display learning statistics
+integran --reset                   # Reset all progress data
 ```
 
-## 🚀 Features (Planned & In Development)
+## 🎯 About the Exam
 
-### ✅ **Currently Implemented**
-- **Dataset Generation**: Extract questions from official BAMF PDF
-- **AI Processing**: Generate multilingual explanations using Google Gemini
-- **Image Processing**: Analyze and describe visual questions
-- **Data Validation**: Comprehensive question and answer validation
-- **Database Schema**: SQLite backend with progress tracking
+The "Leben in Deutschland" (LiD) test consists of:
+- **33 Questions Total**: 30 general + 3 state-specific questions
+- **Multiple Choice Format**: Select from 4 answer options
+- **Passing Score**: 17 correct answers (just over 50%)
+- **Topics Covered**: German society, laws, culture, history, and democratic values
 
-### 🚧 **In Development** 
+This app includes all 460 possible questions from the official question pool, ensuring you're fully prepared for any combination that appears on your exam.
 
-#### 1. **Multilingual Learning Experience**
-- **5 Language Support**: English (primary), German, Turkish, Ukrainian, Arabic
-- **Cultural Context**: Explanations adapted for different backgrounds
-- **Language Selection**: Choose your preferred explanation language
+## 📋 System Requirements
 
-#### 2. **Advanced Question Types**
-- **Text Questions**: Traditional multiple-choice questions
-- **Image Questions**: Visual questions with detailed image descriptions
-- **State-Specific Questions**: Federal state questions for regional exams
-- **AI-Enhanced Descriptions**: Automatic image analysis and context
-
-#### 3. **Multiple Practice Modes**
-- **Random Practice**: Questions shuffled for varied learning
-- **Sequential Practice**: Work through questions in order
-- **Targeted Practice**: Jump to specific question numbers
-- **Category Practice**: Focus on specific topics (e.g., Grundrechte, Geschichte)
-
-#### 4. **Intelligent Learning System**
-- **Failure Tracking**: Automatically saves incorrectly answered questions
-- **Spaced Repetition**: Review difficult questions more frequently
-- **Performance Analytics**: Track your progress over time
-- **Category Insights**: Identify weak areas for focused study
-
-#### 5. **Enhanced Terminal UI**
-- Color-coded feedback (✅ correct / ❌ incorrect)
-- **Image Display**: Shows relevant images for visual questions
-- **Multilingual Explanations**: Switch between explanation languages
-- Clear navigation menus
-- Progress indicators
-- Unicode support for German characters
-- Responsive design for various terminal sizes
-
-## 📈 Progress Tracking (Coming Soon)
-
-View your progress with:
-```bash
-integran --stats  # Not yet functional
-```
-
-This will show:
-- Total questions mastered
-- Success rate by category
-- Learning curve visualization
-- Recommended focus areas
-
-## 📋 Prerequisites
-
+- Python 3.12+
 - Conda (Anaconda or Miniconda)
 - Terminal with UTF-8 support
-- 100MB free disk space (includes images and multilingual data)
+- 100MB free disk space
 
-## 🛠️ Installation
 
-> **Current Status**: Installation sets up the development environment and dataset building tools. The main training application is not yet functional.
+## ⚙️ Settings
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/integran.git
-cd integran
-```
+### Language Options
 
-2. Create and activate conda environment:
-```bash
-conda create -n integran python=3.12 -y
-conda activate integran
-```
+Choose your preferred explanation language in the app settings:
+- 🇬🇧 English (default)
+- 🇩🇪 German (Deutsch)
+- 🇹🇷 Turkish (Türkçe)
+- 🇺🇦 Ukrainian (Українська)
+- 🇸🇦 Arabic (العربية)
 
-3. Install uv (if not already installed):
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+### Study Preferences
 
-4. Install dependencies:
-```bash
-uv pip install -e ".[dev]"
-```
+Configure your learning experience:
+- **Daily Question Limit**: Set how many new questions to learn per day
+- **Show Explanations**: Toggle detailed explanations after each answer
+- **Image Display**: Enable/disable visual questions
+- **Color Theme**: Auto, light, or dark mode
 
-### Alternative: Using Makefile
-```bash
-# Quick setup with make
-make env-create
-conda activate integran
-make install
-```
-
-5. Run the setup script to initialize the database:
-```bash
-integran-setup
-```
-
-### What Works Currently
-- ✅ **Dataset Building Tools**: `integran-build-dataset`, `integran-direct-extract`
-- ✅ **PDF Processing**: Extract questions from official BAMF PDF
-- ✅ **AI Integration**: Generate multilingual explanations
-- 🚧 **Terminal Trainer**: Under development
-- 🚧 **Practice Sessions**: Coming soon
-
-**Note**: The dataset building tools are functional for developers working with question extraction and processing.
-
-## 🔧 Configuration
-
-### Basic Configuration
-
-Edit `data/config.json` to customize:
-```json
-{
-  "repetition_interval": 3,
-  "max_daily_questions": 50,
-  "show_explanations": true,
-  "show_images": true,
-  "explanation_language": "en",
-  "color_mode": "auto"
-}
-```
-
-### Language Settings
-
-Available explanation languages:
-- `"en"` - English (default)
-- `"de"` - German (Deutsch)
-- `"tr"` - Turkish (Türkçe)
-- `"uk"` - Ukrainian (Українська)
-- `"ar"` - Arabic (العربية)
-
-### Developer Configuration
-
-For developers working with the dataset building:
-
-```bash
-# Environment variables for dataset building (developers only)
-export GEMINI_API_KEY="your-key"              # Required: For dataset building
-export GCP_PROJECT_ID="your-project"          # Required: For AI processing
-```
-
-## 🔄 CI/CD
-
-This project supports multiple CI/CD platforms:
-
-### GitHub Actions (`.github/workflows/`)
-- **Main CI Pipeline**: Automated testing, linting, and type checking
-- **Security Checks**: Weekly security scans and dependency vulnerability checks  
-- **Release Automation**: Automated releases when tags are pushed
-- **Dependabot**: Automatic dependency updates
-
-### Gitea Actions (`.gitea/workflows/`)
-- **Self-hosted CI**: Runs on custom DietPi runner
-- **Docker Testing**: Full Docker build and test pipeline
-- **Fallback Testing**: Local Python environment if Docker unavailable
-
-### Available Make Commands
-```bash
-# Quality checks
-make lint          # Run ruff linter and formatting checks
-make typecheck     # Run mypy type checking  
-make test          # Run pytest test suite
-make coverage      # Run tests with coverage report
-make check-all     # Run all quality checks
-
-# Docker workflows
-make docker-build  # Build production Docker image
-make docker-test   # Run tests in Docker container
-make docker-run    # Run application in Docker
-
-# Environment management
-make env-create    # Create conda environment
-make install       # Install dependencies with uv
-make clean         # Remove build artifacts
-```
-
-Both CI systems exclude slow integration tests that require API calls, ensuring fast and reliable builds.
 
 ## 🙏 Acknowledgments
 
@@ -264,31 +179,54 @@ Both CI systems exclude slow integration tests that require API calls, ensuring 
 - Inspired by Anki's spaced repetition algorithm
 - Built with love for the integration community
 
+---
+
 ## 👩‍💻 For Developers
 
-If you're contributing to this project or want to modify the dataset building process, see our comprehensive [Developer Guide](docs/developer-guide.md).
+See our comprehensive [Developer Guide](docs/developer-guide.md) for:
+- Architecture details (DDD, CQRS, Event-Driven)
+- Development setup and environment
+- Testing and code quality standards
+- Dataset building process
+- Contributing guidelines
 
-The developer guide covers:
-- 📊 Data structure and database schema
-- 🏗️ Complete dataset building with `integran-build-dataset`
-- 🤖 PDF question extraction and AI processing
-- 🌍 Multilingual explanation generation
-- 🖼️ Image processing and description system
-- 🔧 Development environment setup
-- 🧪 Testing and code quality
-- 📝 Contributing guidelines
-
-### Quick Developer Commands
+### Quick Developer Setup
 
 ```bash
-# Check dataset build status
-integran-build-dataset --status
+# Clone and setup development environment
+git clone https://github.com/jaigouk/integran.git
+cd integran
+make env-create
+conda activate integran
+make install
 
-# Build complete multilingual dataset
-integran-build-dataset --verbose
+# Run tests
+make test
 
-# Backup existing data
-integran-backup-data backup
+# Run all quality checks
+make check-all
+```
+
+### Project Structure
+
+```
+src/
+├── domain/         # Business logic (FSRS algorithm, domain services)
+├── application/    # Commands, queries, event handlers
+├── infrastructure/ # Database, external APIs, repositories
+├── presentation/   # Terminal UI (Textual/Rich)
+└── main.py        # Entry point
+```
+
+Architecture Flow:
+```
+  Domain Layer (defines interfaces)
+       ↓ depends on
+  Infrastructure Layer (implements interfaces)
+       ↓ injected via
+  Application Layer (uses dependency injection)
+       ↓ called by
+  Presentation Layer (uses commands/queries)
 ```
 
 ## 📝 License

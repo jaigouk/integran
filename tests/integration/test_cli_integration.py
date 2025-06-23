@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.cli.backup_data import main as backup_main
-from src.cli.build_dataset import build_dataset_cli
+from src.presentation.cli.backup_data import main as backup_main
+from src.presentation.cli.build_dataset import build_dataset_cli
 
 
 class TestCLIIntegration:
@@ -23,7 +23,7 @@ class TestCLIIntegration:
         self.temp_dir = tempfile.mkdtemp()
         self.test_dir = Path(self.temp_dir)
 
-    @patch("src.core.settings.has_gemini_config")
+    @patch("src.infrastructure.config.settings.has_gemini_config")
     def test_build_dataset_help_command_integration(
         self, mock_has_gemini_config, capsys
     ):

@@ -1,0 +1,301 @@
+# Event Flow Definition for Integran
+# This file defines all events and their relationships across the system
+# Used for validation, documentation, and cross-platform consistency
+
+version: "1.0"
+last_updated: "2025-06-16"
+
+# Event Categories
+categories:
+  system: "Application lifecycle and system events"
+  user: "User actions and preferences"
+  learning: "Learning session and FSRS events"
+  content: "Content processing and dataset events"
+  analytics: "Performance tracking and analysis events"
+  developer: "Developer-only operations"
+
+# Core Events Definition
+events:
+  # System Events
+  AppStartedEvent:
+    category: system
+    triggers: [FirstTimeSetupEvent, UserSettingsLoadedEvent]
+    dependencies: []
+    description: "Application startup initialization"
+    
+  FirstTimeSetupEvent:
+    category: system
+    triggers: [LanguageSelectedEvent]
+    dependencies: [AppStartedEvent]
+    description: "First-time user setup flow"
+    
+  DatabaseMigrationEvent:
+    category: system
+    triggers: [UserSettingsLoadedEvent]
+    dependencies: [AppStartedEvent]
+    description: "Database schema migration"
+
+  # User Configuration Events
+  UserSettingsLoadedEvent:
+    category: user
+    triggers: [MainMenuDisplayedEvent]
+    dependencies: [AppStartedEvent]
+    description: "User preferences loaded from database"
+    
+  UserSettingsChangedEvent:
+    category: user
+    triggers: [SettingsSavedEvent, DeveloperModeToggledEvent]
+    dependencies: [UserSettingsLoadedEvent]
+    description: "User changed preferences"
+    
+  DeveloperModeToggledEvent:
+    category: user
+    triggers: [DeveloperMenuDisplayedEvent, ServiceAvailabilityChangedEvent]
+    dependencies: [UserSettingsChangedEvent]
+    description: "Developer mode enabled/disabled"
+    
+  LanguageSelectedEvent:
+    category: user
+    triggers: [DeveloperModeToggledEvent]
+    dependencies: [FirstTimeSetupEvent]
+    description: "User selected interface language"
+    
+  FirstTimeSetupCompletedEvent:
+    category: user
+    triggers: [MainMenuDisplayedEvent]
+    dependencies: [DeveloperModeToggledEvent]
+    description: "Initial setup workflow completed"
+    
+  MainMenuDisplayedEvent:
+    category: system
+    triggers: []
+    dependencies: [UserSettingsLoadedEvent, FirstTimeSetupCompletedEvent]
+    description: "Main menu screen displayed to user"
+    
+  SettingsOpenedEvent:
+    category: user
+    triggers: [UserSettingsChangedEvent]
+    dependencies: [MainMenuDisplayedEvent]
+    description: "Settings screen opened"
+    
+  SettingsSavedEvent:
+    category: user
+    triggers: []
+    dependencies: [UserSettingsChangedEvent]
+    description: "User settings saved to database"
+    
+  ServiceAvailabilityChangedEvent:
+    category: system
+    triggers: []
+    dependencies: [DeveloperModeToggledEvent]
+    description: "Service availability changed due to developer mode"
+    
+  DeveloperMenuDisplayedEvent:
+    category: developer
+    triggers: [DatasetBuildStartedEvent]
+    dependencies: [DeveloperModeToggledEvent]
+    description: "Developer operations menu displayed"
+    
+  DeveloperOperationFinishedEvent:
+    category: developer
+    triggers: []
+    dependencies: [DatasetBuildCompletedEvent]
+    description: "Developer operation completed"
+    
+  InterleavingOptimizedEvent:
+    category: analytics
+    triggers: []
+    dependencies: [LeechDetectedEvent, PerformanceAnalyzedEvent]
+    description: "Question interleaving strategy optimized"
+
+  # Learning Events
+  SessionStartedEvent:
+    category: learning
+    triggers: [QuestionLoadedEvent]
+    dependencies: [UserSettingsLoadedEvent]
+    description: "Learning session initiated"
+    
+  QuestionLoadedEvent:
+    category: learning
+    triggers: [AnswerSubmittedEvent]
+    dependencies: [SessionStartedEvent]
+    description: "Question displayed to user"
+    
+  AnswerSubmittedEvent:
+    category: learning
+    triggers: [CardScheduledEvent]
+    dependencies: [QuestionLoadedEvent]
+    description: "User submitted answer with FSRS rating"
+    
+  CardScheduledEvent:
+    category: learning
+    triggers: [ProgressTrackedEvent, SessionCompletedEvent]
+    dependencies: [AnswerSubmittedEvent]
+    description: "FSRS algorithm scheduled next review"
+    
+  SessionCompletedEvent:
+    category: learning
+    triggers: [PerformanceAnalyzedEvent]
+    dependencies: [CardScheduledEvent]
+    description: "Learning session finished"
+
+  # Analytics Events
+  ProgressTrackedEvent:
+    category: analytics
+    triggers: [PerformanceAnalyzedEvent]
+    dependencies: [CardScheduledEvent]
+    description: "User progress metrics updated"
+    
+  PerformanceAnalyzedEvent:
+    category: analytics
+    triggers: [LeechDetectedEvent, InterleavingOptimizedEvent]
+    dependencies: [ProgressTrackedEvent, SessionCompletedEvent]
+    description: "Performance analysis completed"
+    
+  LeechDetectedEvent:
+    category: analytics
+    triggers: [InterleavingOptimizedEvent]
+    dependencies: [PerformanceAnalyzedEvent]
+    description: "Difficult card requiring special attention"
+
+  # Content Events (Developer Mode)
+  DatasetBuildStartedEvent:
+    category: developer
+    triggers: [ImageProcessedEvent, AnswerGeneratedEvent]
+    dependencies: [DeveloperModeToggledEvent]
+    description: "Dataset generation process started"
+    
+  ImageProcessedEvent:
+    category: developer
+    triggers: [DatasetBuildCompletedEvent]
+    dependencies: [DatasetBuildStartedEvent]
+    description: "Image processing with Gemini AI"
+    
+  AnswerGeneratedEvent:
+    category: developer
+    triggers: [DatasetBuildCompletedEvent]
+    dependencies: [DatasetBuildStartedEvent]
+    description: "Multilingual answer generation"
+    
+  DatasetBuildCompletedEvent:
+    category: developer
+    triggers: [DeveloperOperationFinishedEvent]
+    dependencies: [ImageProcessedEvent, AnswerGeneratedEvent]
+    description: "Dataset generation finished"
+
+# User Flow Sequences
+flows:
+  first_time_setup:
+    name: "First Time User Setup"
+    description: "New user onboarding workflow"
+    sequence:
+      - AppStartedEvent
+      - FirstTimeSetupEvent
+      - LanguageSelectedEvent
+      - DeveloperModeToggledEvent
+      - FirstTimeSetupCompletedEvent
+      - MainMenuDisplayedEvent
+    validation:
+      - no_circular_dependencies
+      - sequential_execution
+      
+  returning_user:
+    name: "Returning User Startup"
+    description: "Existing user application startup"
+    sequence:
+      - AppStartedEvent
+      - UserSettingsLoadedEvent
+      - MainMenuDisplayedEvent
+    validation:
+      - no_circular_dependencies
+      - sequential_execution
+      
+  learning_session:
+    name: "Main Learning Flow"
+    description: "Core learning session with FSRS"
+    sequence:
+      - SessionStartedEvent
+      - QuestionLoadedEvent
+      - AnswerSubmittedEvent
+      - CardScheduledEvent
+      - ProgressTrackedEvent
+    loops:
+      - from: CardScheduledEvent
+        to: QuestionLoadedEvent
+        condition: "session_not_complete"
+      - to: SessionCompletedEvent
+        condition: "session_complete"
+    validation:
+      - no_circular_dependencies
+      - conditional_branching_allowed
+      
+  settings_management:
+    name: "Settings Management Flow"
+    description: "User preference modification"
+    sequence:
+      - SettingsOpenedEvent
+      - UserSettingsChangedEvent
+      - SettingsSavedEvent
+    optional_branches:
+      - DeveloperModeToggledEvent
+      - ServiceAvailabilityChangedEvent
+    validation:
+      - no_circular_dependencies
+      - optional_branching_allowed
+      
+  developer_operations:
+    name: "Developer Dataset Generation"
+    description: "Dataset building with AI services"
+    sequence:
+      - DeveloperModeToggledEvent
+      - DatasetBuildStartedEvent
+      - ImageProcessedEvent
+      - AnswerGeneratedEvent
+      - DatasetBuildCompletedEvent
+    validation:
+      - requires_developer_mode
+      - no_circular_dependencies
+
+# Validation Rules
+validation_rules:
+  no_circular_dependencies:
+    description: "Events cannot trigger themselves directly or indirectly"
+    
+  sequential_execution:
+    description: "Events must execute in defined order"
+    
+  conditional_branching_allowed:
+    description: "Events may branch based on conditions"
+    
+  optional_branching_allowed:
+    description: "Some events in flow are optional"
+    
+  requires_developer_mode:
+    description: "Flow only available when developer mode enabled"
+
+# Cross-Platform Compatibility
+platforms:
+  terminal:
+    supports_all_flows: true
+    keyboard_navigation: true
+    
+  mobile:
+    supports_all_flows: true
+    touch_navigation: true
+    
+  desktop:
+    supports_all_flows: true
+    mouse_keyboard_navigation: true
+    
+  web:
+    supports_all_flows: true
+    browser_navigation: true
+
+# Event Processing Configuration
+processing:
+  async_execution: true
+  event_bus_type: "in_memory"
+  max_event_queue_size: 1000
+  event_timeout_ms: 5000
+  retry_failed_events: true
+  max_retries: 3

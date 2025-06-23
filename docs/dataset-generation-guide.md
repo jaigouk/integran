@@ -281,6 +281,6 @@ python scripts/extract_images.py
 
 ---
 
-**Last Updated**: 2025-06-11  
+**Last Updated**: 2025-01-17  
 **Status**: ✅ Production Ready (100% Complete)  
 **Next Steps**: Use `final_dataset.json` in the Integran app
