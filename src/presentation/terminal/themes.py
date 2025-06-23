@@ -203,7 +203,7 @@ COMMON_CSS_BASE = """
 
 .text-subtitle {
     text-align: center;
-    color: $text-muted;
+    color: $text 50%;
     margin-bottom: 2;
     text-style: italic;
     height: auto;
@@ -219,7 +219,7 @@ COMMON_CSS_BASE = """
 }
 
 .text-help {
-    color: $text-muted;
+    color: $text 50%;
     text-style: italic;
     margin-top: 1;
     height: auto;
@@ -279,7 +279,7 @@ COMMON_CSS_BASE = """
 }
 
 .status-disabled {
-    color: $text-muted;
+    color: $text 50%;
     text-style: italic;
 }
 
@@ -425,6 +425,180 @@ COMMON_CSS_BASE = """
 
 .text-italic {
     text-style: italic;
+}
+
+/* ===== IMAGE DISPLAY SYSTEM ===== */
+.image-options-grid {
+    grid-size: 2 2;
+    grid-gutter: 1 2;
+    width: 100%;
+    margin: 2 0;
+    height: auto;
+    min-height: 30;
+}
+
+.image-option-container {
+    border: solid white;
+    padding: 1;
+    height: auto;
+    min-height: 15;
+    align: center middle;
+    background: $surface;
+}
+
+.coat-of-arms-image {
+    max-width: 100%;
+    max-height: 12;
+    align: center middle;
+    margin: 1;
+}
+
+.image-fallback {
+    border: dashed gray;
+    padding: 1;
+    text-align: center;
+    background: $warning 10%;
+    color: gray;
+    height: 12;
+    align: center middle;
+}
+
+.image-option-button {
+    width: 100%;
+    margin-top: 1;
+    background: $primary;
+    color: white;
+    border: solid $primary-darken-3;
+}
+
+.image-option-button:hover {
+    background: $primary-lighten-3;
+}
+
+.info-message {
+    text-align: center;
+    margin: 1 0;
+    padding: 1;
+    background: $background;
+    border-left: solid $accent;
+    color: $text;
+}
+
+.error-message {
+    color: $error;
+    text-style: bold;
+    text-align: center;
+    margin: 2 0;
+    padding: 2;
+    background: $error 10%;
+    border: solid $error;
+}
+
+/* ===== QUESTION SPECIFIC SCROLLING ===== */
+.question-pane {
+    height: 1fr;
+    max-height: 85vh;
+}
+
+.question-container {
+    height: 1fr;
+    min-height: 50vh;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+.question-tabs {
+    height: 1fr;
+    max-height: 90vh;
+}
+
+/* ===== ANSWER BUTTON STYLING ===== */
+.answer-buttons-column {
+    width: 100%;
+    height: auto;
+    min-height: 30;
+    padding: 2;
+}
+
+.answer-buttons-column Button {
+    width: 100%;
+    height: 5;
+    margin: 1 0;
+    min-height: 5;
+    text-align: center;
+    padding: 1 2;
+}
+
+.multi-image-button {
+    background: $primary;
+    color: white;
+    border: solid $primary-darken-3;
+    text-align: center;
+    padding: 1 2;
+    width: 100%;
+    height: 5;
+    min-height: 5;
+    margin: 1 0;
+    text-style: bold;
+}
+
+.options-header {
+    text-align: center;
+    text-style: bold;
+    color: $primary;
+    margin: 2 0 1 0;
+    padding: 1;
+}
+
+/* ===== MULTI-IMAGE LAYOUT STYLING ===== */
+.images-row {
+    width: 100%;
+    height: auto;
+    min-height: 20;
+    max-height: 30;
+    margin: 2 0;
+    padding: 1;
+}
+
+.image-container {
+    width: 1fr;
+    height: auto;
+    min-height: 15;
+    max-height: 20;
+    margin: 0 1;
+    border: solid white;
+    padding: 1;
+    align: center middle;
+}
+
+.multi-question-image {
+    width: 100%;
+    height: auto;
+    max-height: 18;
+    align: center middle;
+}
+
+.image-option-label {
+    text-align: center;
+    text-style: bold;
+    color: $primary;
+    margin-top: 1;
+    height: 1;
+}
+
+/* ===== SINGLE-IMAGE LAYOUT STYLING ===== */
+.single-image-container {
+    width: 100%;
+    height: auto;
+    margin: 2 0;
+    padding: 1;
+    align: center middle;
+}
+
+.single-question-image {
+    width: 90%;
+    height: auto;
+    align: center middle;
 }
 """
 

@@ -52,6 +52,11 @@ class QuestionRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_image_questions(self) -> list[Question]:
+        """Get all questions that have images."""
+        pass
+
+    @abstractmethod
     async def save_question(self, question: Question) -> Question:
         """Save or update a question."""
         pass
@@ -281,4 +286,28 @@ class SessionRepository(ABC):
     @abstractmethod
     async def get_session_by_id(self, session_id: int) -> dict[str, Any] | None:
         """Get session data by session ID."""
+        pass
+
+
+class ImageRepository(ABC):
+    """Repository interface for image-related data operations."""
+
+    @abstractmethod
+    async def get_image_data(self, path: str) -> bytes | None:
+        """Get image data by path."""
+        pass
+
+    @abstractmethod
+    async def validate_image_exists(self, path: str) -> bool:
+        """Check if image file exists."""
+        pass
+
+    @abstractmethod
+    async def get_image_metadata(self, path: str) -> dict[str, Any] | None:
+        """Get image metadata (size, format, etc.)."""
+        pass
+
+    @abstractmethod
+    async def list_available_images(self, directory: str = "data/images") -> list[str]:
+        """List all available image files in directory."""
         pass

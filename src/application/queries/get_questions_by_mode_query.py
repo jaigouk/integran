@@ -53,6 +53,8 @@ class GetQuestionsByModeQueryHandler:
                 return await self._get_sequential_questions(query)
             elif query.practice_mode == "category":
                 return await self._get_category_questions(query)
+            elif query.practice_mode == "images":
+                return await self._get_image_questions(query)
             else:
                 return await self._get_default_question(query)
 
@@ -141,6 +143,27 @@ class GetQuestionsByModeQueryHandler:
         """Get questions from a specific category (could be enhanced later)."""
         # For now, delegate to random mode
         return await self._get_random_questions(query)
+
+    async def _get_image_questions(
+        self, query: GetQuestionsByModeQuery
+    ) -> GetQuestionsByModeResult:
+        """Get questions that have images."""
+        image_questions = await self.question_repository.get_image_questions()
+        if image_questions:
+            # Cycle through image questions sequentially
+            question_index = query.last_question_id % len(image_questions)
+            question = image_questions[question_index]
+
+            next_state = {
+                "last_question_id": (query.last_question_id + 1) % len(image_questions)
+            }
+            return GetQuestionsByModeResult(
+                success=True, question=question, next_state=next_state
+            )
+
+        return GetQuestionsByModeResult(
+            success=False, error_message="No image questions available"
+        )
 
     async def _get_default_question(
         self, _query: GetQuestionsByModeQuery

@@ -202,26 +202,13 @@ class TestMainEntryPointIntegration:
 
     @patch("src.main._start_trainer")
     @patch("src.main.DatabaseManager")
-    @patch("src.main.Path")
+    @patch("pathlib.Path.exists")
     def test_main_function_calls_start_trainer_correctly(
-        self, mock_path_class, mock_db_class, mock_start_trainer
+        self, mock_path_exists, mock_db_class, mock_start_trainer
     ):
         """Test that main function calls _start_trainer with correct parameters."""
-        # Arrange
-        mock_questions_file = Mock()
-        mock_questions_file.exists.return_value = True
-        mock_db_file = Mock()
-        mock_db_file.exists.return_value = True
-
-        # Mock Path to return different mocks based on the path string
-        def path_side_effect(path_str):
-            if "final_dataset.json" in str(path_str):
-                return mock_questions_file
-            elif "trainer.db" in str(path_str):
-                return mock_db_file
-            return Mock()
-
-        mock_path_class.side_effect = path_side_effect
+        # Arrange - Mock path exists to return True for both files
+        mock_path_exists.return_value = True
 
         mock_db_manager = Mock()
         mock_db_class.return_value = mock_db_manager
@@ -255,10 +242,10 @@ class TestMainEntryPointIntegration:
     @patch("src.application.setup.database_setup_service.main_async")
     @patch("src.main.console")
     @patch("src.main.DatabaseManager")
-    @patch("src.main.Path")
+    @patch("pathlib.Path.exists")
     def test_main_function_handles_missing_questions_file(
         self,
-        mock_path_class,
+        mock_path_exists,
         mock_db_class,
         mock_console,
         mock_main_async,
@@ -266,22 +253,29 @@ class TestMainEntryPointIntegration:
         mock_start_trainer,
     ):
         """Test that main function triggers auto-setup when questions file is missing."""
-        # Arrange
-        mock_questions_file = Mock()
-        mock_questions_file.exists.return_value = False
 
-        def path_side_effect(path_str):
-            if "final_dataset.json" in str(path_str):
-                return mock_questions_file
-            return Mock()
+        # Arrange - Mock the specific path check for questions file to return False
+        def path_exists_side_effect():
+            # This will be called on the Path object, we need to get the actual path
+            # Since we can't access the Path object directly, we'll return False first time
+            # (for questions file) and True for subsequent calls
+            if not hasattr(path_exists_side_effect, "call_count"):
+                path_exists_side_effect.call_count = 0
+            path_exists_side_effect.call_count += 1
+            # First call is for questions file - return False
+            # Subsequent calls return True (for db file exists)
+            return path_exists_side_effect.call_count > 1
 
-        mock_path_class.side_effect = path_side_effect
+        mock_path_exists.side_effect = path_exists_side_effect
 
         mock_db_manager = Mock()
         mock_db_class.return_value = mock_db_manager
 
         # Mock successful setup - main_async returns a coroutine
-        mock_main_async.return_value = AsyncMock()()
+        async def mock_setup_coroutine():
+            return None
+
+        mock_main_async.return_value = mock_setup_coroutine()
         # Mock asyncio.run to not actually run the coroutine
         mock_asyncio_run.return_value = None
         # Mock _start_trainer to prevent it from running

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import sys
 from pathlib import Path
 
@@ -11,9 +12,31 @@ from rich.console import Console
 from rich.text import Text
 
 from src.domain.content.models.question_models import Question
+from src.infrastructure.config.settings import get_settings
 from src.infrastructure.database.database import DatabaseManager
 
 console = Console()
+
+
+def setup_logging() -> None:
+    """Setup logging configuration from settings."""
+    settings = get_settings()
+
+    # Ensure logs directory exists
+    log_file = Path(settings.log_file)
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Configure logging
+    logging.basicConfig(
+        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.FileHandler(log_file), logging.StreamHandler(sys.stdout)],
+    )
+
+    logger = logging.getLogger(__name__)
+    logger.info(
+        f"Logging configured: level={settings.log_level}, file={settings.log_file}"
+    )
 
 
 @click.command()
@@ -63,6 +86,9 @@ def main(
     through interactive practice sessions, spaced repetition, and progress tracking.
     """
     try:
+        # Setup logging first
+        setup_logging()
+
         # Initialize database
         db_manager = DatabaseManager()
 

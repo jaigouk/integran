@@ -20,11 +20,17 @@ class TestPracticeSessionCreation:
         app = Mock()
         app.event_bus = Mock(spec=EventBus)
 
-        # Mock container and session repository
+        # Mock container and start session command handler
         container = Mock()
-        session_repository = Mock()
-        session_repository.create_session = AsyncMock(return_value=123)
-        container.get_session_repository.return_value = session_repository
+        start_session_handler = Mock()
+
+        # Mock the command result
+        from src.application.commands.start_session_command import StartSessionResult
+
+        result = StartSessionResult(success=True, session_id=123)
+        start_session_handler.handle = AsyncMock(return_value=result)
+
+        container.get_start_session_command_handler.return_value = start_session_handler
 
         app.container = container
         return app
@@ -48,7 +54,7 @@ class TestPracticeSessionCreation:
     async def test_create_practice_session_with_container(
         self, practice_screen, mock_app
     ):
-        """Test that practice session is created when container is available."""
+        """Test that practice session is created using CQRS command when container is available."""
         # Arrange
         # Patch the app property to return our mock
         with patch.object(
@@ -61,28 +67,29 @@ class TestPracticeSessionCreation:
             await practice_screen._create_practice_session()
 
             # Assert
-            session_repository = mock_app.container.get_session_repository.return_value
-            session_repository.create_session.assert_called_once_with(
-                user_id=1,
-                session_type="sequential",
-                configuration={"mode": "sequential"},
+            start_session_handler = (
+                mock_app.container.get_start_session_command_handler.return_value
             )
+            start_session_handler.handle.assert_called_once()
+
+            # Verify the command was created with correct parameters
+            call_args = start_session_handler.handle.call_args[0][0]  # Get the command
+            assert call_args.session_type == "sequential"
+            assert call_args.user_id == 1
+            assert call_args.max_questions == 20
             assert practice_screen.session_id == 123
 
     @pytest.mark.asyncio
     async def test_create_practice_session_fallback_without_container(
-        self, practice_screen
+        self, practice_screen, caplog
     ):
-        """Test that practice session creation falls back to direct database manager."""
+        """Test that practice session creation fails gracefully when no container is available."""
         # Arrange
         mock_app = Mock()
         mock_app.container = None
 
-        # Mock DatabaseManager
         with (
-            patch(
-                "src.infrastructure.database.database.DatabaseManager"
-            ) as mock_db_class,
+            caplog.at_level(logging.WARNING),
             patch.object(
                 type(practice_screen),
                 "app",
@@ -90,18 +97,12 @@ class TestPracticeSessionCreation:
                 return_value=mock_app,
             ),
         ):
-            mock_db_manager = Mock()
-            mock_db_manager.create_session.return_value = 456
-            mock_db_class.return_value = mock_db_manager
-
             # Act
             await practice_screen._create_practice_session()
 
             # Assert
-            mock_db_manager.create_session.assert_called_once_with(
-                "sequential", user_id=1
-            )
-            assert practice_screen.session_id == 456
+            assert practice_screen.session_id is None
+            assert "No container available - skipping session creation" in caplog.text
 
     @pytest.mark.asyncio
     async def test_create_practice_session_handles_exceptions(
@@ -111,8 +112,8 @@ class TestPracticeSessionCreation:
         # Arrange
         mock_app = Mock()
         mock_app.container = Mock()
-        mock_app.container.get_session_repository.side_effect = Exception(
-            "Database error"
+        mock_app.container.get_start_session_command_handler.side_effect = Exception(
+            "Command handler error"
         )
 
         with (

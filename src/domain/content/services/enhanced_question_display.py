@@ -269,11 +269,21 @@ class EnhancedQuestionDisplay(
         options = question_data.get("options", [])
         correct_answer = question_data.get("correct", "")
 
+        # Handle both string and dict formats for wrong answer explanations
+        if isinstance(lang_wrong_answers, str):
+            # Parse string format like "A) explanation B) explanation C) explanation"
+            wrong_explanations = self._parse_combined_explanations(lang_wrong_answers)
+        elif isinstance(lang_wrong_answers, dict):
+            # Use dict format directly
+            wrong_explanations = lang_wrong_answers
+        else:
+            wrong_explanations = {}
+
         # Map option letters to explanations
         for i, option_text in enumerate(options):
             if option_text != correct_answer:  # Only wrong answers
                 option_letter = chr(65 + i)  # A, B, C, D
-                explanation = lang_wrong_answers.get(
+                explanation = wrong_explanations.get(
                     option_letter, "No explanation available"
                 )
 
@@ -286,6 +296,32 @@ class EnhancedQuestionDisplay(
                 )
 
         return wrong_analysis
+
+    def _parse_combined_explanations(self, combined_text: str) -> dict[str, str]:
+        """Parse combined explanation text into option letter -> explanation mapping.
+
+        Handles formats like:
+        "A) explanation text B) another explanation C) third explanation"
+        """
+        explanations = {}
+
+        # Split by pattern like "A) ", "B) ", "C) ", "D) "
+        import re
+
+        pattern = r"([A-D])\)\s*"
+        parts = re.split(pattern, combined_text)
+
+        # parts will be ['', 'A', 'text1', 'B', 'text2', 'C', 'text3']
+        # Process pairs of (letter, text)
+        for i in range(1, len(parts), 2):
+            if i + 1 < len(parts):
+                letter = parts[i]
+                text = parts[i + 1].strip()
+                # Remove any trailing letter markers like " B)" from the end
+                text = re.sub(r"\s+[A-D]\).*$", "", text).strip()
+                explanations[letter] = text
+
+        return explanations
 
     def _extract_image_info(self, question_data: dict[str, Any]) -> list[ImageInfo]:
         """Extract image information with descriptions."""

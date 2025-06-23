@@ -57,6 +57,13 @@ class QuestionWidget(EventAwareWidget):
         self.load_user_settings_service = LoadUserSettings(event_bus, user_repository)
         self.user_preferences = None  # Will be loaded from user settings
 
+    async def on_mount(self) -> None:
+        """Called when widget is mounted - setup event subscriptions."""
+        import time
+
+        self._component_ready_time = time.time()
+        await self.setup_event_subscriptions()
+
     def compose(self) -> ComposeResult:
         """Compose the enhanced question widget with tab-based navigation."""
         # Tab-based content organization
@@ -72,15 +79,12 @@ class QuestionWidget(EventAwareWidget):
                     )
                     yield Static(self.question.question, classes="question-text")
 
-                    # Answer options
-                    with Vertical(classes="answer-options"):
-                        for i, option in enumerate(self.question.options_list, 1):
-                            yield Button(
-                                f"{i}. {option}",
-                                id=f"option_{i}",
-                                variant="default",
-                                classes="answer-option",
-                            )
+                    # Answer options - different layout for image questions
+                    if self.question.is_image_question:
+                        # Always use image layout for image questions, even without enhanced data initially
+                        yield from self._compose_image_question_options()
+                    else:
+                        yield from self._compose_text_question_options()
 
                     # Initially hidden - shown after answer selection
                     yield Container(
@@ -168,10 +172,342 @@ class QuestionWidget(EventAwareWidget):
             classes="fsrs-rating hidden",
         )
 
+    def _compose_image_question_options(self) -> ComposeResult:
+        """Compose image question with appropriate layout based on number of images.
+
+        Yields:
+            Layout with images and buttons for each option
+        """
+        try:
+            logger.debug(
+                f"_compose_image_question_options called for Q{self.question.id}"
+            )
+
+            # Check if textual-image is available
+            try:
+                from textual_image.widget import Image
+
+                has_textual_image = True
+                logger.debug("textual-image library is available")
+            except ImportError:
+                has_textual_image = False
+                logger.debug("textual-image library not available")
+                # Provide a dummy Image class to avoid import errors
+                Image = None
+
+            # Check how many images exist for this question
+            from pathlib import Path
+
+            image_count = 0
+            for i in range(1, 5):  # Check for images 1-4
+                image_path = f"data/images/q{self.question.id}_{i}.png"
+                if Path(image_path).exists():
+                    image_count += 1
+
+            logger.debug(f"Question {self.question.id} has {image_count} images")
+
+            # Different layouts based on image count
+            if image_count == 1:
+                # Single image layout - full width image with text options below
+                single_image_path = f"data/images/q{self.question.id}_1.png"
+
+                # Display the single image centered and larger
+                with Container(classes="single-image-container"):
+                    if has_textual_image and Path(single_image_path).exists():
+                        try:
+                            # Try to resize image for better terminal display
+                            resized_image_path = self._resize_image_for_terminal(
+                                single_image_path
+                            )
+                            image_to_display = resized_image_path or single_image_path
+
+                            # Create image with proper classes for CSS sizing
+                            yield Image(
+                                image_to_display, classes="single-question-image"
+                            )
+
+                            if resized_image_path:
+                                logger.debug(
+                                    f"Successfully displayed resized single image: {resized_image_path}"
+                                )
+                            else:
+                                logger.debug(
+                                    f"Successfully displayed original single image: {single_image_path}"
+                                )
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to display image {single_image_path}: {e}"
+                            )
+                            yield Static(
+                                "[yellow]📸 Image\n[dim]Press 'v' to view in external viewer[/dim]",
+                                classes="image-fallback-text-large",
+                            )
+                    else:
+                        yield Static(
+                            "[yellow]📸 Image\n[dim]Press 'v' to view in external viewer[/dim]",
+                            classes="image-fallback-text-large",
+                        )
+
+                # Display text options below the image
+                yield Static("Answer Options:", classes="options-header")
+                with Vertical(classes="answer-options"):
+                    for i, option in enumerate(self.question.options_list, 1):
+                        option_letter = chr(65 + i - 1)  # A, B, C, D
+                        yield Button(
+                            f"{option_letter}. {option}",
+                            id=f"option_{i}",
+                            variant="default",
+                            classes="answer-option",  # IMPORTANT: Keep this class for event handler
+                        )
+
+            else:
+                # Multiple images layout - display all images in a row, then buttons below
+
+                # Row of 4 images
+                with Horizontal(classes=f"images-row image-count-{image_count}"):
+                    for i in range(1, 5):  # Always show 4 image slots
+                        option_letter = chr(65 + i - 1)  # A, B, C, D
+
+                        with Container(classes="image-container"):
+                            # Try to display image if available
+                            if has_textual_image and self.question.is_image_question:
+                                image_path = f"data/images/q{self.question.id}_{i}.png"
+
+                                if Path(image_path).exists():
+                                    try:
+                                        # Display the image with proper classes
+                                        yield Image(
+                                            image_path, classes="multi-question-image"
+                                        )
+                                        logger.debug(
+                                            f"Successfully displayed image: {image_path}"
+                                        )
+                                    except Exception as e:
+                                        logger.error(
+                                            f"Failed to display image {image_path}: {e}"
+                                        )
+                                        # Show fallback text
+                                        yield Static(
+                                            f"[yellow]📸 {option_letter}[/yellow]\n[dim]Image viewer needed[/dim]",
+                                            classes="image-fallback-text",
+                                        )
+                                else:
+                                    logger.warning(
+                                        f"Image file not found: {image_path}"
+                                    )
+                                    yield Static(
+                                        f"[red]❌ Image missing[/red]\n[dim]{option_letter}[/dim]",
+                                        classes="image-missing-text",
+                                    )
+                            else:
+                                # Show placeholder for non-textual-image case
+                                yield Static(
+                                    f"[yellow]📸 {option_letter}[/yellow]\n[dim]Press 'v' to view[/dim]",
+                                    classes="image-fallback-text",
+                                )
+
+                            # Add option letter label below each image
+                            yield Static(
+                                f"{option_letter}", classes="image-option-label"
+                            )
+
+                # Row of 4 buttons below images
+                yield Static("Choose your answer:", classes="options-header")
+                with Vertical(classes="answer-buttons-column"):
+                    for i, option in enumerate(self.question.options_list, 1):
+                        option_letter = chr(65 + i - 1)  # A, B, C, D
+                        yield Button(
+                            f"{option_letter}. {option}",
+                            id=f"option_{i}",
+                            variant="default",
+                            classes="answer-option multi-image-button",
+                            disabled=False,
+                        )
+
+        except Exception as e:
+            logger.error(f"Error in _compose_image_question_options: {e}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
+
+            # Emergency fallback - just show basic buttons
+            yield Static(
+                "[red]Error loading image options. Using text-only fallback.[/red]",
+                classes="error-message",
+            )
+            with Horizontal(classes="image-options-row"):
+                for i, option in enumerate(self.question.options_list, 1):
+                    yield Button(
+                        f"{i}. {option}",
+                        id=f"option_{i}",
+                        variant="default",
+                        classes="answer-option",
+                    )
+
+    def _compose_text_question_options(self) -> ComposeResult:
+        """Compose regular text question with vertical button layout.
+
+        Yields:
+            Vertical container with answer option buttons
+        """
+        with Vertical(classes="answer-options"):
+            for i, option in enumerate(self.question.options_list, 1):
+                yield Button(
+                    f"{i}. {option}",
+                    id=f"option_{i}",
+                    variant="default",
+                    classes="answer-option",
+                )
+
+    def _create_image_display_info(self) -> Static:
+        """Create info message about image display capabilities.
+
+        Returns:
+            Static widget with capability information
+        """
+        # Check terminal support for images
+        if self._check_terminal_support():
+            return Static(
+                "[green]✓ Your terminal supports image display[/green]",
+                classes="info-message",
+            )
+        else:
+            return Static(
+                "[yellow]Press 'v' to view images in external viewer[/yellow]",
+                classes="info-message",
+            )
+
+    def _check_terminal_support(self) -> bool:
+        """Check if terminal supports image display.
+
+        Returns:
+            True if terminal supports images, False otherwise
+        """
+        import os
+
+        try:
+            from textual_image.widget import Image  # noqa: F401
+
+            has_textual_image = True
+        except ImportError:
+            has_textual_image = False
+
+        if not has_textual_image:
+            return False
+
+        term = os.environ.get("TERM", "").lower()
+        term_program = os.environ.get("TERM_PROGRAM", "")
+
+        # Modern terminals with native image support
+        supported_terminals = [
+            "kitty" in term,
+            term_program == "iTerm.app",
+            "wezterm" in term,
+            os.environ.get("WT_SESSION") is not None,  # Windows Terminal
+            "konsole" in term,  # KDE Konsole
+            "sixel" in term,  # Sixel protocol support
+        ]
+
+        return any(supported_terminals)
+
+    def _resize_image_for_terminal(
+        self, image_path: str, max_width: int = 100, max_height: int = 40
+    ) -> str | None:
+        """Resize image for optimal terminal display to prevent cutoff.
+
+        Args:
+            image_path: Path to the original image file
+            max_width: Maximum width in terminal cells (default: 100 for single images)
+            max_height: Maximum height in terminal cells (default: 40 for single images)
+
+        Returns:
+            Path to resized image file, or None if processing failed
+        """
+        # Check if PIL is available
+        try:
+            from PIL import Image as PILImage
+        except ImportError:
+            logger.debug("PIL not available for image resizing")
+            return None
+
+        import tempfile
+        from pathlib import Path
+
+        original_path = Path(image_path)
+        if not original_path.exists():
+            logger.warning(f"Image file not found: {image_path}")
+            return None
+
+        try:
+            # Open the original image
+            with PILImage.open(original_path) as img:
+                # Get original dimensions
+                orig_width, orig_height = img.size
+                logger.debug(f"Original single image size: {orig_width}x{orig_height}")
+
+                # Calculate scaling factor to fit within terminal bounds
+                # Terminal cells are roughly 1:2 ratio (height:width), so adjust accordingly
+                # For vertical images, we need to be more conservative with height
+                width_ratio = max_width / orig_width
+
+                # Adjust height calculation based on image orientation
+                if orig_height > orig_width:  # Vertical image
+                    # More conservative height scaling for vertical images
+                    height_ratio = (max_height * 1.5) / orig_height
+                else:  # Horizontal or square image
+                    height_ratio = (max_height * 2) / orig_height
+
+                scale_factor = min(width_ratio, height_ratio, 1.0)  # Don't upscale
+
+                # Skip processing if image is already small enough
+                if scale_factor >= 0.95:
+                    logger.debug("Single image already optimal size, using original")
+                    return image_path
+
+                # Calculate new dimensions
+                new_width = int(orig_width * scale_factor)
+                new_height = int(orig_height * scale_factor)
+
+                logger.debug(
+                    f"Resizing single image to: {new_width}x{new_height} (scale: {scale_factor:.2f})"
+                )
+
+                # Resize with high quality resampling
+                resized_img = img.resize(
+                    (new_width, new_height), PILImage.Resampling.LANCZOS
+                )
+
+                # Create temporary file for resized image
+                temp_dir = Path(tempfile.gettempdir()) / "integran_images"
+                temp_dir.mkdir(exist_ok=True)
+
+                # Create filename based on original and target size
+                original_name = original_path.stem
+                temp_filename = f"{original_name}_single_{new_width}x{new_height}.png"
+                temp_path = temp_dir / temp_filename
+
+                # Save resized image with optimization
+                resized_img.save(temp_path, "PNG", optimize=True, quality=95)
+
+                logger.debug(f"Resized single image saved to: {temp_path}")
+                return str(temp_path)
+
+        except Exception as e:
+            logger.error(f"Failed to resize single image {image_path}: {e}")
+            return None
+
     async def setup_event_subscriptions(self) -> None:
         """Setup event subscriptions for this widget."""
+
         # Load user preferred language on startup
         await self._load_user_preferred_language()
+
+        # For image questions, load enhanced data immediately
+        if self.question.is_image_question:
+            await self._load_enhanced_content()
+            # Refresh the display after loading enhanced data
+            if self.enhanced_data and self.enhanced_data.images:
+                await self._refresh_image_display()
 
     async def _load_user_preferred_language(self) -> None:
         """Load user's preferred language and progressive disclosure settings."""
@@ -247,18 +583,37 @@ class QuestionWidget(EventAwareWidget):
         if self.answer_revealed:
             return
 
+        # Add a small safety check to prevent immediate auto-selection
+        # This helps avoid accidental selection during widget initialization
+        import time
+
+        if not hasattr(self, "_component_ready_time"):
+            self._component_ready_time = time.time()
+
+        # Prevent selection within first 500ms of component creation (but allow tests)
+        time_diff = time.time() - self._component_ready_time
+        if time_diff < 0.5 and not hasattr(self, "_test_mode"):
+            logger.debug("Ignoring early button press - component still initializing")
+            return
+
         # Extract option number from button ID
-        option_num = int(event.button.id.split("_")[1])
+        button_id = event.button.id
+        # Format: option_1, option_2, etc.
+        option_num = int(button_id.split("_")[1])
+
         self.selected_answer = self.question.options_list[option_num - 1]
 
-        # Highlight selected option
+        # Highlight selected option - disable all other buttons
         for i in range(1, 5):
-            btn = self.query_one(f"#option_{i}", Button)
-            if i == option_num:
-                btn.variant = "primary"
-                btn.add_class("selected")
-            else:
-                btn.disabled = True
+            try:
+                btn = self.query_one(f"#option_{i}", Button)
+                if i == option_num:
+                    btn.variant = "primary"
+                    btn.add_class("selected")
+                else:
+                    btn.disabled = True
+            except Exception:
+                logger.debug(f"Button #option_{i} not found")
 
         # Reveal the answer
         await self.reveal_answer()
@@ -332,6 +687,10 @@ class QuestionWidget(EventAwareWidget):
             if result.success and result.question_data:
                 self.enhanced_data = result.question_data
                 logger.info(f"Loaded enhanced content for question {self.question.id}")
+
+                # If this is an image question, refresh the display to show images
+                if self.enhanced_data.is_image_question and self.enhanced_data.images:
+                    await self._refresh_image_display()
             else:
                 logger.warning(
                     f"Failed to load enhanced content: {result.error_message}"
@@ -339,6 +698,26 @@ class QuestionWidget(EventAwareWidget):
 
         except Exception as e:
             logger.error(f"Error loading enhanced content: {e}")
+
+    async def _refresh_image_display(self) -> None:
+        """Refresh the question display to show images after enhanced data is loaded."""
+        try:
+            # Since images are already displayed during compose, we don't need to refresh much
+            # Just log that enhanced data is available
+            if self.enhanced_data and self.enhanced_data.images:
+                logger.info(
+                    f"Enhanced data loaded for Q{self.question.id} with {len(self.enhanced_data.images)} images"
+                )
+            else:
+                logger.warning(
+                    f"Enhanced data still not available for Q{self.question.id} during refresh"
+                )
+
+        except Exception as e:
+            logger.error(f"Error refreshing image display for Q{self.question.id}: {e}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
 
     async def _display_enhanced_content(self) -> None:
         """Display the enhanced multilingual content."""
@@ -564,7 +943,7 @@ class PracticeScreen(Screen):
     .question-container {
         width: 100%;
         height: auto;
-        max-height: 65vh;
+        max-height: 75vh;
         padding: 1;
         overflow-y: auto;
         scrollbar-gutter: stable;
@@ -587,6 +966,186 @@ class PracticeScreen(Screen):
         min-height: 3;
         background: $panel;
         border-left: solid white;
+    }
+
+    /* Single image layout - for questions with only 1 image */
+    .single-image-container {
+        width: 100%;
+        height: auto;
+        max-height: 65vh;  /* Limit container height */
+        margin: 1 0;
+        padding: 2;
+        align: center middle;
+        background: $panel;
+        border: solid $primary;
+        overflow: auto;  /* Allow scrolling if needed */
+    }
+
+    .single-question-image {
+        width: auto;
+        max-width: 90%;
+        height: auto;
+        max-height: 50vh;  /* Use viewport height instead of fixed cells */
+        margin: 1;
+        align: center middle;
+    }
+
+    .image-fallback-text-large {
+        text-align: center;
+        padding: 4;
+        height: 20;
+        width: 60;
+        background: $warning 20%;
+        margin: 1;
+        border: solid $warning;
+        align: center middle;
+    }
+
+    /* Image options styling - horizontal row layout for multiple images */
+    .image-options-row {
+        width: 100%;
+        height: auto;
+        margin: 1 0;
+        padding: 1;
+        align: center middle;
+    }
+
+    .image-option-wrapper {
+        width: 1fr;
+        margin: 0 1;
+        padding: 1;
+        align: center middle;
+        background: $surface;
+        border: solid $primary;
+    }
+
+    /* Responsive image sizing based on image count */
+    .image-count-2 .image-option-wrapper {
+        width: 1fr;
+        max-width: 50;
+    }
+
+    .image-count-3 .image-option-wrapper {
+        width: 1fr;
+        max-width: 35;
+    }
+
+    .image-count-4 .image-option-wrapper {
+        width: 1fr;
+        max-width: 25;
+    }
+
+
+    /* Image containers and images */
+    .image-option-container {
+        width: 100%;
+        height: auto;
+        align: center middle;
+        background: $panel;
+        border: solid white;
+        margin-bottom: 1;
+    }
+
+    .coat-of-arms-image {
+        width: 100%;
+        height: auto;
+        max-height: 15;
+        margin-bottom: 1;
+    }
+
+    /* New styles for direct image display */
+    .question-image {
+        width: 100%;
+        height: auto;
+        max-height: 20;
+        min-height: 10;
+        margin-bottom: 1;
+    }
+
+    .image-fallback-text {
+        text-align: center;
+        padding: 2;
+        height: 8;
+        background: $warning 20%;
+        margin-bottom: 1;
+    }
+
+    .image-missing-text {
+        text-align: center;
+        padding: 2;
+        height: 8;
+        background: $error 20%;
+        margin-bottom: 1;
+    }
+
+    .image-answer-button {
+        width: 100%;
+        height: 3;
+        text-align: center;
+        margin-top: 0;
+    }
+
+    .options-header {
+        text-align: center;
+        margin: 1 0;
+        color: $accent;
+        text-style: bold;
+    }
+
+    .image-buttons-row {
+        width: 100%;
+        margin: 1 0;
+        align: center middle;
+    }
+
+    .image-answer-button-fallback {
+        width: 1fr;
+        height: 3;
+        margin: 0 1;
+        text-align: center;
+    }
+
+    .external-viewer-hint {
+        text-align: center;
+        margin-top: 1;
+        padding: 1;
+        color: $text-muted;
+    }
+
+    .image-fallback {
+        color: $warning;
+        text-align: center;
+        padding: 1;
+        background: $warning 20%;
+        border: solid $warning;
+        margin-bottom: 1;
+        height: auto;
+        min-height: 8;
+    }
+
+    .image-option-button {
+        width: 100%;
+        height: auto;
+        min-height: 3;
+        text-align: center;
+        margin-top: 1;
+    }
+
+    .info-message {
+        text-align: center;
+        margin-bottom: 1;
+        padding: 1;
+        background: $accent 20%;
+        border-left: solid $accent;
+    }
+
+    .loading-message {
+        text-align: center;
+        margin-bottom: 1;
+        padding: 1;
+        background: $warning 30%;
+        border-left: solid $warning;
+        color: $warning;
     }
 
     .answer-options {
@@ -754,6 +1313,12 @@ class PracticeScreen(Screen):
         ("2", "select_option_2", "Option 2"),
         ("3", "select_option_3", "Option 3"),
         ("4", "select_option_4", "Option 4"),
+        ("5", "invalid_option", ""),
+        ("6", "invalid_option", ""),
+        ("7", "invalid_option", ""),
+        ("8", "invalid_option", ""),
+        ("9", "invalid_option", ""),
+        ("v", "view_images_externally", "View Images"),
         ("escape", "back_to_menu", "Back to Menu"),
     ]
 
@@ -888,30 +1453,22 @@ class PracticeScreen(Screen):
             submit_handler = self.app.container.get_submit_answer_command_handler()
 
         # Create enhanced question widget with command handler support
-        if self.user_repository:
-            question_widget = QuestionWidget(
-                question=self.current_question,
-                event_bus=self.app.event_bus,
-                user_repository=self.user_repository,
-                submit_answer_command_handler=submit_handler,
-                preferred_language=Language.ENGLISH,  # Will be updated from user settings
-                session_id=self.session_id,  # Pass session ID for progress tracking
+        # Use provided user repository or raise error if not available
+        user_repo = self.user_repository
+        if not user_repo:
+            logger.error("No user repository provided - cannot create question widget")
+            raise RuntimeError(
+                "User repository not available - check dependency injection in parent"
             )
-        else:
-            # Fallback: create a temporary repository
-            from src.infrastructure.database.database import DatabaseManager
 
-            temp_db_manager = DatabaseManager()
-            temp_repository = UserSettingsRepository(temp_db_manager)
-
-            question_widget = QuestionWidget(
-                question=self.current_question,
-                event_bus=self.app.event_bus,
-                user_repository=temp_repository,
-                submit_answer_command_handler=submit_handler,
-                preferred_language=Language.ENGLISH,
-                session_id=self.session_id,  # Pass session ID for progress tracking
-            )
+        question_widget = QuestionWidget(
+            question=self.current_question,
+            event_bus=self.app.event_bus,
+            user_repository=user_repo,
+            submit_answer_command_handler=submit_handler,
+            preferred_language=Language.ENGLISH,  # Will be updated from user settings
+            session_id=self.session_id,  # Pass session ID for progress tracking
+        )
 
         # Remove all children except header and footer, then mount the question widget
         try:
@@ -945,29 +1502,179 @@ class PracticeScreen(Screen):
 
     def _select_option(self, option_num: int) -> None:
         """Select an option by number."""
+        # Get the question widget first
+        question_widgets = self.query(QuestionWidget)
+        if not question_widgets:
+            logger.debug("No QuestionWidget found")
+            return
+
+        question_widget = question_widgets.first()
+
         # First check if we should be selecting a rating button instead
         try:
             # Check if the rating container is visible
-            rating_container = self.query_one(".fsrs-rating", fallback=None)
-            if rating_container and not rating_container.has_class("hidden"):
-                # Select rating button instead
-                rating_btn = self.query_one(f"#rating_{option_num}", Button)
-                rating_btn.press()
-                return
+            rating_containers = question_widget.query(".fsrs-rating")
+            if rating_containers:
+                rating_container = rating_containers.first()
+                if rating_container and not rating_container.has_class("hidden"):
+                    # Select rating button instead
+                    rating_btn = question_widget.query_one(
+                        f"#rating_{option_num}", Button
+                    )
+                    rating_btn.press()
+                    return
         except Exception as e:
             logger.debug(f"Could not press rating button: {e}")
 
         # Otherwise select answer option
         try:
-            btn = self.query_one(f"#option_{option_num}", Button)
+            btn = question_widget.query_one(f"#option_{option_num}", Button)
             btn.press()
         except Exception as e:
             # Button not found or not available
             logger.debug(f"Could not select option {option_num}: {e}")
 
+    def action_invalid_option(self) -> None:
+        """Handle invalid option number press."""
+        self.notify("Only options 1-4 are available", severity="warning", timeout=2)
+
     def action_back_to_menu(self) -> None:
         """Go back to main menu."""
         self.app.pop_screen()
+
+    async def action_view_images_externally(self) -> None:
+        """Open current question's images in external viewer."""
+        logger.info("'v' key pressed - attempting to view images externally")
+
+        if not self.current_question:
+            logger.warning("No current question available")
+            self.notify("No question loaded", severity="warning")
+            return
+
+        if not self.current_question.is_image_question:
+            logger.info(f"Q{self.current_question.id} is not an image question")
+            self.notify("This is not an image question", severity="info")
+            return
+
+        logger.info(f"Processing external image view for Q{self.current_question.id}")
+
+        try:
+            # Get the question widget to access enhanced data
+            question_widgets = self.query(QuestionWidget)
+            if not question_widgets:
+                self.notify("Question widget not found", severity="error")
+                return
+            question_widget = question_widgets.first()
+
+            # 🔥 FIX: Ensure enhanced data is loaded before accessing images
+            if (
+                not question_widget.enhanced_data
+                or not question_widget.enhanced_data.images
+            ):
+                self.notify("Loading image data...", timeout=1)
+                logger.info(
+                    f"Enhanced data not loaded for Q{self.current_question.id}, loading now..."
+                )
+                await question_widget._load_enhanced_content()
+
+            # Check if enhanced data is available
+            if question_widget.enhanced_data and question_widget.enhanced_data.images:
+                # Import the external viewer
+                from src.presentation.terminal.actions.external_image_viewer import (
+                    ExternalImageViewer,
+                )
+
+                # Convert enhanced image data to format expected by viewer
+                images = [
+                    {"path": img.path} for img in question_widget.enhanced_data.images
+                ]
+
+                # Open in external viewer
+                self.notify("Opening images in external viewer...", timeout=2)
+                success = await ExternalImageViewer.view_question_images(
+                    question_id=self.current_question.id,
+                    images=images,
+                    question_text=self.current_question.question,
+                )
+
+                if success:
+                    self.notify("Images opened successfully", severity="information")
+                    logger.info(
+                        f"External viewer opened successfully for Q{self.current_question.id}"
+                    )
+                else:
+                    self.notify(
+                        "Failed to open images. Check that you have an image viewer installed.",
+                        severity="error",
+                    )
+                    logger.error(
+                        "External viewer failed to open images for Q%s",
+                        self.current_question.id,
+                    )
+            else:
+                # Fallback: Look for image files directly
+                logger.info(
+                    "Enhanced data not available, falling back to direct image file access"
+                )
+                from pathlib import Path
+
+                # Check for image files in the data/images directory
+                image_files = []
+                for i in range(1, 5):  # Check for images 1-4
+                    image_path = f"data/images/q{self.current_question.id}_{i}.png"
+                    if Path(image_path).exists():
+                        image_files.append({"path": image_path})
+
+                if image_files:
+                    # Import the external viewer
+                    from src.presentation.terminal.actions.external_image_viewer import (
+                        ExternalImageViewer,
+                    )
+
+                    # Open in external viewer using direct file paths
+                    self.notify("Opening images in external viewer...", timeout=2)
+                    success = await ExternalImageViewer.view_question_images(
+                        question_id=self.current_question.id,
+                        images=image_files,
+                        question_text=self.current_question.question,
+                    )
+
+                    if success:
+                        self.notify(
+                            "Images opened successfully", severity="information"
+                        )
+                        logger.info(
+                            f"External viewer opened successfully for Q{self.current_question.id} using direct file access"
+                        )
+                    else:
+                        self.notify(
+                            "Failed to open images. Check that you have an image viewer installed.",
+                            severity="error",
+                        )
+                        logger.error(
+                            "External viewer failed to open images for Q%s",
+                            self.current_question.id,
+                        )
+                else:
+                    self.notify(
+                        "No image files found for this question", severity="warning"
+                    )
+                    logger.warning(
+                        f"No image files found for Q{self.current_question.id} in data/images/"
+                    )
+
+        except ImportError as e:
+            logger.error(f"PIL not available for external viewer: {e}")
+            self.notify(
+                "PIL (Pillow) library required for external viewer. Install with: pip install pillow",
+                severity="error",
+            )
+        except Exception as e:
+            logger.error(f"Error opening images externally: {e}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            self.notify(f"Error opening images: {str(e)}", severity="error")
 
     @on(QuestionWidget.QuestionCompleted)
     async def on_question_completed(
@@ -984,32 +1691,41 @@ class PracticeScreen(Screen):
         await self.load_next_question()
 
     async def _create_practice_session(self) -> None:
-        """Create a practice session for progress tracking."""
+        """Create a practice session for progress tracking using CQRS command."""
         try:
-            # Get session repository from app container
-            if hasattr(self.app, "container") and self.app.container:
-                session_repository = self.app.container.get_session_repository()
-                # Create session with practice mode type
-                session_id = await session_repository.create_session(
-                    user_id=1,
-                    session_type=self.practice_mode,
-                    configuration={"mode": self.practice_mode},
-                )
-                # Store session ID for tracking answers
-                self.session_id = session_id
+            # Get start session command handler from app container
+            if not (hasattr(self.app, "container") and self.app.container):
+                logger.warning("No container available - skipping session creation")
+                self.session_id = None
+                return
+
+            start_session_handler = (
+                self.app.container.get_start_session_command_handler()
+            )
+
+            # Create session using application layer command
+            from src.application.commands.start_session_command import (
+                StartSessionCommand,
+            )
+
+            command = StartSessionCommand(
+                session_type=self.practice_mode,
+                max_questions=20,  # Default limit
+                user_id=1,
+            )
+
+            # Execute command through CQRS
+            result = await start_session_handler.handle(command)
+
+            if result.success and result.session_id:
+                self.session_id = result.session_id
                 logger.info(
-                    f"Created practice session {session_id} for mode {self.practice_mode}"
+                    f"Created practice session {result.session_id} for mode {self.practice_mode}"
                 )
             else:
-                # Fallback: create session directly with DatabaseManager
-                from src.infrastructure.database.database import DatabaseManager
+                logger.warning(f"Failed to create session: {result.error_message}")
+                self.session_id = None
 
-                db_manager = DatabaseManager()
-                session_id = db_manager.create_session(self.practice_mode, user_id=1)
-                self.session_id = session_id
-                logger.info(
-                    f"Created practice session {session_id} (fallback) for mode {self.practice_mode}"
-                )
         except Exception as e:
             logger.warning(f"Failed to create practice session: {e}")
             # Continue without session tracking
