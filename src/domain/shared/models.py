@@ -28,6 +28,7 @@ class PracticeMode(str, Enum):
     SEQUENTIAL = "sequential"
     CATEGORY = "category"
     REVIEW = "review"
+    IMAGES = "images"
 
 
 class AnswerStatus(str, Enum):

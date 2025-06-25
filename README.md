@@ -14,7 +14,7 @@ A comprehensive, terminal-based training application for the German Integration 
 ### 🌍 Complete Question Database
 - **460 Official Questions**: All 300 general + 160 state-specific questions from the official exam
 - **5 Language Support**: Explanations in English, German, Turkish, Ukrainian, and Arabic
-- **Visual Questions**: Image-based questions with detailed descriptions
+- **Visual Questions**: Image-based questions with detailed descriptions and mnemonic images
 - **AI-Generated Explanations**: Comprehensive explanations with memory aids for every question
 
 ### 📊 Progress Tracking
@@ -220,13 +220,13 @@ src/
 
 Architecture Flow:
 ```
-  Domain Layer (defines interfaces)
-       ↓ depends on
-  Infrastructure Layer (implements interfaces)
-       ↓ injected via
-  Application Layer (uses dependency injection)
-       ↓ called by
-  Presentation Layer (uses commands/queries)
+  Presentation Layer (UI, Controllers)
+       ↓ calls (via commands/queries)
+  Application Layer (Command/Query Handlers)  
+       ↓ uses (via interfaces)
+  Domain Layer (Business Logic, defines interfaces)
+       ↑ implemented by (Dependency Inversion)
+  Infrastructure Layer (Database, External APIs)
 ```
 
 ## 📝 License

@@ -80,6 +80,7 @@ class MainMenuScreen(Screen):
         ("2", "sequential_practice", "Sequential Practice"),
         ("3", "category_practice", "Category Practice"),
         ("4", "review_practice", "Review Failed"),
+        ("5", "images_practice", "Image Questions"),
         ("s", "show_stats", "Statistics"),
         ("t", "show_settings", "Settings"),
         ("q", "quit", "Quit"),
@@ -102,6 +103,7 @@ class MainMenuScreen(Screen):
                     ),
                     Button("3. Category Practice", id="category", variant="warning"),
                     Button("4. Review Failed Questions", id="review", variant="error"),
+                    Button("5. Image Questions Only", id="images", variant="primary"),
                     Button("Statistics & Progress", id="stats", variant="default"),
                     Button("Settings", id="settings", variant="default"),
                     classes="buttons-vertical",
@@ -163,6 +165,21 @@ class MainMenuScreen(Screen):
         """Review failed questions."""
         practice_screen = PracticeScreen(
             practice_mode="review",
+            user_repository=self.app.user_repository,
+            submit_answer_command_handler=self.app.container.get_submit_answer_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+            start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+        )
+        self.app.push_screen(practice_screen)
+
+    @on(Button.Pressed, "#images")
+    def action_images_practice(self) -> None:
+        """Practice with image questions only."""
+        practice_screen = PracticeScreen(
+            practice_mode="images",
             user_repository=self.app.user_repository,
             submit_answer_command_handler=self.app.container.get_submit_answer_command_handler()
             if hasattr(self.app, "container")

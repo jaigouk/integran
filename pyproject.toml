@@ -32,6 +32,8 @@ dependencies = [
     "pillow>=10.0.0",
     # Basic web and data processing dependencies
     "requests>=2.32.4",
+    # Terminal image display support
+    "textual-image>=0.3.0",
 ]
 
 [project.optional-dependencies]
@@ -124,6 +126,9 @@ docstring-code-format = true
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ARG002"]  # Allow unused arguments in test fixtures
+
 [tool.black]
 line-length = 88
 target-version = ['py312']
@@ -147,6 +152,7 @@ module = [
     "google.genai.*",
     "pymupdf.*",
     "textual.*",
+    "textual_image.*",
     "rich.*",
     "yaml",
     "src.domain.user.*",
@@ -191,8 +197,10 @@ module = [
     "src.presentation.terminal.session_view",
     "src.presentation.terminal.progress_view",
     "src.infrastructure.processors.pdf_processor",
+    "src.infrastructure.services.image_loader",
     "src.domain.content.services.process_image",
     "src.domain.content.services.generate_answer",
+    "src.presentation.terminal.widgets.smart_image_widget",
 ]
 ignore_errors = true
 

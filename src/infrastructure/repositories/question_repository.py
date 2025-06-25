@@ -46,6 +46,15 @@ class SQLAlchemyQuestionRepository(QuestionRepository):
 
         return await self._run_in_executor(_get_all_questions)
 
+    async def get_image_questions(self) -> list[Question]:
+        """Get all questions that have images."""
+
+        def _get_image_questions() -> list[Question]:
+            with self.db_manager.get_session() as session:
+                return session.query(Question).filter(Question.is_image_question).all()
+
+        return await self._run_in_executor(_get_image_questions)
+
     async def save_question(self, question: Question) -> Question:
         """Save or update a question."""
 
