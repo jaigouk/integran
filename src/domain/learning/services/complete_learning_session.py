@@ -30,10 +30,10 @@ from src.domain.shared.repositories import (
 from src.domain.shared.services import (
     BusinessRuleViolationError,
     DomainService,
+    EventBusInterface,
     ValidationError,
     log_domain_operation,
 )
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +253,7 @@ class CompleteLearningSession(
         question_repository: QuestionRepository,
         session_repository: SessionRepository,
         schedule_card_service: ScheduleCard,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
     ) -> None:
         """Initialize the learning session domain service.
 

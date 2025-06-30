@@ -31,6 +31,52 @@ class ThemeMode(str, Enum):
     AUTO = "auto"
 
 
+class FederalState(str, Enum):
+    """German federal states with questions in the dataset."""
+
+    GENERAL = "general"  # General (All States)
+    BADEN_WUERTTEMBERG = "Baden-Württemberg"
+    BAYERN = "Bayern"
+    BERLIN = "Berlin"
+    BRANDENBURG = "Brandenburg"
+    BREMEN = "Bremen"
+    HAMBURG = "Hamburg"
+    HESSEN = "Hessen"
+    MECKLENBURG_VORPOMMERN = "Mecklenburg-Vorpommern"
+    NIEDERSACHSEN = "Niedersachsen"
+    NORDRHEIN_WESTFALEN = "Nordrhein-Westfalen"
+    RHEINLAND_PFALZ = "Rheinland-Pfalz"
+    SAARLAND = "Saarland"
+    SACHSEN = "Sachsen"
+    SACHSEN_ANHALT = "Sachsen-Anhalt"
+    SCHLESWIG_HOLSTEIN = "Schleswig-Holstein"
+    THUERINGEN = "Thüringen"
+
+    @property
+    def display_name(self) -> str:
+        """Return the display name for the federal state."""
+        display_names = {
+            "general": "General (All States)",
+            "Baden-Württemberg": "Baden-Württemberg",
+            "Bayern": "Bayern",
+            "Berlin": "Berlin",
+            "Brandenburg": "Brandenburg",
+            "Bremen": "Bremen",
+            "Hamburg": "Hamburg",
+            "Hessen": "Hessen",
+            "Mecklenburg-Vorpommern": "Mecklenburg-Vorpommern",
+            "Niedersachsen": "Niedersachsen",
+            "Nordrhein-Westfalen": "Nordrhein-Westfalen",
+            "Rheinland-Pfalz": "Rheinland-Pfalz",
+            "Saarland": "Saarland",
+            "Sachsen": "Sachsen",
+            "Sachsen-Anhalt": "Sachsen-Anhalt",
+            "Schleswig-Holstein": "Schleswig-Holstein",
+            "Thüringen": "Thüringen",
+        }
+        return display_names.get(self.value, self.value)
+
+
 # ============================================================================
 # SQLAlchemy Database Models
 # ============================================================================
@@ -71,6 +117,11 @@ class UserSettingsDB(Base):
     # Notifications
     enable_notifications = Column(Boolean, default=True, nullable=False)
     reminder_time = Column(String(10), default="19:00", nullable=False)  # HH:MM format
+
+    # Location preferences
+    federal_state = Column(
+        String(50), default=FederalState.GENERAL.value, nullable=False
+    )
 
     # Metadata
     created_at = Column(
@@ -134,6 +185,19 @@ class UserPreferences:
     enable_notifications: bool = True
     reminder_time: str = "19:00"  # HH:MM format
 
+    # Location preferences
+    federal_state: FederalState = FederalState.GENERAL
+
+    # FSRS Learning Algorithm Settings
+    desired_retention_rate: float = 0.90  # Target recall probability (80%-95%)
+    mastery_stability_threshold: int = 30  # Days of stability to consider "mastered"
+    leech_detection_threshold: int = 8  # Lapses before flagging as leech
+    sequential_mode_uses_fsrs: bool = True  # Apply FSRS filtering to sequential mode
+    random_mode_uses_fsrs: bool = True  # Apply FSRS filtering to random mode
+    image_mode_uses_fsrs: bool = True  # Apply FSRS filtering to image mode
+    include_mastered_occasionally: bool = False  # Show mastered questions periodically
+    retrievability_exclusion_threshold: float = 0.9  # R > 0.9 excludes from practice
+
     # Custom preferences (extensible)
     custom_settings: dict[str, Any] = field(default_factory=dict)
 
@@ -148,6 +212,15 @@ class UserPreferences:
             "language": self.language.value,
             "enable_notifications": self.enable_notifications,
             "reminder_time": self.reminder_time,
+            "federal_state": self.federal_state.value,
+            "desired_retention_rate": self.desired_retention_rate,
+            "mastery_stability_threshold": self.mastery_stability_threshold,
+            "leech_detection_threshold": self.leech_detection_threshold,
+            "sequential_mode_uses_fsrs": self.sequential_mode_uses_fsrs,
+            "random_mode_uses_fsrs": self.random_mode_uses_fsrs,
+            "image_mode_uses_fsrs": self.image_mode_uses_fsrs,
+            "include_mastered_occasionally": self.include_mastered_occasionally,
+            "retrievability_exclusion_threshold": self.retrievability_exclusion_threshold,
             "custom_settings": self.custom_settings,
         }
 
@@ -163,6 +236,21 @@ class UserPreferences:
             language=Language(data.get("language", Language.ENGLISH.value)),
             enable_notifications=data.get("enable_notifications", True),
             reminder_time=data.get("reminder_time", "19:00"),
+            federal_state=FederalState(
+                data.get("federal_state", FederalState.GENERAL.value)
+            ),
+            desired_retention_rate=data.get("desired_retention_rate", 0.90),
+            mastery_stability_threshold=data.get("mastery_stability_threshold", 30),
+            leech_detection_threshold=data.get("leech_detection_threshold", 8),
+            sequential_mode_uses_fsrs=data.get("sequential_mode_uses_fsrs", True),
+            random_mode_uses_fsrs=data.get("random_mode_uses_fsrs", True),
+            image_mode_uses_fsrs=data.get("image_mode_uses_fsrs", True),
+            include_mastered_occasionally=data.get(
+                "include_mastered_occasionally", False
+            ),
+            retrievability_exclusion_threshold=data.get(
+                "retrievability_exclusion_threshold", 0.9
+            ),
             custom_settings=data.get("custom_settings", {}),
         )
 
@@ -289,6 +377,7 @@ class UserSettings:
             auto_advance=self.preferences.auto_advance,
             enable_notifications=self.preferences.enable_notifications,
             reminder_time=self.preferences.reminder_time,
+            federal_state=self.preferences.federal_state.value,
             created_at=self.created_at.replace(tzinfo=None),
             updated_at=self.updated_at.replace(tzinfo=None),
         )
@@ -298,6 +387,23 @@ class UserSettings:
         """Create from database model."""
         preferences_data = json.loads(str(db_model.user_preferences or "{}"))
         flow_state_data = json.loads(str(db_model.user_flow_state or "{}"))
+
+        # Merge database fields with JSON preferences data
+        # This ensures new fields are included even if not in existing JSON
+        merged_preferences = {
+            "daily_goal": db_model.daily_goal,
+            "session_timeout_minutes": db_model.session_timeout_minutes,
+            "show_explanations": db_model.show_explanations,
+            "auto_advance": db_model.auto_advance,
+            "theme_mode": str(db_model.theme_mode),
+            "language": str(db_model.language),
+            "enable_notifications": db_model.enable_notifications,
+            "reminder_time": db_model.reminder_time,
+            "federal_state": getattr(
+                db_model, "federal_state", FederalState.GENERAL.value
+            ),
+            **preferences_data,  # JSON data takes precedence for custom settings
+        }
 
         return cls(
             user_id=int(db_model.user_id),
@@ -309,7 +415,7 @@ class UserSettings:
             ),
             first_time_setup=bool(db_model.first_time_setup),
             onboarding_completed=bool(db_model.onboarding_completed),
-            preferences=UserPreferences.from_dict(preferences_data),
+            preferences=UserPreferences.from_dict(merged_preferences),
             flow_state=UserFlowState.from_dict(flow_state_data),
             created_at=db_model.created_at.replace(tzinfo=UTC)
             if db_model.created_at

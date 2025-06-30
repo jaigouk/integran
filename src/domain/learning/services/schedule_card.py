@@ -23,10 +23,10 @@ from src.domain.shared.repositories import LearningRepository
 from src.domain.shared.services import (
     BusinessRuleViolationError,
     DomainService,
+    EventBusInterface,
     ValidationError,
     log_domain_operation,
 )
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
     """
 
     def __init__(
-        self, learning_repository: LearningRepository, event_bus: EventBus
+        self, learning_repository: LearningRepository, event_bus: EventBusInterface
     ) -> None:
         """Initialize ScheduleCard service.
 

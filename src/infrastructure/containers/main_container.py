@@ -11,14 +11,30 @@ from src.application.commands.reset_user_progress_command import (
 from src.application.commands.save_user_settings_command import (
     SaveUserSettingsCommandHandler,
 )
+from src.application.commands.start_dataset_build_command import (
+    StartDatasetBuildCommandHandler,
+)
 from src.application.commands.start_practice_session_command import (
     StartPracticeSessionCommandHandler,
 )
 from src.application.commands.submit_answer_with_rating_command import (
     SubmitAnswerWithRatingCommandHandler,
 )
+from src.application.commands.toggle_developer_mode_command import (
+    ToggleDeveloperModeCommandHandler,
+)
 from src.application.events import EventSubscriptionManager
 from src.application.events.handlers.card_scheduled_handler import CardScheduledHandler
+from src.application.events.handlers.content_processed_handler import (
+    ContentProcessedHandler,
+)
+from src.application.projections.user_progress_projection import UserProgressProjection
+from src.application.queries.enhanced_question_content_query import (
+    EnhancedQuestionContentQueryHandler,
+)
+from src.application.queries.get_fsrs_analytics_query import (
+    GetFSRSAnalyticsQueryHandler,
+)
 from src.application.queries.get_learning_stats_query import (
     GetLearningStatsQueryHandler,
 )
@@ -30,6 +46,9 @@ from src.application.queries.get_session_progress_query import (
 )
 from src.application.queries.load_user_preferences_query import (
     LoadUserPreferencesQueryHandler,
+)
+from src.application.queries.load_user_settings_query import (
+    LoadUserSettingsQueryHandler,
 )
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
 from src.domain.analytics.services.analyze_performance import ProgressAnalytics
@@ -108,6 +127,7 @@ class MainContainer:
         )
         self._questions_query_service = GetQuestionsByModeQueryHandler(
             question_repository=self._question_repository,
+            learning_repository=self._learning_repository,
         )
 
         # Analytics services
@@ -129,6 +149,9 @@ class MainContainer:
         self._start_practice_session_command_handler = (
             StartPracticeSessionCommandHandler(
                 question_repository=self._question_repository,
+                user_repository=self._user_repository,
+                session_repository=self._session_repository,
+                event_bus=self._event_bus,
             )
         )
         self._submit_answer_command_handler = SubmitAnswerWithRatingCommandHandler(
@@ -142,14 +165,43 @@ class MainContainer:
         self._pause_session_command_handler = PauseSessionCommandHandler(
             learning_service=self._complete_learning_session,
         )
+        self._toggle_developer_mode_command_handler = ToggleDeveloperModeCommandHandler(
+            user_repository=self._user_repository,
+            event_bus=self._event_bus,
+        )
+        self._start_dataset_build_command_handler = StartDatasetBuildCommandHandler(
+            user_repository=self._user_repository,
+            question_repository=self._question_repository,
+            event_bus=self._event_bus,
+        )
 
         # Additional query handlers
         self._learning_stats_query_handler = GetLearningStatsQueryHandler(
             analytics_repository=self._analytics_repository,
         )
+        self._fsrs_analytics_query_handler = GetFSRSAnalyticsQueryHandler(
+            analytics_repository=self._analytics_repository,
+        )
         self._user_preferences_query_handler = LoadUserPreferencesQueryHandler(
             user_repository=self._user_repository,
             event_bus=self._event_bus,
+        )
+        self._load_user_settings_query_handler = LoadUserSettingsQueryHandler(
+            user_repository=self._user_repository,
+            event_bus=self._event_bus,
+        )
+        self._enhanced_question_content_query_handler = (
+            EnhancedQuestionContentQueryHandler(
+                user_repository=self._user_repository,
+                event_bus=self._event_bus,
+            )
+        )
+
+        # Event handlers and projections
+        self._content_processed_handler = ContentProcessedHandler()
+        self._user_progress_projection = UserProgressProjection(
+            analytics_repository=self._analytics_repository,
+            learning_repository=self._learning_repository,
         )
 
         # Event subscription manager and handlers
@@ -238,9 +290,43 @@ class MainContainer:
         """Get the learning stats query handler."""
         return self._learning_stats_query_handler
 
+    def get_fsrs_analytics_query_handler(self) -> GetFSRSAnalyticsQueryHandler:
+        """Get the FSRS analytics query handler."""
+        return self._fsrs_analytics_query_handler
+
     def get_user_preferences_query_handler(self) -> LoadUserPreferencesQueryHandler:
         """Get the user preferences query handler."""
         return self._user_preferences_query_handler
+
+    def get_load_user_settings_query_handler(self) -> LoadUserSettingsQueryHandler:
+        """Get the load user settings query handler."""
+        return self._load_user_settings_query_handler
+
+    def get_enhanced_question_content_query_handler(
+        self,
+    ) -> EnhancedQuestionContentQueryHandler:
+        """Get the enhanced question content query handler."""
+        return self._enhanced_question_content_query_handler
+
+    def get_toggle_developer_mode_command_handler(
+        self,
+    ) -> ToggleDeveloperModeCommandHandler:
+        """Get the toggle developer mode command handler."""
+        return self._toggle_developer_mode_command_handler
+
+    def get_start_dataset_build_command_handler(
+        self,
+    ) -> StartDatasetBuildCommandHandler:
+        """Get the start dataset build command handler."""
+        return self._start_dataset_build_command_handler
+
+    def get_content_processed_handler(self) -> ContentProcessedHandler:
+        """Get the content processed handler."""
+        return self._content_processed_handler
+
+    def get_user_progress_projection(self) -> UserProgressProjection:
+        """Get the user progress projection."""
+        return self._user_progress_projection
 
     def _setup_event_handlers(self) -> None:
         """Setup all event handlers."""

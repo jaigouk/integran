@@ -7,6 +7,7 @@ import logging
 from src.domain.shared.repositories import RepositoryError, UserRepository
 from src.domain.shared.services import (
     DomainService,
+    EventBusInterface,
     ValidationError,
     log_domain_operation,
 )
@@ -19,7 +20,6 @@ from src.domain.user.models.user_models import (
     ToggleDeveloperModeResult,
     UserSettings,
 )
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class ToggleDeveloperMode(
 
     def __init__(
         self,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         user_repository: UserRepository,
     ):
         """Initialize the ToggleDeveloperMode domain service.

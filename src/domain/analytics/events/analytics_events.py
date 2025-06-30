@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from src.infrastructure.messaging.enhanced_event_bus import DomainEvent
+from src.domain.shared.events import DomainEvent
 
 
 @dataclass

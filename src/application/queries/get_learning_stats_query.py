@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from src.domain.analytics.services.analyze_performance import (
@@ -32,25 +33,43 @@ class GetLearningStatsResult:
     insights: LearningInsights | None = None
     category_progress: dict[str, dict[str, Any]] | None = None
     error_message: str | None = None
+    timestamp: datetime | None = None
+
+    def __post_init__(self) -> None:
+        """Set timestamp if not provided."""
+        if self.timestamp is None:
+            self.timestamp = datetime.now(UTC)
 
 
 class GetLearningStatsQueryHandler:
-    """Handler for getting learning statistics using CQRS pattern."""
+    """Query handler for getting comprehensive learning statistics.
+
+    Follows CQRS pattern with direct repository access for read operations.
+    """
 
     def __init__(self, analytics_repository: AnalyticsRepository):
         """Initialize with analytics repository."""
         self.analytics_repository = analytics_repository
-        self.progress_analytics = ProgressAnalytics(
-            analytics_repository=analytics_repository
-        )
 
     async def handle(self, query: GetLearningStatsQuery) -> GetLearningStatsResult:
-        """Handle the query to get learning statistics."""
+        """Handle the query to get learning statistics.
+
+        Args:
+            query: GetLearningStatsQuery with user parameters
+
+        Returns:
+            GetLearningStatsResult with comprehensive analytics data
+        """
         try:
             logger.info(f"Getting learning stats for user {query.user_id}")
 
-            # Get comprehensive insights using analytics service
-            insights = await self.progress_analytics.get_learning_insights(
+            # Initialize analytics service with repository
+            progress_analytics = ProgressAnalytics(
+                analytics_repository=self.analytics_repository
+            )
+
+            # Get comprehensive insights using domain analytics service
+            insights = await progress_analytics.get_learning_insights(
                 user_id=query.user_id
             )
 

@@ -37,12 +37,12 @@ from src.domain.shared.repositories import UserRepository
 from src.domain.shared.services import (
     BusinessRuleViolationError,
     DomainService,
+    EventBusInterface,
     ValidationError,
     log_domain_operation,
 )
 from src.domain.user.models.user_models import LoadUserSettingsRequest
 from src.domain.user.services.load_user_settings import LoadUserSettings
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ class BuildDataset(
     def __init__(
         self,
         question_repository: QuestionRepository,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         generate_answer: GenerateAnswer | None = None,
         process_image: ProcessImage | None = None,
         create_mapping: CreateImageMapping | None = None,

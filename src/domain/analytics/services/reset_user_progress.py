@@ -13,8 +13,7 @@ from src.domain.shared.repositories import (
     SessionRepository,
     UserRepository,
 )
-from src.domain.shared.services import DomainService
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.domain.shared.services import DomainService, EventBusInterface
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +52,7 @@ class ResetUserProgress(
         learning_repository: LearningRepository,
         analytics_repository: AnalyticsRepository,
         session_repository: SessionRepository,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
     ):
         """Initialize the reset service."""
         super().__init__(event_bus)

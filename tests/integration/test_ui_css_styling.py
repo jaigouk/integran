@@ -18,7 +18,6 @@ class TestUICSSStying:
             event_bus=container.get_event_bus(),
             session_workflow=container.get_session_workflow(),
             query_service=container.get_query_service(),
-            analytics_service=container.get_analytics_service(),
             user_repository=container.get_user_container().get_repository(),
             container=container,
         )
@@ -43,9 +42,17 @@ class TestUICSSStying:
     def test_practice_screen_navigation_preserves_css(self):
         """Test that navigating to practice screen preserves CSS styling."""
         # Verify the practice screen class has the expected CSS
+        # Create mock dependencies for PracticeScreen
+        from unittest.mock import Mock
+
         from src.presentation.terminal.question_view import PracticeScreen
 
-        practice_screen = PracticeScreen(practice_mode="sequential")
+        practice_screen = PracticeScreen(
+            practice_mode="sequential",
+            user_repository=Mock(),
+            submit_answer_command_handler=Mock(),
+            start_practice_command_handler=Mock(),
+        )
 
         # Verify the practice screen has the expected attributes
         assert hasattr(practice_screen, "practice_mode")
@@ -106,7 +113,8 @@ class TestUICSSStying:
             ("1", "random_practice", "Random Practice"),
             ("2", "sequential_practice", "Sequential Practice"),
             ("3", "category_practice", "Category Practice"),
-            ("4", "review_practice", "Review Failed"),
+            ("4", "failed_practice", "Review Failed"),
+            ("5", "images_practice", "Image Questions"),
             ("s", "show_stats", "Statistics"),
             ("t", "show_settings", "Settings"),
             ("q", "quit", "Quit"),
@@ -130,7 +138,8 @@ class TestUICSSStying:
             "action_random_practice",
             "action_sequential_practice",
             "action_category_practice",
-            "action_review_practice",
+            "action_failed_practice",
+            "action_images_practice",
             "action_show_stats",
             "action_show_settings",
             "action_confirm_quit",

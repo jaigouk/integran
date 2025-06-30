@@ -30,7 +30,7 @@ class TestEnums:
         assert PracticeMode.RANDOM.value == "random"
         assert PracticeMode.SEQUENTIAL.value == "sequential"
         assert PracticeMode.CATEGORY.value == "category"
-        assert PracticeMode.REVIEW.value == "review"
+        assert PracticeMode.FAILED.value == "failed"
 
     def test_answer_status_values(self) -> None:
         """Test answer status enum values."""

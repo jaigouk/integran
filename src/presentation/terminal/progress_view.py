@@ -19,6 +19,10 @@ from src.application.commands.reset_user_progress_command import (
     ResetUserProgressCommand,
     ResetUserProgressCommandHandler,
 )
+from src.application.queries.get_fsrs_analytics_query import (
+    GetFSRSAnalyticsQuery,
+    GetFSRSAnalyticsQueryHandler,
+)
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import (
@@ -38,6 +42,7 @@ class StatsWidget(Static):
         learning_stats_query_handler,
         event_bus: EventBus,
         reset_command_handler: ResetUserProgressCommandHandler | None = None,
+        fsrs_analytics_query_handler: GetFSRSAnalyticsQueryHandler | None = None,
         **kwargs: Any,
     ):
         # Start with simple visible content
@@ -48,6 +53,7 @@ class StatsWidget(Static):
         self.learning_stats_query_handler = learning_stats_query_handler
         self.event_bus = event_bus
         self.reset_command_handler = reset_command_handler
+        self.fsrs_analytics_query_handler = fsrs_analytics_query_handler
 
     async def refresh_stats(self) -> None:
         """Refresh statistics display using CQRS query handler."""
@@ -62,6 +68,7 @@ class StatsWidget(Static):
                 GetLearningStatsQuery,
             )
 
+            # Create query - repository will be injected by handler
             query = GetLearningStatsQuery(
                 user_id=1,
                 include_category_breakdown=False,
@@ -104,7 +111,7 @@ Daily Goal: [green]{insights.recommended_daily_reviews} reviews[/green]
 Focus Areas: [yellow]{", ".join(insights.recommended_focus_categories[:3]) if insights.recommended_focus_categories else "None"}[/yellow]
 
 [bold yellow]LEECH DETECTION:[/bold yellow]
-{self._get_leech_summary()}
+{await self._get_leech_summary()}
 """
 
                 self.update(content)
@@ -185,15 +192,361 @@ No difficult cards detected
             logger.error(f"Failed to get session count from insights: {e}")
             return 0
 
-    def _get_leech_summary(self) -> str:
+    async def _get_leech_summary(self) -> str:
         """Get summary of leech detection results."""
         try:
-            # For now, return a styled placeholder that will be enhanced
-            # with real leech detection when the service is fully integrated
-            return "[dim]Checking for difficult cards... (Feature coming soon)[/dim]"
+            if not self.fsrs_analytics_query_handler:
+                return "[dim]Leech detection requires FSRS analytics[/dim]"
+
+            # Get leech analysis from FSRS analytics
+            from src.application.queries.get_fsrs_analytics_query import (
+                GetFSRSAnalyticsQuery,
+            )
+
+            query = GetFSRSAnalyticsQuery(
+                user_id=1,
+                include_stability_analysis=False,
+                include_retrievability_analysis=False,
+                include_leech_analysis=True,
+                include_performance_trends=False,
+            )
+
+            result = await self.fsrs_analytics_query_handler.handle(query)
+
+            if result.success and result.leech_analysis:
+                leech = result.leech_analysis
+                if leech.total_leeches == 0:
+                    return "[green]No difficult cards detected[/green]"
+
+                # Create summary string
+                summary = f"[yellow]{leech.total_leeches} difficult cards[/yellow]"
+
+                if leech.average_lapses > 0:
+                    summary += f" • [red]Avg lapses: {leech.average_lapses:.1f}[/red]"
+
+                # Show top category with leeches
+                if leech.leeches_by_category:
+                    top_category = max(
+                        leech.leeches_by_category.items(), key=lambda x: x[1]
+                    )
+                    summary += f" • [red]{top_category[0]}: {top_category[1]}[/red]"
+
+                return summary
+            else:
+                return "[yellow]Analyzing difficult cards...[/yellow]"
+
         except Exception as e:
             logger.error(f"Failed to get leech summary: {e}")
             return "[red]Leech detection unavailable[/red]"
+
+
+class FSRSAnalyticsWidget(Static):
+    """Widget for displaying FSRS-specific analytics."""
+
+    def __init__(
+        self,
+        fsrs_analytics_query_handler: GetFSRSAnalyticsQueryHandler,
+        event_bus: EventBus,
+        **kwargs: Any,
+    ):
+        super().__init__(
+            "[bold cyan]FSRS Analytics[/bold cyan]\n\nLoading FSRS analytics...",
+            **kwargs,
+        )
+        self.fsrs_analytics_query_handler = fsrs_analytics_query_handler
+        self.event_bus = event_bus
+
+    async def refresh_fsrs_analytics(self) -> None:
+        """Refresh FSRS analytics display using CQRS query handler."""
+        logger.info("FSRSAnalyticsWidget: Starting refresh_fsrs_analytics()")
+        try:
+            if not self.fsrs_analytics_query_handler:
+                logger.warning("No FSRS analytics query handler available")
+                return
+
+            # Get FSRS analytics using CQRS query
+            query = GetFSRSAnalyticsQuery(
+                user_id=1,
+                include_stability_analysis=True,
+                include_retrievability_analysis=True,
+                include_leech_analysis=True,
+                include_performance_trends=True,
+            )
+
+            result = await self.fsrs_analytics_query_handler.handle(query)
+
+            if result.success:
+                content = self._format_fsrs_analytics(result)
+                self.update(content)
+                logger.info("FSRSAnalyticsWidget: Successfully updated with FSRS data")
+            else:
+                logger.error(f"Failed to get FSRS analytics: {result.error_message}")
+                self._show_fallback_content()
+
+        except Exception as e:
+            logger.error(f"FSRSAnalyticsWidget: Failed to refresh analytics: {e}")
+            self._show_fallback_content()
+
+    def _format_fsrs_analytics(self, result) -> str:
+        """Format FSRS analytics results into rich markup."""
+        try:
+            content = "[bold cyan]FSRS Analytics[/bold cyan]\n\n"
+
+            # Card State Distribution
+            if result.card_state_distribution:
+                dist = result.card_state_distribution
+                content += "[bold yellow]CARD STATES:[/bold yellow]\n"
+                content += f"New: [blue]{dist.new_cards}[/blue]\n"
+                content += f"Learning: [yellow]{dist.learning_cards}[/yellow]\n"
+                content += f"Review: [green]{dist.review_cards}[/green]\n"
+                content += f"Relearning: [red]{dist.relearning_cards}[/red]\n"
+                content += f"Mastery: [green]{dist.mastery_percentage:.1f}%[/green]\n\n"
+
+            # Stability Analysis
+            if result.stability_analysis:
+                stab = result.stability_analysis
+                content += "[bold yellow]STABILITY DISTRIBUTION:[/bold yellow]\n"
+                content += f"< 7 days: [red]{stab.cards_below_7_days}[/red]\n"
+                content += f"7-30 days: [yellow]{stab.cards_7_to_30_days}[/yellow]\n"
+                content += f"30-90 days: [green]{stab.cards_30_to_90_days}[/green]\n"
+                content += f"> 90 days: [bright_green]{stab.cards_above_90_days}[/bright_green]\n"
+                content += (
+                    f"Average: [cyan]{stab.average_stability:.1f} days[/cyan]\n\n"
+                )
+
+            # Retrievability Analysis
+            if result.retrievability_analysis:
+                retr = result.retrievability_analysis
+                content += "[bold yellow]RETRIEVABILITY:[/bold yellow]\n"
+                content += f"< 80%: [red]{retr.cards_below_80_percent}[/red]\n"
+                content += f"80-90%: [yellow]{retr.cards_80_to_90_percent}[/yellow]\n"
+                content += f"> 90%: [green]{retr.cards_above_90_percent}[/green]\n"
+                content += f"Average: [cyan]{retr.average_retrievability:.1%}[/cyan]\n"
+                content += (
+                    f"Due Today: [magenta]{retr.due_for_review_today}[/magenta]\n\n"
+                )
+
+            # Leech Analysis
+            if result.leech_analysis:
+                leech = result.leech_analysis
+                content += "[bold yellow]LEECH DETECTION:[/bold yellow]\n"
+                content += f"Total Leeches: [red]{leech.total_leeches}[/red]\n"
+                content += f"Avg Lapses: [yellow]{leech.average_lapses:.1f}[/yellow]\n"
+                if leech.leeches_by_category:
+                    top_category = max(
+                        leech.leeches_by_category.items(), key=lambda x: x[1]
+                    )
+                    content += f"Most Difficult: [red]{top_category[0]} ({top_category[1]})[/red]\n"
+                content += "\n"
+
+            # Performance Trends
+            if result.performance_trends:
+                trends = result.performance_trends
+                content += "[bold yellow]PERFORMANCE TRENDS:[/bold yellow]\n"
+                content += f"7-Day Retention: [cyan]{trends.retention_rate_7_days:.1f}%[/cyan]\n"
+                content += f"30-Day Retention: [cyan]{trends.retention_rate_30_days:.1f}%[/cyan]\n"
+                content += f"Graduated (Week): [green]{trends.cards_graduated_last_week}[/green]\n"
+                content += f"Graduated (Month): [green]{trends.cards_graduated_last_month}[/green]\n"
+
+            return content
+
+        except Exception as e:
+            logger.error(f"Error formatting FSRS analytics: {e}")
+            return "[red]Error displaying FSRS analytics[/red]"
+
+    def _show_fallback_content(self) -> None:
+        """Show fallback content when FSRS analytics loading fails."""
+        fallback_content = """[bold cyan]FSRS Analytics[/bold cyan]
+
+CARD STATES:
+New: 0
+Learning: 0
+Review: 0
+Relearning: 0
+Mastery: 0.0%
+
+STABILITY DISTRIBUTION:
+< 7 days: 0
+7-30 days: 0
+30-90 days: 0
+> 90 days: 0
+Average: 0.0 days
+
+RETRIEVABILITY:
+< 80%: 0
+80-90%: 0
+> 90%: 0
+Average: 0.0%
+Due Today: 0
+
+LEECH DETECTION:
+Total Leeches: 0
+Avg Lapses: 0.0
+
+PERFORMANCE TRENDS:
+7-Day Retention: 0.0%
+30-Day Retention: 0.0%
+Graduated (Week): 0
+Graduated (Month): 0
+"""
+        self.update(fallback_content)
+
+
+class PerformanceTrendsWidget(Static):
+    """Widget for displaying performance trends and time-based analytics."""
+
+    def __init__(
+        self,
+        analytics_repository,
+        event_bus: EventBus,
+        **kwargs: Any,
+    ):
+        super().__init__(
+            "[bold cyan]Performance Trends[/bold cyan]\n\nLoading performance data...",
+            **kwargs,
+        )
+        self.analytics_repository = analytics_repository
+        self.event_bus = event_bus
+
+    async def refresh_performance_trends(self) -> None:
+        """Refresh performance trends display."""
+        logger.info("PerformanceTrendsWidget: Starting refresh_performance_trends()")
+        try:
+            if not self.analytics_repository:
+                logger.warning("No analytics repository available")
+                return
+
+            # Get hourly session statistics
+            hourly_stats = await self.analytics_repository.get_hourly_session_stats(
+                user_id=1, days=30
+            )
+
+            # Get daily study patterns
+            daily_patterns = await self.analytics_repository.get_daily_study_patterns(
+                user_id=1, days=7
+            )
+
+            content = self._format_performance_trends(hourly_stats, daily_patterns)
+            self.update(content)
+            logger.info(
+                "PerformanceTrendsWidget: Successfully updated with trends data"
+            )
+
+        except Exception as e:
+            logger.error(f"PerformanceTrendsWidget: Failed to refresh trends: {e}")
+            self._show_fallback_content()
+
+    def _format_performance_trends(
+        self, hourly_stats: dict, daily_patterns: list
+    ) -> str:
+        """Format performance trends into rich markup."""
+        try:
+            content = "[bold cyan]Performance Trends[/bold cyan]\n\n"
+
+            # Study time analysis
+            content += "[bold yellow]STUDY TIME PATTERNS:[/bold yellow]\n"
+
+            # Find peak study hours
+            if hourly_stats:
+                peak_hour = max(hourly_stats.items(), key=lambda x: x[1]["count"])
+                if peak_hour[1]["count"] > 0:
+                    content += f"Peak Hour: [green]{peak_hour[0]:02d}:00[/green] ({peak_hour[1]['count']} sessions)\n"
+                    avg_accuracy = peak_hour[1]["avg_accuracy"]
+                    content += f"Peak Hour Accuracy: [cyan]{avg_accuracy:.1f}%[/cyan]\n"
+                else:
+                    content += "Peak Hour: [dim]No sessions recorded[/dim]\n"
+            else:
+                content += "Peak Hour: [dim]No data available[/dim]\n"
+
+            # Recent daily patterns
+            if daily_patterns and len(daily_patterns) > 0:
+                content += f"\n[bold yellow]RECENT ACTIVITY (Last {len(daily_patterns)} days):[/bold yellow]\n"
+                total_sessions = sum(day["session_count"] for day in daily_patterns)
+                total_questions = sum(day["total_questions"] for day in daily_patterns)
+                avg_accuracy = sum(
+                    day["avg_accuracy"]
+                    for day in daily_patterns
+                    if day["avg_accuracy"] > 0
+                ) / max(1, len([d for d in daily_patterns if d["avg_accuracy"] > 0]))
+
+                content += f"Total Sessions: [cyan]{total_sessions}[/cyan]\n"
+                content += f"Questions Answered: [cyan]{total_questions}[/cyan]\n"
+                content += f"Average Accuracy: [green]{avg_accuracy:.1f}%[/green]\n"
+
+                # Show consistency
+                active_days = len([d for d in daily_patterns if d["session_count"] > 0])
+                consistency = (active_days / len(daily_patterns)) * 100
+                consistency_color = (
+                    "green"
+                    if consistency >= 70
+                    else "yellow"
+                    if consistency >= 40
+                    else "red"
+                )
+                content += f"Study Consistency: [{consistency_color}]{consistency:.0f}%[/{consistency_color}] ({active_days}/{len(daily_patterns)} days)\n"
+            else:
+                content += "\n[bold yellow]RECENT ACTIVITY:[/bold yellow]\n"
+                content += "[dim]No recent study sessions[/dim]\n"
+
+            # Study recommendations
+            content += "\n[bold yellow]RECOMMENDATIONS:[/bold yellow]\n"
+            if hourly_stats and any(h["count"] > 0 for h in hourly_stats.values()):
+                # Find most productive hours
+                productive_hours = sorted(
+                    [
+                        (h, stats)
+                        for h, stats in hourly_stats.items()
+                        if stats["avg_accuracy"] >= 80 and stats["count"] >= 2
+                    ],
+                    key=lambda x: x[1]["avg_accuracy"],
+                    reverse=True,
+                )[:3]
+
+                if productive_hours:
+                    best_hours = ", ".join([f"{h:02d}:00" for h, _ in productive_hours])
+                    content += f"• [green]Best study times: {best_hours}[/green]\n"
+                else:
+                    content += "• [yellow]Study more consistently for better insights[/yellow]\n"
+
+                # Consistency recommendation
+                if daily_patterns:
+                    active_days = len(
+                        [d for d in daily_patterns if d["session_count"] > 0]
+                    )
+                    if active_days < len(daily_patterns) * 0.5:
+                        content += "• [yellow]Try to study daily for better retention[/yellow]\n"
+                    elif active_days == len(daily_patterns):
+                        content += (
+                            "• [green]Excellent consistency! Keep it up[/green]\n"
+                        )
+            else:
+                content += "• [blue]Start studying to see personalized recommendations[/blue]\n"
+
+            return content
+
+        except Exception as e:
+            logger.error(f"Error formatting performance trends: {e}")
+            return "[red]Error displaying performance trends[/red]"
+
+    def _show_fallback_content(self) -> None:
+        """Show fallback content when performance trends loading fails."""
+        fallback_content = """[bold cyan]Performance Trends[/bold cyan]
+
+STUDY TIME PATTERNS:
+Peak Hour: No data available
+
+RECENT ACTIVITY:
+Total Sessions: 0
+Questions Answered: 0
+Average Accuracy: 0.0%
+Study Consistency: 0% (0/7 days)
+
+RECOMMENDATIONS:
+• Start studying to see personalized insights
+• Aim for consistent daily practice
+• Track your progress over time
+"""
+        self.update(fallback_content)
 
 
 class CategoryProgressWidget(EventAwareWidget):
@@ -248,6 +601,7 @@ class CategoryProgressWidget(EventAwareWidget):
                 GetLearningStatsQuery,
             )
 
+            # Create query - repository will be injected by handler
             query = GetLearningStatsQuery(
                 user_id=1,
                 include_category_breakdown=True,
@@ -418,6 +772,42 @@ class ProgressScreen(Screen):
         text-align: left;
         overflow-x: auto;
     }
+
+    #fsrs-analytics-widget {
+        width: 100%;
+        height: auto;
+        min-height: 12;
+        background: $surface;
+        border: solid white;
+        padding: 2;
+        margin-bottom: 1;
+        color: white;
+        text-align: left;
+    }
+
+    #fsrs-analytics-placeholder {
+        width: 100%;
+        height: auto;
+        min-height: 3;
+        background: $background;
+        border: dashed white;
+        padding: 1;
+        margin-bottom: 1;
+        color: gray;
+        text-align: center;
+    }
+
+    #performance-trends-widget {
+        width: 100%;
+        height: auto;
+        min-height: 12;
+        background: $surface;
+        border: solid white;
+        padding: 2;
+        margin-bottom: 1;
+        color: white;
+        text-align: left;
+    }
     """
     )
 
@@ -430,12 +820,16 @@ class ProgressScreen(Screen):
     def __init__(
         self,
         learning_stats_query_handler,
+        fsrs_analytics_query_handler: GetFSRSAnalyticsQueryHandler | None = None,
         reset_command_handler: ResetUserProgressCommandHandler | None = None,
+        analytics_repository=None,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self.learning_stats_query_handler = learning_stats_query_handler
+        self.fsrs_analytics_query_handler = fsrs_analytics_query_handler
         self.reset_command_handler = reset_command_handler
+        self.analytics_repository = analytics_repository
 
     def compose(self) -> ComposeResult:
         """Compose the progress screen."""
@@ -445,12 +839,33 @@ class ProgressScreen(Screen):
                     learning_stats_query_handler=self.learning_stats_query_handler,
                     event_bus=self.app.event_bus,
                     reset_command_handler=self.reset_command_handler,
+                    fsrs_analytics_query_handler=self.fsrs_analytics_query_handler,
                     id="stats-widget",
                 ),
                 CategoryProgressWidget(
                     learning_stats_query_handler=self.learning_stats_query_handler,
                     event_bus=self.app.event_bus,
                     id="category-widget",
+                ),
+                FSRSAnalyticsWidget(
+                    fsrs_analytics_query_handler=self.fsrs_analytics_query_handler,
+                    event_bus=self.app.event_bus,
+                    id="fsrs-analytics-widget",
+                )
+                if self.fsrs_analytics_query_handler
+                else Static(
+                    "[dim]FSRS Analytics unavailable[/dim]",
+                    id="fsrs-analytics-placeholder",
+                ),
+                PerformanceTrendsWidget(
+                    analytics_repository=self.analytics_repository,
+                    event_bus=self.app.event_bus,
+                    id="performance-trends-widget",
+                )
+                if self.analytics_repository
+                else Static(
+                    "[dim]Performance Trends unavailable[/dim]",
+                    id="performance-trends-placeholder",
                 ),
                 classes="progress-container",
             )
@@ -500,6 +915,40 @@ class ProgressScreen(Screen):
             )
             await category_widget.refresh_categories()
             logger.info("ProgressScreen: Category widget refreshed successfully")
+
+            # Refresh FSRS analytics if available
+            try:
+                fsrs_widget = self.query_one(
+                    "#fsrs-analytics-widget", FSRSAnalyticsWidget
+                )
+                logger.info(
+                    "ProgressScreen: Found FSRS analytics widget, refreshing..."
+                )
+                await fsrs_widget.refresh_fsrs_analytics()
+                logger.info(
+                    "ProgressScreen: FSRS analytics widget refreshed successfully"
+                )
+            except Exception as fsrs_error:
+                logger.debug(
+                    f"ProgressScreen: FSRS analytics widget not available: {fsrs_error}"
+                )
+
+            # Refresh performance trends if available
+            try:
+                trends_widget = self.query_one(
+                    "#performance-trends-widget", PerformanceTrendsWidget
+                )
+                logger.info(
+                    "ProgressScreen: Found performance trends widget, refreshing..."
+                )
+                await trends_widget.refresh_performance_trends()
+                logger.info(
+                    "ProgressScreen: Performance trends widget refreshed successfully"
+                )
+            except Exception as trends_error:
+                logger.debug(
+                    f"ProgressScreen: Performance trends widget not available: {trends_error}"
+                )
         except Exception as e:
             logger.error(f"ProgressScreen: Error in refresh_data(): {e}")
             import traceback

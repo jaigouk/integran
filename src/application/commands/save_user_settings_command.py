@@ -4,63 +4,64 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
 
 from src.domain.shared.repositories import UserRepository
+from src.domain.shared.services import EventBusInterface
 from src.domain.user.models.user_models import (
-    Language,
+    SaveUserSettingsRequest,
     UserSettings,
 )
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.domain.user.services.save_user_settings import SaveUserSettings
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class SaveUserSettingsCommand:
-    """Command to save user settings and preferences."""
+    """Command to save user settings."""
 
-    user_id: int
-    language: Language | None = None
-    preferences: dict[str, Any] | None = None
-    developer_mode: bool | None = None
+    user_settings: UserSettings  # Changed to match domain expectation
 
 
 @dataclass
-class SaveUserSettingsResult:
-    """Result of saving user settings."""
+class SaveUserSettingsCommandResult:
+    """Result of save user settings command."""
 
     success: bool
-    updated_settings: UserSettings | None = None
+    user_settings: UserSettings | None = None
     error_message: str | None = None
 
 
 class SaveUserSettingsCommandHandler:
-    """Handler for saving user settings using CQRS pattern."""
+    """Command handler for saving user settings using domain service."""
 
-    def __init__(self, user_repository: UserRepository, event_bus: EventBus):
+    def __init__(self, user_repository: UserRepository, event_bus: EventBusInterface):
         """Initialize with user repository and event bus."""
-        self.user_repository = user_repository
-        self.event_bus = event_bus
+        self.save_user_settings_service = SaveUserSettings(event_bus, user_repository)
 
-    async def handle(self, command: SaveUserSettingsCommand) -> SaveUserSettingsResult:
-        """Handle the command to save user settings."""
+    async def handle(
+        self, command: SaveUserSettingsCommand
+    ) -> SaveUserSettingsCommandResult:
+        """Handle save user settings command using domain service."""
         try:
-            logger.info(f"Saving user settings for user {command.user_id}")
+            # Create domain service request
+            request = SaveUserSettingsRequest(
+                user_settings=command.user_settings,
+            )
 
-            # For now, use a simplified approach that bypasses the complex domain service
-            # This can be enhanced later with proper UserSettings model handling
-            logger.info(f"Simplified save for user {command.user_id}")
+            # Call domain service
+            result = await self.save_user_settings_service.call(request)
 
-            # Simulate successful save for now
-            return SaveUserSettingsResult(
-                success=True,
-                updated_settings=None,  # Would contain actual saved settings
+            # Convert domain result to command result
+            return SaveUserSettingsCommandResult(
+                success=result.success,
+                user_settings=result.user_settings,
+                error_message=result.error_message,
             )
 
         except Exception as e:
-            logger.error(f"Error saving user settings: {e}")
-            return SaveUserSettingsResult(
+            logger.error(f"Error in SaveUserSettingsCommandHandler: {e}")
+            return SaveUserSettingsCommandResult(
                 success=False,
                 error_message=f"Failed to save user settings: {e}",
             )

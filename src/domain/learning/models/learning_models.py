@@ -105,6 +105,19 @@ class FSRSCard(Base):
         {"extend_existing": True},
     )
 
+    @staticmethod
+    def create_new(question_id: int, user_id: int = 1) -> FSRSCard:
+        """Create a new FSRS card with default initial state."""
+        return FSRSCard(
+            question_id=question_id,
+            user_id=user_id,
+            difficulty=5.0,  # Initial difficulty
+            stability=1.0,  # Initial stability (1 day)
+            retrievability=1.0,  # Perfect retrievability for new cards
+            state=0,  # New state
+            next_review_date=datetime.now(UTC).timestamp(),
+        )
+
 
 class ReviewHistory(Base):
     """Complete review log for FSRS algorithm."""

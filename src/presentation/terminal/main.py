@@ -45,7 +45,6 @@ async def main() -> None:
             event_bus=container.get_event_bus(),
             session_workflow=container.get_session_workflow(),
             query_service=container.get_query_service(),
-            analytics_service=container.get_analytics_service(),
             user_repository=container.get_user_container().get_repository(),
             container=container,  # Pass the full container for service access
         )

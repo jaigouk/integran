@@ -4,6 +4,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from src.application.queries.enhanced_question_content_query import (
+    EnhancedQuestionContentQueryHandler,
+)
+from src.application.queries.load_user_settings_query import (
+    LoadUserSettingsQueryHandler,
+)
 from src.domain.content.models.question_models import Question
 from src.domain.user.models.user_models import Language
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
@@ -29,6 +35,24 @@ class TestQuestionView:
         """Create mock submit answer command handler."""
         handler = AsyncMock()
         handler.handle = AsyncMock(return_value=MagicMock(success=True))
+        return handler
+
+    @pytest.fixture
+    def enhanced_question_handler(self):
+        """Create mock enhanced question query handler."""
+        handler = MagicMock(spec=EnhancedQuestionContentQueryHandler)
+        handler.handle = AsyncMock(
+            return_value=MagicMock(success=True, enhanced_data=None)
+        )
+        return handler
+
+    @pytest.fixture
+    def load_user_settings_handler(self):
+        """Create mock load user settings query handler."""
+        handler = MagicMock(spec=LoadUserSettingsQueryHandler)
+        handler.handle = AsyncMock(
+            return_value=MagicMock(success=True, user_settings=None)
+        )
         return handler
 
     @pytest.fixture
@@ -77,14 +101,20 @@ class TestQuestionView:
         )
 
     def test_text_question_layout(
-        self, text_question, event_bus, user_repository, submit_handler
+        self,
+        text_question,
+        event_bus,
+        enhanced_question_handler,
+        load_user_settings_handler,
+        submit_handler,
     ):
         """Test layout for questions without images."""
         # Create widget
         widget = QuestionWidget(
             question=text_question,
             event_bus=event_bus,
-            user_repository=user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
             submit_answer_command_handler=submit_handler,
             preferred_language=Language.ENGLISH,
         )
@@ -95,14 +125,20 @@ class TestQuestionView:
         assert len(widget.question.options_list) == 4
 
     def test_single_image_question_layout(
-        self, single_image_question, event_bus, user_repository, submit_handler
+        self,
+        single_image_question,
+        event_bus,
+        enhanced_question_handler,
+        load_user_settings_handler,
+        submit_handler,
     ):
         """Test layout for questions with 1 image."""
         # Create widget
         widget = QuestionWidget(
             question=single_image_question,
             event_bus=event_bus,
-            user_repository=user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
             submit_answer_command_handler=submit_handler,
             preferred_language=Language.ENGLISH,
         )
@@ -114,14 +150,20 @@ class TestQuestionView:
         assert "Bundestagssitz" in widget.question.options_list[0]
 
     def test_multi_image_question_layout(
-        self, multi_image_question, event_bus, user_repository, submit_handler
+        self,
+        multi_image_question,
+        event_bus,
+        enhanced_question_handler,
+        load_user_settings_handler,
+        submit_handler,
     ):
         """Test layout for questions with 4 images."""
         # Create widget
         widget = QuestionWidget(
             question=multi_image_question,
             event_bus=event_bus,
-            user_repository=user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
             submit_answer_command_handler=submit_handler,
             preferred_language=Language.ENGLISH,
         )
@@ -133,13 +175,19 @@ class TestQuestionView:
         assert all("Bild" in option for option in widget.question.options_list)
 
     def test_compose_text_options_basic(
-        self, text_question, event_bus, user_repository, submit_handler
+        self,
+        text_question,
+        event_bus,
+        enhanced_question_handler,
+        load_user_settings_handler,
+        submit_handler,
     ):
         """Test that text question widget can be created."""
         widget = QuestionWidget(
             question=text_question,
             event_bus=event_bus,
-            user_repository=user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
             submit_answer_command_handler=submit_handler,
         )
 
@@ -172,13 +220,19 @@ class TestQuestionView:
 
     @pytest.mark.asyncio
     async def test_answer_button_click_handling(
-        self, text_question, event_bus, user_repository, submit_handler
+        self,
+        text_question,
+        event_bus,
+        enhanced_question_handler,
+        load_user_settings_handler,
+        submit_handler,
     ):
         """Test that answer buttons can be clicked."""
         widget = QuestionWidget(
             question=text_question,
             event_bus=event_bus,
-            user_repository=user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
             submit_answer_command_handler=submit_handler,
         )
 
@@ -212,6 +266,8 @@ class TestQuestionView:
         screen = PracticeScreen(
             practice_mode="random",
             user_repository=MagicMock(),
+            submit_answer_command_handler=MagicMock(),
+            start_practice_command_handler=MagicMock(),
         )
 
         # Mock notify method
@@ -230,6 +286,8 @@ class TestQuestionView:
         screen = PracticeScreen(
             practice_mode="random",
             user_repository=MagicMock(),
+            submit_answer_command_handler=MagicMock(),
+            start_practice_command_handler=MagicMock(),
         )
 
         # Check bindings

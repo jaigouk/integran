@@ -15,7 +15,8 @@ from typing import Any
 
 import yaml
 
-from src.infrastructure.messaging.enhanced_event_bus import DomainEvent, EventBus
+from src.domain.shared.events import DomainEvent
+from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 

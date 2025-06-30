@@ -12,19 +12,18 @@ from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import Button, Collapsible, Static, TabbedContent, TabPane
 
+from src.application.queries.enhanced_question_content_query import (
+    EnhancedQuestionContentQuery,
+    EnhancedQuestionContentQueryHandler,
+)
+from src.application.queries.load_user_settings_query import (
+    LoadUserSettingsQuery,
+    LoadUserSettingsQueryHandler,
+)
 from src.domain.content.models.question_models import Question
-from src.domain.content.services.enhanced_question_display import (
-    EnhancedQuestionData,
-    EnhancedQuestionDisplay,
-    EnhancedQuestionDisplayRequest,
-)
+from src.domain.content.services.enhanced_question_display import EnhancedQuestionData
 from src.domain.user.models.user_models import Language
-from src.domain.user.services.load_user_settings import (
-    LoadUserSettings,
-    LoadUserSettingsRequest,
-)
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
-from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import COMMON_CSS_BASE
 
@@ -38,7 +37,9 @@ class QuestionWidget(EventAwareWidget):
         self,
         question: Question,
         event_bus: EventBus,
-        user_repository: UserSettingsRepository,
+        enhanced_question_query_handler: EnhancedQuestionContentQueryHandler,
+        load_user_settings_query_handler: LoadUserSettingsQueryHandler,
+        learning_repository=None,
         submit_answer_command_handler=None,
         preferred_language: Language = Language.ENGLISH,
         session_id: int | None = None,
@@ -46,15 +47,15 @@ class QuestionWidget(EventAwareWidget):
     ):
         super().__init__(event_bus=event_bus, **kwargs)
         self.question = question
-        self.user_repository = user_repository
+        self.enhanced_question_query_handler = enhanced_question_query_handler
+        self.load_user_settings_query_handler = load_user_settings_query_handler
+        self._learning_repository = learning_repository
         self.submit_answer_command_handler = submit_answer_command_handler
         self.preferred_language = preferred_language
         self.session_id = session_id
         self.selected_answer: str | None = None
         self.answer_revealed = False
         self.enhanced_data: EnhancedQuestionData | None = None
-        self.enhanced_service = EnhancedQuestionDisplay(event_bus)
-        self.load_user_settings_service = LoadUserSettings(event_bus, user_repository)
         self.user_preferences = None  # Will be loaded from user settings
 
     async def on_mount(self) -> None:
@@ -166,6 +167,12 @@ class QuestionWidget(EventAwareWidget):
                     id="rating_4",
                     variant="primary",
                     classes="rating-btn",
+                ),
+                Button(
+                    "Menu",
+                    id="back_to_menu",
+                    variant="default",
+                    classes="menu-btn",
                 ),
                 classes="rating-buttons",
             ),
@@ -512,8 +519,8 @@ class QuestionWidget(EventAwareWidget):
     async def _load_user_preferred_language(self) -> None:
         """Load user's preferred language and progressive disclosure settings."""
         try:
-            request = LoadUserSettingsRequest(user_id=1)
-            result = await self.load_user_settings_service.call(request)
+            query = LoadUserSettingsQuery(user_id=1)
+            result = await self.load_user_settings_query_handler.handle(query)
 
             if result.success and result.user_settings:
                 # Update preferred language from user settings
@@ -629,6 +636,22 @@ class QuestionWidget(EventAwareWidget):
         # Notify parent that we're ready for next question
         self.post_message(self.QuestionCompleted(rating))
 
+    @on(Button.Pressed, ".menu-btn")
+    async def on_menu_button_pressed(self, event: Button.Pressed) -> None:  # noqa: ARG002
+        """Handle Menu button press to go back to main menu."""
+        try:
+            # Get the parent screen (PracticeScreen) and call its cleanup method
+            screen = self.screen
+            if hasattr(screen, "action_cleanup_and_exit"):
+                await screen.action_cleanup_and_exit()
+            else:
+                # Fallback: just pop the screen
+                self.app.pop_screen()
+        except Exception as e:
+            logger.error(f"Error in menu button handler: {e}")
+            # Ensure we can still navigate back even if cleanup fails
+            self.app.pop_screen()
+
     async def reveal_answer(self) -> None:
         """Reveal the correct answer and enhanced multilingual content."""
         self.answer_revealed = True
@@ -673,19 +696,15 @@ class QuestionWidget(EventAwareWidget):
     async def _load_enhanced_content(self) -> None:
         """Load enhanced content from the enhanced question display service."""
         try:
-            request = EnhancedQuestionDisplayRequest(
+            query = EnhancedQuestionContentQuery(
                 question_id=self.question.id,
                 preferred_language=self.preferred_language,
-                include_wrong_analysis=True,
-                include_key_concepts=True,
-                include_mnemonics=True,
-                include_image_descriptions=True,
             )
 
-            result = await self.enhanced_service.call(request)
+            result = await self.enhanced_question_query_handler.handle(query)
 
-            if result.success and result.question_data:
-                self.enhanced_data = result.question_data
+            if result.success and result.enhanced_data:
+                self.enhanced_data = result.enhanced_data
                 logger.info(f"Loaded enhanced content for question {self.question.id}")
 
                 # If this is an image question, refresh the display to show images
@@ -748,9 +767,16 @@ class QuestionWidget(EventAwareWidget):
             try:
                 # Find the Collapsible that contains the mnemonic
                 for collapsible in self.query("Collapsible").results():
-                    if collapsible.query_one("#mnemonic", Static, fallback=None):
+                    try:
+                        collapsible.query_one("#mnemonic", Static)
+                        # If we get here, the element exists
                         collapsible.add_class("hidden")
                         break
+                    except Exception as e:
+                        logger.debug(
+                            f"Could not find mnemonic element in collapsible: {e}"
+                        )
+                        continue
             except Exception as e:
                 logger.debug(f"Could not hide mnemonic section: {e}")
 
@@ -782,18 +808,30 @@ class QuestionWidget(EventAwareWidget):
             for collapsible in collapsibles:
                 section_id = None
                 # Determine which section this is based on its content
-                if collapsible.query_one(
-                    "#detailed-explanation", Static, fallback=None
-                ):
+                try:
+                    collapsible.query_one("#detailed-explanation", Static)
                     section_id = "explanation"
-                elif collapsible.query_one("#key-concept", Static, fallback=None):
-                    section_id = "key_concepts"
-                elif collapsible.query_one("#mnemonic", Static, fallback=None):
-                    section_id = "mnemonics"
-                elif collapsible.query_one("#wrong-analysis", fallback=None):
-                    section_id = "wrong_analysis"
-                elif collapsible.query_one("#image-descriptions", fallback=None):
-                    section_id = "image_descriptions"
+                except Exception:
+                    try:
+                        collapsible.query_one("#key-concept", Static)
+                        section_id = "key_concepts"
+                    except Exception:
+                        try:
+                            collapsible.query_one("#mnemonic", Static)
+                            section_id = "mnemonics"
+                        except Exception:
+                            try:
+                                collapsible.query_one("#wrong-analysis")
+                                section_id = "wrong_analysis"
+                            except Exception:
+                                try:
+                                    collapsible.query_one("#image-descriptions")
+                                    section_id = "image_descriptions"
+                                except Exception as e:
+                                    logger.debug(
+                                        f"Could not identify collapsible section: {e}"
+                                    )
+                                    continue
 
                 # Apply preference based on section
                 if section_id == "explanation":
@@ -880,6 +918,8 @@ class QuestionWidget(EventAwareWidget):
                 selected_answer=self.selected_answer or "",
                 correct_answer=self.question.correct,
                 fsrs_rating=rating,
+                learning_repository=self._learning_repository,
+                event_bus=self.event_bus,
                 user_id=1,  # Default user
                 session_id=self.session_id,  # Pass session ID for progress tracking
             )
@@ -1305,6 +1345,13 @@ class PracticeScreen(Screen):
         min-width: 8;
         height: 3;
     }
+
+    .menu-btn {
+        width: 1fr;
+        min-width: 8;
+        height: 3;
+        margin-left: 1;
+    }
     """
     )
 
@@ -1325,7 +1372,7 @@ class PracticeScreen(Screen):
     def __init__(
         self,
         practice_mode: str = "random",
-        user_repository: UserSettingsRepository | None = None,
+        user_repository=None,
         submit_answer_command_handler=None,
         start_practice_command_handler=None,
         **kwargs: Any,
@@ -1340,12 +1387,13 @@ class PracticeScreen(Screen):
         self.correct_answers = 0
         self.session_id: int | None = None
 
-        # State for question cycling
+        # State for question cycling - will be loaded from user settings
         self._question_state = {
             "category_index": 0,
             "question_indices": {},
             "last_question_id": 0,
         }
+        self._state_loaded = False
 
     def compose(self) -> ComposeResult:
         """Compose the practice screen."""
@@ -1361,6 +1409,9 @@ class PracticeScreen(Screen):
         """Load first question when screen mounts."""
         try:
             logger.info(f"PracticeScreen mounting with mode: {self.practice_mode}")
+
+            # Load session state from user settings
+            await self._load_session_state()
 
             # Create a practice session for progress tracking
             await self._create_practice_session()
@@ -1383,12 +1434,15 @@ class PracticeScreen(Screen):
     async def load_next_question(self) -> None:
         """Load the next question for practice using CQRS command handler."""
         try:
-            # Get command handler or fallback to app container
+            # Get command handler and container
             command_handler = self.start_practice_command_handler
+            container = None
+
             if not command_handler:
                 if hasattr(self.app, "container") and self.app.container:
+                    container = self.app.container
                     command_handler = (
-                        self.app.container.get_start_practice_session_command_handler()
+                        container.get_start_practice_session_command_handler()
                     )
                 else:
                     # Fallback: create temporary handler
@@ -1400,6 +1454,16 @@ class PracticeScreen(Screen):
                     command_handler = (
                         container.get_start_practice_session_command_handler()
                     )
+            else:
+                # Get container for command creation
+                if hasattr(self.app, "container") and self.app.container:
+                    container = self.app.container
+                else:
+                    from src.infrastructure.containers.main_container import (
+                        MainContainer,
+                    )
+
+                    container = MainContainer()
 
             # Create command with current state
             from src.application.commands.start_practice_session_command import (
@@ -1408,11 +1472,15 @@ class PracticeScreen(Screen):
 
             command = StartPracticeSessionCommand(
                 practice_mode=self.practice_mode,
+                user_repository=container.get_user_repository(),
+                session_repository=container.get_session_repository(),
+                event_bus=container.get_event_bus(),
                 user_id=1,
                 limit=1,
                 category_index=self._question_state["category_index"],
                 question_indices=self._question_state["question_indices"],
                 last_question_id=self._question_state["last_question_id"],
+                existing_session_id=self.session_id,  # Pass existing session ID to avoid duplicates
             )
 
             # Execute command
@@ -1421,9 +1489,18 @@ class PracticeScreen(Screen):
             if result.success and result.question:
                 self.current_question = result.question
 
+                # Store session ID for tracking progress
+                if result.session_id:
+                    self.session_id = result.session_id
+                    logger.info(
+                        f"Practice session {self.session_id} started for {self.practice_mode} mode"
+                    )
+
                 # Update state for next question
                 if result.session_state:
                     self._question_state.update(result.session_state)
+                    # Save updated state to persist progress
+                    await self._save_session_state()
 
                 logger.info(
                     f"Loaded question {self.current_question.id} for {self.practice_mode} mode"
@@ -1441,7 +1518,16 @@ class PracticeScreen(Screen):
             error_container = Container(
                 Static("[red]Failed to load question:[/red]", classes="text-title"),
                 Static(f"{str(e)}", classes="error-text"),
-                Static("Press Escape to return to menu", classes="text-help"),
+                Static(
+                    "Press Escape to return to menu or click the button below:",
+                    classes="text-help",
+                ),
+                Button(
+                    "📋 Back to Main Menu",
+                    id="back_to_menu",
+                    variant="primary",
+                    classes="menu-btn",
+                ),
                 classes="container-centered",
             )
             await self.mount(error_container)
@@ -1451,6 +1537,42 @@ class PracticeScreen(Screen):
         submit_handler = self.submit_answer_command_handler
         if not submit_handler and hasattr(self.app, "container") and self.app.container:
             submit_handler = self.app.container.get_submit_answer_command_handler()
+
+        # Get query handlers from container
+        enhanced_question_query_handler = None
+        load_user_settings_query_handler = None
+
+        if hasattr(self.app, "container") and self.app.container:
+            enhanced_question_query_handler = (
+                self.app.container.get_enhanced_question_content_query_handler()
+            )
+            load_user_settings_query_handler = (
+                self.app.container.get_load_user_settings_query_handler()
+            )
+        else:
+            # Fallback: create temporary container
+            from src.infrastructure.containers.main_container import MainContainer
+
+            temp_container = MainContainer()
+            enhanced_question_query_handler = (
+                temp_container.get_enhanced_question_content_query_handler()
+            )
+            load_user_settings_query_handler = (
+                temp_container.get_load_user_settings_query_handler()
+            )
+
+        # Validate required handlers
+        if not enhanced_question_query_handler:
+            logger.error("Enhanced question query handler not available")
+            raise RuntimeError(
+                "Enhanced question query handler not initialized - check container setup"
+            )
+
+        if not load_user_settings_query_handler:
+            logger.error("Load user settings query handler not available")
+            raise RuntimeError(
+                "Load user settings query handler not initialized - check container setup"
+            )
 
         # Create enhanced question widget with command handler support
         # Use provided user repository or raise error if not available
@@ -1464,7 +1586,9 @@ class PracticeScreen(Screen):
         question_widget = QuestionWidget(
             question=self.current_question,
             event_bus=self.app.event_bus,
-            user_repository=user_repo,
+            enhanced_question_query_handler=enhanced_question_query_handler,
+            load_user_settings_query_handler=load_user_settings_query_handler,
+            learning_repository=user_repo,
             submit_answer_command_handler=submit_handler,
             preferred_language=Language.ENGLISH,  # Will be updated from user settings
             session_id=self.session_id,  # Pass session ID for progress tracking
@@ -1539,8 +1663,42 @@ class PracticeScreen(Screen):
         self.notify("Only options 1-4 are available", severity="warning", timeout=2)
 
     def action_back_to_menu(self) -> None:
-        """Go back to main menu."""
-        self.app.pop_screen()
+        """Go back to main menu with proper session cleanup."""
+        # Schedule session cleanup asynchronously
+        self.run_action("cleanup_and_exit")
+
+    async def action_cleanup_and_exit(self) -> None:
+        """Properly clean up session and navigate to main menu."""
+        try:
+            logger.info("Starting session cleanup before navigating to main menu")
+
+            # Save current session state first
+            await self._save_session_state()
+            logger.info("Session state saved successfully")
+
+            # End current session properly if it exists
+            if (
+                self.session_id
+                and hasattr(self.app, "container")
+                and self.app.container
+            ):
+                try:
+                    # Get the session workflow to properly end the session
+                    session_workflow = self.app.container.get_session_workflow()
+                    await session_workflow.complete_session(self.session_id)
+                    logger.info(f"Session {self.session_id} ended successfully")
+                except Exception as e:
+                    # Don't fail the navigation if session ending fails
+                    logger.warning(f"Failed to end session {self.session_id}: {e}")
+
+            # Now safely navigate away
+            self.app.pop_screen()
+            logger.info("Successfully navigated back to main menu")
+
+        except Exception as e:
+            logger.error(f"Error during session cleanup: {e}")
+            # Always allow navigation even if cleanup fails
+            self.app.pop_screen()
 
     async def action_view_images_externally(self) -> None:
         """Open current question's images in external viewer."""
@@ -1686,45 +1844,173 @@ class PracticeScreen(Screen):
         if self.current_question and event.rating in [3, 4]:  # Good or Easy
             self.correct_answers += 1
 
-        # Load next question
+        # Save updated state and load next question
+        await self._save_session_state()
         logger.info(f"Question completed with rating {event.rating}")
         await self.load_next_question()
+
+    async def _load_session_state(self) -> None:
+        """Load session state from user settings for resume capability."""
+        try:
+            if self._state_loaded:
+                return
+
+            # Get user settings to load session state
+            if hasattr(self.app, "container") and self.app.container:
+                load_user_settings_query_handler = (
+                    self.app.container.get_load_user_settings_query_handler()
+                )
+            else:
+                logger.warning("No app container available for loading session state")
+                return
+
+            from src.application.queries.load_user_settings_query import (
+                LoadUserSettingsQuery,
+            )
+
+            query = LoadUserSettingsQuery(user_id=1)
+            result = await load_user_settings_query_handler.handle(query)
+
+            if (
+                result.success
+                and result.user_settings
+                and result.user_settings.flow_state
+            ):
+                flow_data = result.user_settings.flow_state.flow_data
+
+                # Load practice mode specific state
+                practice_state_key = f"practice_state_{self.practice_mode}"
+                if practice_state_key in flow_data:
+                    saved_state = flow_data[practice_state_key]
+                    logger.info(
+                        f"Loading saved session state for {self.practice_mode} mode: {saved_state}"
+                    )
+
+                    # Update our state with saved values
+                    self._question_state.update(
+                        {
+                            "category_index": saved_state.get("category_index", 0),
+                            "question_indices": saved_state.get("question_indices", {}),
+                            "last_question_id": saved_state.get("last_question_id", 0),
+                        }
+                    )
+
+                    logger.info(
+                        f"Session state loaded for {self.practice_mode}: {self._question_state}"
+                    )
+                else:
+                    logger.info(
+                        f"No saved session state found for {self.practice_mode} mode"
+                    )
+            else:
+                logger.warning("Could not load user settings for session state")
+
+            self._state_loaded = True
+
+        except Exception as e:
+            logger.error(f"Error loading session state: {e}")
+            # Continue with default state
+            self._state_loaded = True
+
+    async def _save_session_state(self) -> None:
+        """Save current session state to user settings for resume capability."""
+        try:
+            # Get user settings handler
+            if hasattr(self.app, "container") and self.app.container:
+                save_user_settings_command_handler = (
+                    self.app.container.get_save_user_settings_command_handler()
+                )
+                load_user_settings_query_handler = (
+                    self.app.container.get_load_user_settings_query_handler()
+                )
+            else:
+                logger.warning("No app container available for saving session state")
+                return
+
+            # First load current settings
+            from src.application.queries.load_user_settings_query import (
+                LoadUserSettingsQuery,
+            )
+
+            query = LoadUserSettingsQuery(user_id=1)
+            result = await load_user_settings_query_handler.handle(query)
+
+            if not result.success or not result.user_settings:
+                logger.warning("Could not load current user settings for state update")
+                return
+
+            # Update flow data with current practice state
+            current_flow_data = result.user_settings.flow_state.flow_data.copy()
+            practice_state_key = f"practice_state_{self.practice_mode}"
+            current_flow_data[practice_state_key] = self._question_state.copy()
+
+            # Create updated flow state
+            from src.domain.user.models.user_models import UserFlowState
+
+            updated_flow_state = UserFlowState(
+                current_screen=result.user_settings.flow_state.current_screen,
+                session_in_progress=result.user_settings.flow_state.session_in_progress,
+                current_session_id=result.user_settings.flow_state.current_session_id,
+                last_question_id=result.user_settings.flow_state.last_question_id,
+                setup_step=result.user_settings.flow_state.setup_step,
+                flow_data=current_flow_data,
+            )
+
+            # Create updated user settings
+            updated_settings = result.user_settings.update_flow_state(
+                updated_flow_state
+            )
+
+            # Save updated settings
+            from src.application.commands.save_user_settings_command import (
+                SaveUserSettingsCommand,
+            )
+
+            command = SaveUserSettingsCommand(user_settings=updated_settings)
+
+            save_result = await save_user_settings_command_handler.handle(command)
+
+            if save_result.success:
+                logger.info(
+                    f"Session state saved for {self.practice_mode}: {self._question_state}"
+                )
+            else:
+                logger.warning(
+                    f"Failed to save session state: {save_result.error_message}"
+                )
+
+        except Exception as e:
+            logger.error(f"Error saving session state: {e}")
+            # Continue without saving (non-critical error)
 
     async def _create_practice_session(self) -> None:
         """Create a practice session for progress tracking using CQRS command."""
         try:
-            # Get start session command handler from app container
-            if not (hasattr(self.app, "container") and self.app.container):
-                logger.warning("No container available - skipping session creation")
-                self.session_id = None
+            # Create session once per PracticeScreen instance to avoid duplicate sessions
+            if self.session_id is not None:
+                logger.info(f"Session {self.session_id} already exists, reusing")
                 return
 
-            start_session_handler = (
-                self.app.container.get_start_session_command_handler()
-            )
-
-            # Create session using application layer command
-            from src.application.commands.start_session_command import (
-                StartSessionCommand,
-            )
-
-            command = StartSessionCommand(
-                session_type=self.practice_mode,
-                max_questions=20,  # Default limit
-                user_id=1,
-            )
-
-            # Execute command through CQRS
-            result = await start_session_handler.handle(command)
-
-            if result.success and result.session_id:
-                self.session_id = result.session_id
-                logger.info(
-                    f"Created practice session {result.session_id} for mode {self.practice_mode}"
-                )
+            # Get session repository from container
+            container = None
+            if hasattr(self.app, "container") and self.app.container:
+                container = self.app.container
             else:
-                logger.warning(f"Failed to create session: {result.error_message}")
-                self.session_id = None
+                from src.infrastructure.containers.main_container import MainContainer
+
+                container = MainContainer()
+
+            session_repository = container.get_session_repository()
+
+            # Create a new session for this practice screen instance
+            self.session_id = await session_repository.create_session(
+                user_id=1,
+                session_type=self.practice_mode,
+                configuration={"limit": 50},  # Default limit for practice sessions
+            )
+            logger.info(
+                f"Created practice session {self.session_id} for mode {self.practice_mode}"
+            )
 
         except Exception as e:
             logger.warning(f"Failed to create practice session: {e}")

@@ -7,6 +7,7 @@ import logging
 from src.domain.shared.repositories import RepositoryError, UserRepository
 from src.domain.shared.services import (
     DomainService,
+    EventBusInterface,
     ValidationError,
     log_domain_operation,
 )
@@ -19,7 +20,6 @@ from src.domain.user.models.user_models import (
     LoadUserSettingsResult,
     UserSettings,
 )
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class LoadUserSettings(DomainService[LoadUserSettingsRequest, LoadUserSettingsRe
 
     def __init__(
         self,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         user_repository: UserRepository,
     ):
         """Initialize the LoadUserSettings domain service.

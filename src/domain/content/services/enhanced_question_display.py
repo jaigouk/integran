@@ -10,11 +10,11 @@ from typing import Any
 
 from src.domain.shared.services import (
     DomainService,
+    EventBusInterface,
     ValidationError,
     log_domain_operation,
 )
 from src.domain.user.models.user_models import Language
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ class EnhancedQuestionDisplay(
 
     def __init__(
         self,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         dataset_path: str | Path = "data/final_dataset.json",
     ):
         """Initialize the enhanced question display service.

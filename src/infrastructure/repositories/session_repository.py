@@ -29,18 +29,90 @@ class SQLAlchemySessionRepository(SessionRepository):
         configuration: dict[str, Any],  # noqa: ARG002
     ) -> int:
         """Create a new session and return session ID."""
-        # DatabaseManager create_session now takes user_id parameter
-        return self.db_manager.create_session(session_type, user_id)
+        from datetime import UTC, datetime
+
+        from src.domain.learning.models.learning_models import LearningSession
+        from src.infrastructure.database.models import SessionDB
+
+        # Create both session records - let each use auto-generated IDs
+        with self.db_manager.get_session() as session:
+            # First create the LearningSession to get an auto-generated ID
+            learning_session = LearningSession(
+                user_id=user_id,
+                start_time=datetime.now(UTC).timestamp(),
+                session_type=session_type,
+                max_reviews=configuration.get("limit", 50),
+            )
+            session.add(learning_session)
+            session.flush()  # Get the ID without committing
+            learning_session_id = int(learning_session.session_id)
+
+            # Create the SessionDB record with its own auto-generated ID for analytics
+            session_record = SessionDB(
+                # Don't specify id - let it auto-generate to avoid conflicts
+                user_id=user_id,
+                started_at=datetime.now(UTC),
+                completed_at=None,
+                duration_seconds=0,
+                total_questions=0,
+                correct_answers=0,
+                incorrect_answers=0,
+                practice_mode=session_type,
+                is_completed=False,
+            )
+            session.add(session_record)
+            session.commit()
+
+            return learning_session_id
 
     async def end_session(
         self,
         session_id: int,
-        end_time: datetime,  # noqa: ARG002
-        summary: dict[str, Any],  # noqa: ARG002
+        end_time: datetime,
+        summary: dict[str, Any],
     ) -> None:
         """End a session with summary data."""
-        # DatabaseManager end_session only takes session_id
-        self.db_manager.end_session(session_id)
+        from src.infrastructure.database.models import SessionDB
+
+        # Update session in the sessions table
+        with self.db_manager.get_session() as session:
+            session_record = session.get(SessionDB, session_id)
+            if session_record:
+                session_record.completed_at = end_time
+                session_record.is_completed = True
+
+                # Update session stats from summary
+                if summary:
+                    session_record.total_questions = summary.get("total_questions", 0)
+                    session_record.correct_answers = summary.get("correct_answers", 0)
+                    session_record.incorrect_answers = summary.get(
+                        "incorrect_answers", 0
+                    )
+
+                    # Calculate duration from start to end time
+                    if session_record.started_at:
+                        duration = end_time - session_record.started_at
+                        session_record.duration_seconds = int(duration.total_seconds())
+
+                session.commit()
+
+    async def update_session_progress(
+        self,
+        session_id: int,
+        total_questions: int,
+        correct_answers: int,
+        incorrect_answers: int,
+    ) -> None:
+        """Update session progress during practice."""
+        from src.infrastructure.database.models import SessionDB
+
+        with self.db_manager.get_session() as session:
+            session_record = session.get(SessionDB, session_id)
+            if session_record:
+                session_record.total_questions = total_questions
+                session_record.correct_answers = correct_answers
+                session_record.incorrect_answers = incorrect_answers
+                session.commit()
 
     async def get_session_statistics(self, user_id: int) -> dict[str, Any]:
         """Get session statistics for a user."""
@@ -70,9 +142,19 @@ class SQLAlchemySessionRepository(SessionRepository):
                 )
 
                 # Delete in proper order (respecting foreign keys)
-                session.query(QuestionAttempt).join(PracticeSession).filter(
-                    PracticeSession.user_id == user_id
-                ).delete(synchronize_session=False)
+                # First get question attempt IDs for this user's sessions
+                question_attempt_ids = [
+                    result[0]
+                    for result in session.query(QuestionAttempt.id)
+                    .join(PracticeSession)
+                    .filter(PracticeSession.user_id == user_id)
+                    .all()
+                ]
+                # Delete question attempts by IDs
+                if question_attempt_ids:
+                    session.query(QuestionAttempt).filter(
+                        QuestionAttempt.id.in_(question_attempt_ids)
+                    ).delete(synchronize_session=False)
                 session.query(PracticeSession).filter_by(user_id=user_id).delete()
 
                 session.commit()

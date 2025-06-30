@@ -9,8 +9,8 @@ from typing import Any
 
 from src.application.projections import ReadModelProjection
 from src.domain.learning.events.card_events import CardScheduledEvent
-from src.infrastructure.database.database import DatabaseManager
-from src.infrastructure.messaging.enhanced_event_bus import DomainEvent
+from src.domain.shared.events import DomainEvent
+from src.domain.shared.repositories import AnalyticsRepository, LearningRepository
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,13 @@ class UserProgressStats:
 class UserProgressProjection(ReadModelProjection):
     """Projection for user progress analytics optimized for dashboard queries."""
 
-    def __init__(self, db_manager: DatabaseManager):
-        self.db_manager = db_manager
+    def __init__(
+        self,
+        analytics_repository: AnalyticsRepository,
+        learning_repository: LearningRepository,
+    ):
+        self.analytics_repository = analytics_repository
+        self.learning_repository = learning_repository
 
     async def update(self, event: DomainEvent) -> None:
         """Update the projection based on domain events."""

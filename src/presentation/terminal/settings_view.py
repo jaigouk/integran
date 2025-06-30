@@ -24,20 +24,26 @@ from textual.widgets import (
     TabPane,
 )
 
+from src.application.commands.save_user_settings_command import (
+    SaveUserSettingsCommand,
+    SaveUserSettingsCommandHandler,
+)
+from src.application.commands.toggle_developer_mode_command import (
+    ToggleDeveloperModeCommand,
+    ToggleDeveloperModeCommandHandler,
+)
+from src.application.queries.load_user_settings_query import (
+    LoadUserSettingsQuery,
+    LoadUserSettingsQueryHandler,
+)
 from src.domain.user.models.user_models import (
+    FederalState,
     Language,
-    LoadUserSettingsRequest,
-    SaveUserSettingsRequest,
     ThemeMode,
-    ToggleDeveloperModeRequest,
     UserPreferences,
     UserSettings,
 )
-from src.domain.user.services.load_user_settings import LoadUserSettings
-from src.domain.user.services.save_user_settings import SaveUserSettings
-from src.domain.user.services.toggle_developer_mode import ToggleDeveloperMode
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
-from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import COMMON_CSS_BASE
 
@@ -50,17 +56,18 @@ class SettingsWidget(EventAwareWidget):
     def __init__(
         self,
         event_bus: EventBus,
-        user_repository: UserSettingsRepository,
+        load_user_settings_query_handler: LoadUserSettingsQueryHandler,
+        save_user_settings_command_handler: SaveUserSettingsCommandHandler,
+        toggle_developer_mode_command_handler: ToggleDeveloperModeCommandHandler,
         **kwargs: Any,
     ):
         super().__init__(event_bus=event_bus, **kwargs)
-        self.user_repository = user_repository
+        self.load_user_settings_query_handler = load_user_settings_query_handler
+        self.save_user_settings_command_handler = save_user_settings_command_handler
+        self.toggle_developer_mode_command_handler = (
+            toggle_developer_mode_command_handler
+        )
         self.current_settings: UserSettings | None = None
-
-        # Initialize user services
-        self.load_user_settings = LoadUserSettings(event_bus, user_repository)
-        self.save_user_settings = SaveUserSettings(event_bus, user_repository)
-        self.toggle_developer_mode = ToggleDeveloperMode(event_bus, user_repository)
 
     async def setup_event_subscriptions(self) -> None:
         """Setup event subscriptions for settings updates."""
@@ -78,6 +85,9 @@ class SettingsWidget(EventAwareWidget):
                 with TabPane("Learning", id="learning"):  # noqa: SIM117
                     with VerticalScroll(classes="tab-scroll"):  # noqa: SIM117
                         yield from self._compose_learning_settings()
+                with TabPane("Spaced Repetition", id="fsrs"):  # noqa: SIM117
+                    with VerticalScroll(classes="tab-scroll"):  # noqa: SIM117
+                        yield from self._compose_fsrs_settings()
                 with TabPane("Developer", id="developer"):  # noqa: SIM117
                     with VerticalScroll(classes="tab-scroll"):  # noqa: SIM117
                         yield from self._compose_developer_settings()
@@ -147,6 +157,21 @@ class SettingsWidget(EventAwareWidget):
             classes="form-item",
         )
 
+        yield Label("Location Settings", classes="text-section-header")
+        yield Container(
+            Label("Federal State:"),
+            Select(
+                [(state.display_name, state.value) for state in FederalState],
+                value=FederalState.GENERAL.value,
+                id="federal-state-select",
+            ),
+            Static(
+                "Select your federal state for state-specific questions",
+                classes="help-text",
+            ),
+            classes="form-item",
+        )
+
     def _compose_learning_settings(self) -> ComposeResult:
         """Compose learning settings tab."""
         yield Label("Learning Preferences", classes="text-section-header")
@@ -190,6 +215,92 @@ class SettingsWidget(EventAwareWidget):
             Label("Auto Advance:"),
             Switch(value=False, id="auto-advance-switch"),
             Static("Automatically proceed to next question", classes="help-text"),
+            classes="form-item",
+        )
+
+    def _compose_fsrs_settings(self) -> ComposeResult:
+        """Compose FSRS (spaced repetition) settings tab."""
+        yield Label("Spaced Repetition Algorithm", classes="text-section-header")
+        yield Static(
+            "Configure FSRS (Free Spaced Repetition Scheduler) algorithm settings.\n"
+            "These settings control how the app determines which questions to show for optimal learning.",
+            classes="help-text",
+        )
+
+        yield Container(
+            Label("Desired Retention Rate:"),
+            Select(
+                [
+                    ("80% - More reviews, faster learning", 0.80),
+                    ("85% - Balanced approach", 0.85),
+                    ("90% - Recommended default", 0.90),
+                    ("95% - Fewer reviews, slower learning", 0.95),
+                ],
+                value=0.90,
+                id="retention-rate-select",
+            ),
+            Static(
+                "Target probability of recalling learned questions",
+                classes="help-text",
+            ),
+            classes="form-item",
+        )
+
+        yield Container(
+            Label("Mastery Threshold (days):"),
+            Select(
+                [
+                    ("14 days - Conservative", 14),
+                    ("21 days - Moderate", 21),
+                    ("30 days - Recommended", 30),
+                    ("45 days - Aggressive", 45),
+                ],
+                value=30,
+                id="mastery-threshold-select",
+            ),
+            Static(
+                "Questions with stability above this threshold are considered mastered",
+                classes="help-text",
+            ),
+            classes="form-item",
+        )
+
+        yield Container(
+            Label("Leech Detection Threshold:"),
+            Select(
+                [
+                    ("5 lapses - Sensitive", 5),
+                    ("8 lapses - Recommended", 8),
+                    ("12 lapses - Moderate", 12),
+                    ("15 lapses - Tolerant", 15),
+                ],
+                value=8,
+                id="leech-threshold-select",
+            ),
+            Static(
+                "Number of failures before flagging a question as problematic",
+                classes="help-text",
+            ),
+            classes="form-item",
+        )
+
+        yield Container(
+            Label("Sequential Mode Intelligence:"),
+            Switch(value=True, id="fsrs-sequential-switch"),
+            Static(
+                "Apply FSRS filtering to sequential mode (excludes mastered questions)",
+                classes="help-text",
+            ),
+            classes="form-item",
+        )
+
+        yield Container(
+            Label("Include Mastered Occasionally:"),
+            Switch(value=False, id="include-mastered-switch"),
+            Static(
+                "Periodically review well-learned questions for reinforcement",
+                classes="help-text",
+            ),
             classes="form-item",
         )
 
@@ -274,8 +385,8 @@ class SettingsWidget(EventAwareWidget):
     async def _load_current_settings(self) -> None:
         """Load current user settings and populate the UI."""
         try:
-            request = LoadUserSettingsRequest(user_id=1)
-            result = await self.load_user_settings.call(request)
+            query = LoadUserSettingsQuery(user_id=1)
+            result = await self.load_user_settings_query_handler.handle(query)
 
             if result.success and result.user_settings:
                 self.current_settings = result.user_settings
@@ -308,6 +419,9 @@ class SettingsWidget(EventAwareWidget):
         reminder_select = self.query_one("#reminder-select", Select)
         reminder_select.value = settings.preferences.reminder_time
 
+        federal_state_select = self.query_one("#federal-state-select", Select)
+        federal_state_select.value = settings.preferences.federal_state.value
+
         # Learning settings
         daily_goal_select = self.query_one("#daily-goal-select", Select)
         daily_goal_select.value = settings.preferences.daily_goal
@@ -320,6 +434,26 @@ class SettingsWidget(EventAwareWidget):
 
         auto_advance_switch = self.query_one("#auto-advance-switch", Switch)
         auto_advance_switch.value = settings.preferences.auto_advance
+
+        # FSRS settings
+        retention_rate_select = self.query_one("#retention-rate-select", Select)
+        retention_rate_select.value = settings.preferences.desired_retention_rate
+
+        mastery_threshold_select = self.query_one("#mastery-threshold-select", Select)
+        mastery_threshold_select.value = (
+            settings.preferences.mastery_stability_threshold
+        )
+
+        leech_threshold_select = self.query_one("#leech-threshold-select", Select)
+        leech_threshold_select.value = settings.preferences.leech_detection_threshold
+
+        fsrs_sequential_switch = self.query_one("#fsrs-sequential-switch", Switch)
+        fsrs_sequential_switch.value = settings.preferences.sequential_mode_uses_fsrs
+
+        include_mastered_switch = self.query_one("#include-mastered-switch", Switch)
+        include_mastered_switch.value = (
+            settings.preferences.include_mastered_occasionally
+        )
 
         # Developer settings
         developer_switch = self.query_one("#developer-mode-switch", Switch)
@@ -350,8 +484,8 @@ class SettingsWidget(EventAwareWidget):
     async def on_developer_mode_toggle(self, event: Switch.Changed) -> None:
         """Handle developer mode toggle."""
         try:
-            request = ToggleDeveloperModeRequest(user_id=1, enable=event.value)
-            result = await self.toggle_developer_mode.call(request)
+            command = ToggleDeveloperModeCommand(user_id=1, enabled=event.value)
+            result = await self.toggle_developer_mode_command_handler.handle(command)
 
             if result.success:
                 self.current_settings = result.user_settings
@@ -383,8 +517,8 @@ class SettingsWidget(EventAwareWidget):
             updated_settings = await self._gather_settings_from_ui()
 
             # Save settings
-            request = SaveUserSettingsRequest(user_settings=updated_settings)
-            result = await self.save_user_settings.call(request)
+            command = SaveUserSettingsCommand(user_settings=updated_settings)
+            result = await self.save_user_settings_command_handler.handle(command)
 
             if result.success:
                 self.current_settings = result.user_settings
@@ -405,8 +539,8 @@ class SettingsWidget(EventAwareWidget):
             default_settings = UserSettings.create_default(user_id=1)
 
             # Save defaults
-            request = SaveUserSettingsRequest(user_settings=default_settings)
-            result = await self.save_user_settings.call(request)
+            command = SaveUserSettingsCommand(user_settings=default_settings)
+            result = await self.save_user_settings_command_handler.handle(command)
 
             if result.success:
                 self.current_settings = result.user_settings
@@ -456,6 +590,7 @@ class SettingsWidget(EventAwareWidget):
                         "language": self.current_settings.preferences.language.value,
                         "enable_notifications": self.current_settings.preferences.enable_notifications,
                         "reminder_time": self.current_settings.preferences.reminder_time,
+                        "federal_state": self.current_settings.preferences.federal_state.value,
                         "custom_settings": self.current_settings.preferences.custom_settings,
                     },
                     "flow_state": {
@@ -513,12 +648,20 @@ class SettingsWidget(EventAwareWidget):
         theme_select = self.query_one("#theme-select", Select)
         notifications_switch = self.query_one("#notifications-switch", Switch)
         reminder_select = self.query_one("#reminder-select", Select)
+        federal_state_select = self.query_one("#federal-state-select", Select)
 
         # Learning settings
         daily_goal_select = self.query_one("#daily-goal-select", Select)
         timeout_select = self.query_one("#timeout-select", Select)
         explanations_switch = self.query_one("#explanations-switch", Switch)
         auto_advance_switch = self.query_one("#auto-advance-switch", Switch)
+
+        # FSRS settings
+        retention_rate_select = self.query_one("#retention-rate-select", Select)
+        mastery_threshold_select = self.query_one("#mastery-threshold-select", Select)
+        leech_threshold_select = self.query_one("#leech-threshold-select", Select)
+        fsrs_sequential_switch = self.query_one("#fsrs-sequential-switch", Switch)
+        include_mastered_switch = self.query_one("#include-mastered-switch", Switch)
 
         # Create updated preferences with type guards
         daily_goal = 20
@@ -529,6 +672,25 @@ class SettingsWidget(EventAwareWidget):
         if timeout_select.value and isinstance(timeout_select.value, int):
             timeout_minutes = timeout_select.value
 
+        # FSRS values with type guards
+        retention_rate = 0.90
+        if retention_rate_select.value and isinstance(
+            retention_rate_select.value, int | float
+        ):
+            retention_rate = float(retention_rate_select.value)
+
+        mastery_threshold = 30
+        if mastery_threshold_select.value and isinstance(
+            mastery_threshold_select.value, int
+        ):
+            mastery_threshold = mastery_threshold_select.value
+
+        leech_threshold = 8
+        if leech_threshold_select.value and isinstance(
+            leech_threshold_select.value, int
+        ):
+            leech_threshold = leech_threshold_select.value
+
         updated_preferences = UserPreferences(
             daily_goal=daily_goal,
             session_timeout_minutes=timeout_minutes,
@@ -538,6 +700,13 @@ class SettingsWidget(EventAwareWidget):
             language=Language(str(language_select.value)),
             enable_notifications=notifications_switch.value,
             reminder_time=str(reminder_select.value),
+            federal_state=FederalState(str(federal_state_select.value)),
+            desired_retention_rate=retention_rate,
+            mastery_stability_threshold=mastery_threshold,
+            leech_detection_threshold=leech_threshold,
+            sequential_mode_uses_fsrs=fsrs_sequential_switch.value,
+            include_mastered_occasionally=include_mastered_switch.value,
+            retrievability_exclusion_threshold=0.9,  # Keep default for now
             custom_settings=self.current_settings.preferences.custom_settings,
         )
 
@@ -613,18 +782,26 @@ class SettingsScreen(Screen[None]):
     def __init__(
         self,
         event_bus: EventBus,
-        user_repository: UserSettingsRepository,
+        load_user_settings_query_handler: LoadUserSettingsQueryHandler,
+        save_user_settings_command_handler: SaveUserSettingsCommandHandler,
+        toggle_developer_mode_command_handler: ToggleDeveloperModeCommandHandler,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self.event_bus = event_bus
-        self.user_repository = user_repository
+        self.load_user_settings_query_handler = load_user_settings_query_handler
+        self.save_user_settings_command_handler = save_user_settings_command_handler
+        self.toggle_developer_mode_command_handler = (
+            toggle_developer_mode_command_handler
+        )
 
     def compose(self) -> ComposeResult:
         """Compose the settings screen."""
         yield SettingsWidget(
             event_bus=self.event_bus,
-            user_repository=self.user_repository,
+            load_user_settings_query_handler=self.load_user_settings_query_handler,
+            save_user_settings_command_handler=self.save_user_settings_command_handler,
+            toggle_developer_mode_command_handler=self.toggle_developer_mode_command_handler,
         )
 
     def action_back_to_menu(self) -> None:

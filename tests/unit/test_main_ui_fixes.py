@@ -80,7 +80,6 @@ class TestMainUIFixes:
                 event_bus=mock_container.get_event_bus(),
                 session_workflow=mock_container.get_session_workflow(),
                 query_service=mock_container.get_query_service(),
-                analytics_service=mock_container.get_analytics_service(),
                 user_repository=mock_container.get_user_container().get_repository(),
                 container=mock_container,
             )
@@ -239,7 +238,7 @@ class TestMainEntryPointIntegration:
 
     @patch("src.main._start_trainer")
     @patch("src.main.asyncio.run")
-    @patch("src.application.setup.database_setup_service.main_async")
+    @patch("src.infrastructure.setup.database_setup_service.main_async")
     @patch("src.main.console")
     @patch("src.main.DatabaseManager")
     @patch("pathlib.Path.exists")

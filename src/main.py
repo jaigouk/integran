@@ -140,7 +140,7 @@ def main(
                 # Import and run setup with force=True to avoid confirmation
                 import asyncio
 
-                from src.application.setup.database_setup_service import main_async
+                from src.infrastructure.setup.database_setup_service import main_async
 
                 asyncio.run(main_async(force=True, questions_file=None, language="en"))
                 console.print("[green]✅ Setup completed successfully![/green]")
@@ -236,7 +236,6 @@ def _launch_terminal_ui(
             event_bus=container.get_event_bus(),
             session_workflow=container.get_session_workflow(),
             query_service=container.get_query_service(),
-            analytics_service=container.get_analytics_service(),
             user_repository=container.get_user_container().get_repository(),
             container=container,
         )

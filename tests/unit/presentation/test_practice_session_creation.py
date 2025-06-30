@@ -30,7 +30,9 @@ class TestPracticeSessionCreation:
         result = StartSessionResult(success=True, session_id=123)
         start_session_handler.handle = AsyncMock(return_value=result)
 
-        container.get_start_session_command_handler.return_value = start_session_handler
+        container.get_start_practice_session_command_handler.return_value = (
+            start_session_handler
+        )
 
         app.container = container
         return app
@@ -54,8 +56,14 @@ class TestPracticeSessionCreation:
     async def test_create_practice_session_with_container(
         self, practice_screen, mock_app
     ):
-        """Test that practice session is created using CQRS command when container is available."""
+        """Test that practice session creation works with container and creates a session."""
         # Arrange
+        mock_session_repository = AsyncMock()
+        mock_session_repository.create_session.return_value = 123
+        mock_container = Mock()
+        mock_container.get_session_repository.return_value = mock_session_repository
+        mock_app.container = mock_container
+
         # Patch the app property to return our mock
         with patch.object(
             type(practice_screen),
@@ -66,63 +74,62 @@ class TestPracticeSessionCreation:
             # Act
             await practice_screen._create_practice_session()
 
-            # Assert
-            start_session_handler = (
-                mock_app.container.get_start_session_command_handler.return_value
-            )
-            start_session_handler.handle.assert_called_once()
-
-            # Verify the command was created with correct parameters
-            call_args = start_session_handler.handle.call_args[0][0]  # Get the command
-            assert call_args.session_type == "sequential"
-            assert call_args.user_id == 1
-            assert call_args.max_questions == 20
+            # Assert - session should be created
             assert practice_screen.session_id == 123
+            mock_session_repository.create_session.assert_called_once_with(
+                user_id=1, session_type="sequential", configuration={"limit": 50}
+            )
 
     @pytest.mark.asyncio
     async def test_create_practice_session_fallback_without_container(
         self, practice_screen, caplog
     ):
-        """Test that practice session creation fails gracefully when no container is available."""
+        """Test that practice session creation falls back to MainContainer when app container is None."""
         # Arrange
         mock_app = Mock()
         mock_app.container = None
 
+        # Mock the MainContainer fallback
+        mock_session_repository = AsyncMock()
+        mock_session_repository.create_session.return_value = 456
+        mock_main_container = Mock()
+        mock_main_container.get_session_repository.return_value = (
+            mock_session_repository
+        )
+
         with (
-            caplog.at_level(logging.WARNING),
+            caplog.at_level(logging.INFO),
             patch.object(
                 type(practice_screen),
                 "app",
                 new_callable=PropertyMock,
                 return_value=mock_app,
             ),
+            patch(
+                "src.infrastructure.containers.main_container.MainContainer",
+                return_value=mock_main_container,
+            ),
         ):
             # Act
             await practice_screen._create_practice_session()
 
-            # Assert
-            assert practice_screen.session_id is None
-            assert "No container available - skipping session creation" in caplog.text
+            # Assert - fallback should create session via MainContainer
+            assert practice_screen.session_id == 456
+            mock_session_repository.create_session.assert_called_once_with(
+                user_id=1, session_type="sequential", configuration={"limit": 50}
+            )
 
     @pytest.mark.asyncio
     async def test_create_practice_session_handles_exceptions(
         self, practice_screen, caplog
     ):
         """Test that practice session creation handles exceptions gracefully."""
-        # Arrange
-        mock_app = Mock()
-        mock_app.container = Mock()
-        mock_app.container.get_start_session_command_handler.side_effect = Exception(
-            "Command handler error"
-        )
-
+        # Arrange - simulate exception in logging
         with (
             caplog.at_level(logging.WARNING),
-            patch.object(
-                type(practice_screen),
-                "app",
-                new_callable=PropertyMock,
-                return_value=mock_app,
+            patch(
+                "src.presentation.terminal.question_view.logger.info",
+                side_effect=Exception("Test error"),
             ),
         ):
             # Act
@@ -131,6 +138,36 @@ class TestPracticeSessionCreation:
             # Assert
             assert practice_screen.session_id is None
             assert "Failed to create practice session" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_create_practice_session_reuses_existing_session(
+        self, practice_screen, mock_app, caplog
+    ):
+        """Test that calling _create_practice_session multiple times reuses existing session."""
+        # Arrange
+        mock_session_repository = AsyncMock()
+        mock_session_repository.create_session.return_value = 789
+        mock_container = Mock()
+        mock_container.get_session_repository.return_value = mock_session_repository
+        mock_app.container = mock_container
+
+        with (
+            caplog.at_level(logging.INFO),
+            patch.object(
+                type(practice_screen),
+                "app",
+                new_callable=PropertyMock,
+                return_value=mock_app,
+            ),
+        ):
+            # Act - call _create_practice_session twice
+            await practice_screen._create_practice_session()
+            await practice_screen._create_practice_session()
+
+            # Assert - session should be created only once
+            assert practice_screen.session_id == 789
+            mock_session_repository.create_session.assert_called_once()
+            assert "Session 789 already exists, reusing" in caplog.text
 
     @pytest.mark.asyncio
     async def test_on_mount_calls_create_practice_session(
@@ -200,15 +237,30 @@ class TestQuestionWidgetSessionTracking:
         """Create a mock user repository."""
         return Mock(spec=UserSettingsRepository)
 
+    @pytest.fixture
+    def mock_learning_repository(self):
+        """Create a mock learning repository."""
+        return Mock()
+
     def test_question_widget_accepts_session_id(
-        self, sample_question, mock_event_bus, mock_user_repository
+        self,
+        sample_question,
+        mock_event_bus,
+        mock_user_repository,
+        mock_learning_repository,
     ):
         """Test that QuestionWidget accepts and stores session_id parameter."""
         # Arrange & Act
+        enhanced_question_handler = Mock()
+        load_user_settings_handler = Mock()
+        submit_answer_handler = Mock()
+
         widget = QuestionWidget(
             question=sample_question,
             event_bus=mock_event_bus,
-            user_repository=mock_user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
+            submit_answer_command_handler=submit_answer_handler,
             session_id=123,
         )
 
@@ -216,14 +268,24 @@ class TestQuestionWidgetSessionTracking:
         assert widget.session_id == 123
 
     def test_question_widget_defaults_session_id_to_none(
-        self, sample_question, mock_event_bus, mock_user_repository
+        self,
+        sample_question,
+        mock_event_bus,
+        mock_user_repository,
+        mock_learning_repository,
     ):
         """Test that QuestionWidget defaults session_id to None when not provided."""
         # Arrange & Act
+        enhanced_question_handler = Mock()
+        load_user_settings_handler = Mock()
+        submit_answer_handler = Mock()
+
         widget = QuestionWidget(
             question=sample_question,
             event_bus=mock_event_bus,
-            user_repository=mock_user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
+            submit_answer_command_handler=submit_answer_handler,
         )
 
         # Assert
@@ -231,7 +293,11 @@ class TestQuestionWidgetSessionTracking:
 
     @pytest.mark.asyncio
     async def test_submit_answer_includes_session_id(
-        self, sample_question, mock_event_bus, mock_user_repository
+        self,
+        sample_question,
+        mock_event_bus,
+        mock_user_repository,
+        mock_learning_repository,
     ):
         """Test that submit_answer_with_rating includes session_id in command."""
         # Arrange
@@ -240,10 +306,14 @@ class TestQuestionWidgetSessionTracking:
         mock_result.success = True
         mock_handler.handle.return_value = mock_result
 
+        enhanced_question_handler = Mock()
+        load_user_settings_handler = Mock()
+
         widget = QuestionWidget(
             question=sample_question,
             event_bus=mock_event_bus,
-            user_repository=mock_user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
             submit_answer_command_handler=mock_handler,
             session_id=456,
         )

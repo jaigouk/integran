@@ -26,31 +26,25 @@ from textual.widgets import (
     TabPane,
 )
 
+from src.application.commands.start_dataset_build_command import (
+    StartDatasetBuildCommand,
+    StartDatasetBuildCommandHandler,
+)
+from src.application.commands.toggle_developer_mode_command import (
+    ToggleDeveloperModeCommand,
+    ToggleDeveloperModeCommandHandler,
+)
+from src.application.queries.load_user_settings_query import (
+    LoadUserSettingsQuery,
+    LoadUserSettingsQueryHandler,
+)
 from src.domain.content.events.content_events import (
     DatasetBuildCompletedEvent,
     DatasetBuildFailedEvent,
     DatasetBuildProgressEvent,
     DatasetBuildStartedEvent,
 )
-from src.domain.content.services.build_dataset import (
-    BuildDataset,
-    BuildDatasetRequest,
-    GetBuildStatusRequest,
-)
-from src.domain.content.services.generate_answer import GenerateAnswer
-from src.domain.content.services.process_image import ProcessImage
-from src.domain.user.models.user_models import (
-    LoadUserSettingsRequest,
-    ToggleDeveloperModeRequest,
-)
-from src.domain.user.services.load_user_settings import LoadUserSettings
-from src.domain.user.services.toggle_developer_mode import ToggleDeveloperMode
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
-from src.infrastructure.repositories.content_repository import ContentRepository
-from src.infrastructure.repositories.question_repository import (
-    SQLAlchemyQuestionRepository,
-)
-from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import COMMON_CSS_BASE
 
@@ -63,34 +57,23 @@ class DeveloperOperationsWidget(EventAwareWidget):
     def __init__(
         self,
         event_bus: EventBus,
-        user_repository: UserSettingsRepository,
-        content_repository: ContentRepository,
-        question_repository: SQLAlchemyQuestionRepository,
+        load_user_settings_query_handler: LoadUserSettingsQueryHandler,
+        toggle_developer_mode_command_handler: ToggleDeveloperModeCommandHandler,
+        start_dataset_build_command_handler: StartDatasetBuildCommandHandler,
         **kwargs: Any,
     ):
         super().__init__(event_bus=event_bus, **kwargs)
-        self.user_repository = user_repository
-        self.content_repository = content_repository
-        self.question_repository = question_repository
+        self.load_user_settings_query_handler = load_user_settings_query_handler
+        self.toggle_developer_mode_command_handler = (
+            toggle_developer_mode_command_handler
+        )
+        self.start_dataset_build_command_handler = start_dataset_build_command_handler
         self.developer_mode_enabled = False
 
         # Operation status tracking
         self.operation_in_progress = False
         self.current_operation = ""
         self.operation_progress = 0
-
-        # Initialize domain services
-        self.load_user_settings = LoadUserSettings(event_bus, user_repository)
-        self.toggle_developer_mode = ToggleDeveloperMode(event_bus, user_repository)
-        self.generate_answer = GenerateAnswer(event_bus, user_repository)
-        self.process_image = ProcessImage(event_bus, user_repository)
-        self.build_dataset = BuildDataset(
-            question_repository=question_repository,
-            event_bus=event_bus,
-            generate_answer=self.generate_answer,
-            process_image=self.process_image,
-            user_repository=user_repository,
-        )
 
     async def setup_event_subscriptions(self) -> None:
         """Setup event subscriptions for developer operations."""
@@ -522,8 +505,8 @@ Analyze educational images using AI vision to generate contextual descriptions.
     async def _load_developer_status(self) -> None:
         """Load current developer mode status."""
         try:
-            request = LoadUserSettingsRequest(user_id=1)
-            result = await self.load_user_settings.call(request)
+            query = LoadUserSettingsQuery(user_id=1)
+            result = await self.load_user_settings_query_handler.handle(query)
 
             if result.success and result.user_settings:
                 self.developer_mode_enabled = (
@@ -606,8 +589,10 @@ Analyze educational images using AI vision to generate contextual descriptions.
     async def on_toggle_developer_mode(self) -> None:
         """Handle developer mode toggle."""
         try:
-            request = ToggleDeveloperModeRequest(user_id=1)
-            result = await self.toggle_developer_mode.call(request)
+            command = ToggleDeveloperModeCommand(
+                user_id=1, enable=not self.developer_mode_enabled
+            )
+            result = await self.toggle_developer_mode_command_handler.handle(command)
 
             if result.success:
                 self.developer_mode_enabled = result.developer_mode_enabled
@@ -651,21 +636,16 @@ Analyze educational images using AI vision to generate contextual descriptions.
             # Get build parameters from UI
             force_rebuild = self.query_one("#force-rebuild-switch", Switch).value
             multilingual = self.query_one("#multilingual-switch", Switch).value
-            batch_size_select = self.query_one("#batch-size-select", Select)
-            batch_size = 15
-            if batch_size_select.value is not None:
-                try:
-                    batch_size = int(str(batch_size_select.value))
-                except (TypeError, ValueError):
-                    batch_size = 15
+            # Note: batch_size UI exists but is not used in simplified command
             enable_images = self.query_one("#image-processing-switch", Switch).value
 
-            # Create build request
-            request = BuildDatasetRequest(
+            # Create build command
+            command = StartDatasetBuildCommand(
+                user_id=1,
+                use_cache=True,
+                include_images=enable_images,
+                target_languages=["en", "de"] if multilingual else ["en"],
                 force_rebuild=force_rebuild,
-                multilingual=multilingual,
-                batch_size=batch_size,
-                enable_image_processing=enable_images,
             )
 
             # Start build operation
@@ -674,7 +654,7 @@ Analyze educational images using AI vision to generate contextual descriptions.
             await self._update_progress_display("Starting dataset build...")
 
             # Execute build (this would be async in real implementation)
-            result = await self.build_dataset.call(request)
+            result = await self.start_dataset_build_command_handler.handle(command)
 
             if result.success:
                 await self._show_success(
@@ -701,28 +681,18 @@ Analyze educational images using AI vision to generate contextual descriptions.
     async def on_check_build_status(self) -> None:
         """Check dataset build status."""
         try:
-            request = GetBuildStatusRequest()
-            result = await self.build_dataset.call(request)
-
-            if result.success:
-                # Update progress display with build status
-                if hasattr(result, "build_status") and result.build_status:
-                    status = result.build_status.get("status", "Unknown")
-                    progress = result.build_status.get("progress", 0)
-                    await self._update_progress_display(
-                        f"Build status: {status}",
-                        progress,
-                    )
-                    await self._show_success(
-                        f"📊 Build status: {status} ({progress}% complete)"
-                    )
-                else:
-                    await self._update_progress_display("No active build operation", 0)
-                    await self._show_success("✅ No active build operations found")
-            else:
-                await self._show_error(
-                    f"❌ Failed to check build status: {result.error_message}"
+            # Simplified implementation - check current operation status
+            if self.operation_in_progress:
+                await self._update_progress_display(
+                    f"Build status: {self.current_operation} in progress",
+                    self.operation_progress,
                 )
+                await self._show_success(
+                    f"📊 Build status: {self.current_operation} ({self.operation_progress}% complete)"
+                )
+            else:
+                await self._update_progress_display("No active build operation", 0)
+                await self._show_success("✅ No active build operations found")
 
         except Exception as e:
             logger.error(f"Error checking build status: {e}")
@@ -980,22 +950,24 @@ class DeveloperOperationsScreen(Screen[None]):
     def __init__(
         self,
         event_bus: EventBus,
-        user_repository: UserSettingsRepository,
-        content_repository: ContentRepository,
-        question_repository: SQLAlchemyQuestionRepository,
+        load_user_settings_query_handler,
+        toggle_developer_mode_command_handler,
+        start_dataset_build_command_handler,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self.event_bus = event_bus
-        self.user_repository = user_repository
-        self.content_repository = content_repository
-        self.question_repository = question_repository
+        self.load_user_settings_query_handler = load_user_settings_query_handler
+        self.toggle_developer_mode_command_handler = (
+            toggle_developer_mode_command_handler
+        )
+        self.start_dataset_build_command_handler = start_dataset_build_command_handler
 
     def compose(self) -> ComposeResult:
         """Compose the developer operations screen."""
         yield DeveloperOperationsWidget(
             event_bus=self.event_bus,
-            user_repository=self.user_repository,
-            content_repository=self.content_repository,
-            question_repository=self.question_repository,
+            load_user_settings_query_handler=self.load_user_settings_query_handler,
+            toggle_developer_mode_command_handler=self.toggle_developer_mode_command_handler,
+            start_dataset_build_command_handler=self.start_dataset_build_command_handler,
         )

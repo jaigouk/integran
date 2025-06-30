@@ -10,11 +10,57 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+if TYPE_CHECKING:
+    from src.domain.shared.events import DomainEvent
 
 logger = logging.getLogger(__name__)
+
+
+class EventBusInterface(ABC):
+    """Abstract interface for event bus functionality.
+
+    This interface defines the contract that domain services expect
+    from the event bus, allowing the domain layer to remain independent
+    of infrastructure implementations.
+    """
+
+    @abstractmethod
+    async def publish(self, event: DomainEvent) -> None:
+        """Publish a domain event to all registered handlers.
+
+        Args:
+            event: Domain event to publish
+
+        Raises:
+            Exception: If event publishing fails critically
+        """
+        pass
+
+    @abstractmethod
+    def subscribe(
+        self, event_type: type[DomainEvent], handler: Callable[..., Any]
+    ) -> None:
+        """Subscribe a handler to an event type.
+
+        Args:
+            event_type: Type of domain event to subscribe to
+            handler: Handler function (sync or async)
+        """
+        pass
+
+    @abstractmethod
+    def unsubscribe(
+        self, event_type: type[DomainEvent], handler: Callable[..., Any]
+    ) -> None:
+        """Unsubscribe a handler from an event type.
+
+        Args:
+            event_type: Type of domain event to unsubscribe from
+            handler: Handler function to remove
+        """
+        pass
 
 
 class DomainService[T, U](ABC):
@@ -38,11 +84,11 @@ class DomainService[T, U](ABC):
         ```
     """
 
-    def __init__(self, event_bus: EventBus) -> None:
+    def __init__(self, event_bus: EventBusInterface) -> None:
         """Initialize domain service with event bus.
 
         Args:
-            event_bus: Event bus for publishing domain events
+            event_bus: Event bus interface for publishing domain events
         """
         self.event_bus = event_bus
         self.logger = logging.getLogger(self.__class__.__name__)

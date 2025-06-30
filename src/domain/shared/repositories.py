@@ -57,6 +57,44 @@ class QuestionRepository(ABC):
         pass
 
     @abstractmethod
+    async def get_questions_by_state(self, state: str | None = None) -> list[Question]:
+        """Get questions filtered by federal state.
+
+        Args:
+            state: Federal state name (e.g., "Baden-Württemberg").
+                  If None, returns general questions (no state restriction).
+
+        Returns:
+            List of questions for the specified state or general questions.
+        """
+        pass
+
+    @abstractmethod
+    async def get_questions_for_active_learning(
+        self,
+        user_id: int = 1,
+        desired_retention: float = 0.90,
+        stability_threshold: int = 30,
+        retrievability_threshold: float = 0.9,
+        include_leeches: bool = True,
+        limit: int = 100,
+    ) -> list[Question]:
+        """Get questions that need active learning (excludes well-mastered questions).
+
+        Args:
+            user_id: User ID for FSRS card lookup
+            desired_retention: Target retention rate (affects what's considered 'due')
+            stability_threshold: Days of stability above which questions are considered mastered
+            retrievability_threshold: Retrievability above which questions are excluded
+            include_leeches: Whether to include questions with high lapse counts
+            limit: Maximum number of questions to return
+
+        Returns:
+            List of questions needing practice, prioritized by learning urgency
+        """
+        pass
+
+    @abstractmethod
     async def save_question(self, question: Question) -> Question:
         """Save or update a question."""
         pass
@@ -102,6 +140,11 @@ class LearningRepository(ABC):
     @abstractmethod
     async def get_due_cards(self, user_id: int, limit: int = 10) -> list[FSRSCard]:
         """Get cards due for review for a specific user."""
+        pass
+
+    @abstractmethod
+    async def count_due_cards(self, user_id: int) -> int:
+        """Count cards due for review for a specific user."""
         pass
 
     @abstractmethod
@@ -239,6 +282,66 @@ class AnalyticsRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    async def get_fsrs_card_statistics(self, user_id: int) -> dict[str, Any]:
+        """Get FSRS card state distribution statistics.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Dict with counts of cards in each FSRS state (new, learning, review, relearning)
+        """
+        pass
+
+    @abstractmethod
+    async def get_stability_distribution(self, user_id: int) -> dict[str, Any]:
+        """Get stability distribution for FSRS cards.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Dict with stability ranges and statistics
+        """
+        pass
+
+    @abstractmethod
+    async def get_retrievability_distribution(self, user_id: int) -> dict[str, Any]:
+        """Get retrievability distribution for FSRS cards.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Dict with retrievability ranges and statistics
+        """
+        pass
+
+    @abstractmethod
+    async def get_leech_statistics(self, user_id: int) -> dict[str, Any]:
+        """Get leech card statistics and analysis.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Dict with leech counts, categories, and difficult questions
+        """
+        pass
+
+    @abstractmethod
+    async def get_performance_trends(self, user_id: int) -> dict[str, Any]:
+        """Get FSRS performance trends over time.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Dict with retention rates, graduation statistics, and trends
+        """
+        pass
+
 
 class SessionRepository(ABC):
     """Repository interface for session-related data operations."""
@@ -276,6 +379,17 @@ class SessionRepository(ABC):
     @abstractmethod
     async def update_session_status(self, session_id: int, status: str) -> None:
         """Update the status of a session."""
+        pass
+
+    @abstractmethod
+    async def update_session_progress(
+        self,
+        session_id: int,
+        total_questions: int,
+        correct_answers: int,
+        incorrect_answers: int,
+    ) -> None:
+        """Update session progress during practice."""
         pass
 
     @abstractmethod

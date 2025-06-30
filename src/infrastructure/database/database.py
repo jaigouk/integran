@@ -88,6 +88,7 @@ class DatabaseManager:
 
         # Run schema migrations for existing databases
         self.migrate_practice_sessions_schema()
+        self.migrate_user_configuration_schema()
 
         logger.info(f"Database initialized at {self.db_path}")
 
@@ -806,6 +807,45 @@ class DatabaseManager:
             conn.commit()
 
         logger.info("Practice sessions schema migration completed")
+
+    def migrate_user_configuration_schema(self) -> None:
+        """Migrate user_configuration table to include missing columns.
+
+        This method adds missing columns that were added in later versions:
+        - federal_state: user's federal state preference for questions
+        """
+        logger.info("Starting user_configuration schema migration")
+
+        # Use raw SQL for schema changes
+        with self.engine.connect() as conn:
+            # Check which columns are missing
+            from sqlalchemy import text
+
+            result = conn.execute(text("PRAGMA table_info(user_configuration)"))
+            existing_columns = {row[1] for row in result}
+
+            required_columns = {
+                "federal_state": 'VARCHAR(50) NOT NULL DEFAULT "general"',
+            }
+
+            # Add missing columns one by one
+            for column_name, column_def in required_columns.items():
+                if column_name not in existing_columns:
+                    try:
+                        conn.execute(
+                            text(
+                                f"ALTER TABLE user_configuration ADD COLUMN {column_name} {column_def}"
+                            )
+                        )
+                        logger.info(
+                            f"Added column {column_name} to user_configuration table"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to add column {column_name}: {e}")
+
+            conn.commit()
+
+        logger.info("User configuration schema migration completed")
 
     def ensure_all_questions_have_fsrs_cards(self) -> int:
         """Ensure all questions have corresponding FSRS cards.

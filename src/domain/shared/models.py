@@ -27,7 +27,7 @@ class PracticeMode(str, Enum):
     RANDOM = "random"
     SEQUENTIAL = "sequential"
     CATEGORY = "category"
-    REVIEW = "review"
+    FAILED = "failed"  # Previously failed questions for remedial practice
     IMAGES = "images"
 
 

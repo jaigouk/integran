@@ -16,7 +16,14 @@ class TestSimpleCSSValidation:
     def test_practice_screen_css_compiles(self):
         """Test that PracticeScreen CSS compiles without undefined variables."""
         try:
-            screen = PracticeScreen()
+            from unittest.mock import Mock
+
+            screen = PracticeScreen(
+                practice_mode="random",
+                user_repository=Mock(),
+                submit_answer_command_handler=Mock(),
+                start_practice_command_handler=Mock(),
+            )
             assert screen is not None
             assert hasattr(screen, "CSS")
             assert isinstance(screen.CSS, str)
@@ -32,13 +39,15 @@ class TestSimpleCSSValidation:
             mock_event_bus = Mock()
             mock_session_workflow = Mock()
             mock_query_service = Mock()
-            mock_analytics_service = Mock()
+            mock_user_repository = Mock()
+            mock_container = Mock()
 
             app = TrainerApp(
                 event_bus=mock_event_bus,
                 session_workflow=mock_session_workflow,
                 query_service=mock_query_service,
-                analytics_service=mock_analytics_service,
+                user_repository=mock_user_repository,
+                container=mock_container,
             )
             assert app is not None
             assert hasattr(app, "CSS")
@@ -48,7 +57,15 @@ class TestSimpleCSSValidation:
 
     def test_no_muted_variable_usage(self):
         """Test that the specific $muted -> $text-muted fix is applied."""
-        css_content = PracticeScreen.CSS
+        from unittest.mock import Mock
+
+        screen = PracticeScreen(
+            practice_mode="random",
+            user_repository=Mock(),
+            submit_answer_command_handler=Mock(),
+            start_practice_command_handler=Mock(),
+        )
+        css_content = screen.CSS
 
         # Ensure $muted is not used (unless it's $text-muted)
         muted_pattern = r"\$muted(?![a-zA-Z-])"
@@ -64,7 +81,15 @@ class TestSimpleCSSValidation:
 
     def test_css_variables_format(self):
         """Test that CSS variables follow correct format."""
-        css_content = PracticeScreen.CSS
+        from unittest.mock import Mock
+
+        screen = PracticeScreen(
+            practice_mode="random",
+            user_repository=Mock(),
+            submit_answer_command_handler=Mock(),
+            start_practice_command_handler=Mock(),
+        )
+        css_content = screen.CSS
 
         # Find all CSS variable references
         variable_pattern = r"\$[a-zA-Z][a-zA-Z0-9_-]*"
@@ -88,7 +113,14 @@ class TestSimpleCSSValidation:
         # This is the core test - if CSS has undefined variables,
         # instantiation should fail
         try:
-            screen = PracticeScreen()
+            from unittest.mock import Mock
+
+            screen = PracticeScreen(
+                practice_mode="random",
+                user_repository=Mock(),
+                submit_answer_command_handler=Mock(),
+                start_practice_command_handler=Mock(),
+            )
             assert screen is not None
 
             # Basic sanity check

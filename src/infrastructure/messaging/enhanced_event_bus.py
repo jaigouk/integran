@@ -9,10 +9,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from uuid import uuid4
+
+from src.domain.shared.events import DomainEvent
+from src.domain.shared.services import EventBusInterface
 
 # Import EventFlowOrchestrator only when needed to avoid circular imports
 if TYPE_CHECKING:
@@ -23,37 +24,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class DomainEvent:
-    """Base class for all domain events.
-
-    All domain events must inherit from this class and will automatically
-    get an event_id and occurred_at timestamp.
-
-    Note: This is not a dataclass to avoid issues with inheritance
-    when child classes have required fields.
-    """
-
-    def __init__(self, event_id: str = "", occurred_at: datetime | None = None):
-        """Initialize domain event with auto-generated ID and timestamp.
-
-        Args:
-            event_id: Unique event identifier (auto-generated if empty)
-            occurred_at: Event timestamp (auto-generated if None)
-        """
-        self.event_id = event_id or str(uuid4())
-        self.occurred_at = occurred_at or datetime.now(UTC)
-
-    def __str__(self) -> str:
-        """Return string representation of the event."""
-        return f"{self.__class__.__name__}(event_id={self.event_id})"
-
-    @property
-    def event_name(self) -> str:
-        """Return the name of this event type."""
-        return self.__class__.__name__
-
-
-class EventBus:
+class EventBus(EventBusInterface):
     """Lightweight async event bus for domain event publishing.
 
     Designed for local-first applications where events are processed

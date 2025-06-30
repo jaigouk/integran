@@ -16,9 +16,8 @@ from src.domain.content.models.answer_models import (
     AnswerGenerationResult,
     MultilingualAnswer,
 )
-from src.domain.shared.services import DomainService
-from src.infrastructure.config.settings import get_settings, has_gemini_config
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.domain.shared.configuration import APIConfigurationInterface
+from src.domain.shared.services import DomainService, EventBusInterface
 
 try:
     from google import genai
@@ -41,16 +40,14 @@ class GenerateAnswer(DomainService[AnswerGenerationRequest, AnswerGenerationResu
     """Domain service for generating multilingual answers with explanations."""
 
     def __init__(
-        self, event_bus: EventBus, user_repository: UserRepository | None = None
+        self,
+        event_bus: EventBusInterface,
+        api_config: APIConfigurationInterface,
+        user_repository: UserRepository | None = None,
     ):
         """Initialize the answer generation service."""
         super().__init__(event_bus)
-
-        settings = get_settings()
-        self.project_id = settings.gcp_project_id
-        self.region = settings.gcp_region
-        self.model_id = settings.gemini_model
-        self.use_vertex_ai = settings.use_vertex_ai
+        self.api_config = api_config
         self.client: Any | None = None  # Initialize lazily when needed
 
         # User settings repository for developer mode validation
@@ -72,27 +69,32 @@ class GenerateAnswer(DomainService[AnswerGenerationRequest, AnswerGenerationResu
                 "Install with: pip install google-genai"
             )
 
-        # Initialize Gemini client
-        if self.use_vertex_ai:
-            if not self.project_id:
+        # Get configuration from domain interface
+        gemini_config = self.api_config.get_gemini_config()
+        if not gemini_config:
+            raise ValueError("Gemini configuration not available")
+
+        # Initialize Gemini client based on configuration
+        if gemini_config.get("use_vertex_ai", True):
+            project_id = gemini_config.get("project_id")
+            if not project_id:
                 raise ValueError("GCP_PROJECT_ID is required for Vertex AI")
 
             self.client = genai.Client(
                 vertexai=True,
-                project=self.project_id,
+                project=project_id,
                 location="global",
             )
         else:
-            settings = get_settings()
-            self.api_key = settings.gemini_api_key
-            if not self.api_key:
+            api_key = gemini_config.get("api_key")
+            if not api_key:
                 raise ValueError("GEMINI_API_KEY is required")
 
-            self.client = genai.Client(api_key=self.api_key)
+            self.client = genai.Client(api_key=api_key)
 
     async def call(self, request: AnswerGenerationRequest) -> AnswerGenerationResult:
         """Generate multilingual answer with explanations."""
-        if not has_gemini_config():
+        if not self.api_config.is_gemini_available():
             return AnswerGenerationResult(
                 success=False,
                 answer=None,
@@ -326,8 +328,13 @@ Generate the multilingual explanation now:"""
                 assert (
                     self.client is not None
                 )  # Type guard: _ensure_client_initialized guarantees this
+
+                # Get model name from configuration
+                gemini_config = self.api_config.get_gemini_config()
+                model_id = gemini_config.get("model_name", "gemini-1.5-pro")
+
                 response = self.client.models.generate_content(
-                    model=self.model_id,
+                    model=model_id,
                     contents=contents,
                     config=generate_config,
                 )

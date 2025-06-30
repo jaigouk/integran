@@ -50,6 +50,12 @@ class SQLAlchemyLearningRepository(LearningRepository):
         """Get cards due for review for a specific user."""
         return self.db_manager.get_due_fsrs_cards(user_id, limit)
 
+    async def count_due_cards(self, user_id: int) -> int:
+        """Count cards due for review for a specific user."""
+        return await self._run_in_executor(
+            lambda: self.db_manager.count_due_fsrs_cards(user_id)
+        )
+
     async def delete_user_learning_data(self, user_id: int) -> dict[str, int]:
         """Delete all learning data for a user and return counts."""
 
@@ -76,9 +82,19 @@ class SQLAlchemyLearningRepository(LearningRepository):
                 )
 
                 # Delete data in proper order (respecting foreign keys)
-                session.query(ReviewHistory).join(FSRSCard).filter(
-                    FSRSCard.user_id == user_id
-                ).delete(synchronize_session=False)
+                # First get review history IDs for this user's cards
+                review_history_ids = [
+                    result[0]
+                    for result in session.query(ReviewHistory.review_id)
+                    .join(FSRSCard)
+                    .filter(FSRSCard.user_id == user_id)
+                    .all()
+                ]
+                # Delete review history by IDs
+                if review_history_ids:
+                    session.query(ReviewHistory).filter(
+                        ReviewHistory.review_id.in_(review_history_ids)
+                    ).delete(synchronize_session=False)
                 session.query(FSRSCard).filter_by(user_id=user_id).delete()
                 session.query(LearningSession).filter_by(user_id=user_id).delete()
 

@@ -39,18 +39,16 @@ class TestCSSCrashPrevention:
         """Test that TrainerApp has valid CSS that won't cause crashes."""
         # Create minimal container for testing
         container = Mock()
-        container.get_event_bus.return_value = Mock()
-        container.get_session_workflow.return_value = Mock()
-        container.get_query_service.return_value = Mock()
-        container.get_analytics_service.return_value = Mock()
-        container.get_user_container.return_value.get_repository.return_value = Mock()
+        mock_event_bus = Mock()
+        mock_session_workflow = Mock()
+        mock_query_service = Mock()
+        mock_user_repository = Mock()
 
         app = TrainerApp(
-            event_bus=container.get_event_bus(),
-            session_workflow=container.get_session_workflow(),
-            query_service=container.get_query_service(),
-            analytics_service=container.get_analytics_service(),
-            user_repository=container.get_user_container().get_repository(),
+            event_bus=mock_event_bus,
+            session_workflow=mock_session_workflow,
+            query_service=mock_query_service,
+            user_repository=mock_user_repository,
             container=container,
         )
 
@@ -79,7 +77,12 @@ class TestCSSCrashPrevention:
 
     def test_practice_screen_has_valid_css(self):
         """Test that PracticeScreen has valid CSS to prevent rendering crashes."""
-        practice_screen = PracticeScreen(practice_mode="sequential")
+        practice_screen = PracticeScreen(
+            practice_mode="sequential",
+            user_repository=Mock(),
+            submit_answer_command_handler=Mock(),
+            start_practice_command_handler=Mock(),
+        )
 
         assert hasattr(practice_screen, "CSS"), "PracticeScreen missing CSS attribute"
         assert practice_screen.CSS is not None
@@ -102,11 +105,15 @@ class TestCSSCrashPrevention:
     def test_settings_screen_has_valid_css(self):
         """Test that SettingsScreen has valid CSS to prevent rendering crashes."""
         event_bus = Mock()
-        user_repository = Mock()
+        load_user_settings_handler = Mock()
+        save_user_settings_handler = Mock()
+        toggle_developer_mode_handler = Mock()
 
         settings_screen = SettingsScreen(
             event_bus=event_bus,
-            user_repository=user_repository,
+            load_user_settings_query_handler=load_user_settings_handler,
+            save_user_settings_command_handler=save_user_settings_handler,
+            toggle_developer_mode_command_handler=toggle_developer_mode_handler,
         )
 
         assert hasattr(settings_screen, "CSS"), "SettingsScreen missing CSS attribute"
@@ -118,7 +125,15 @@ class TestCSSCrashPrevention:
         """Test that all screen classes have required attributes to prevent crashes."""
         screen_classes = [
             (MainMenuScreen, {}),
-            (PracticeScreen, {"practice_mode": "sequential"}),
+            (
+                PracticeScreen,
+                {
+                    "practice_mode": "sequential",
+                    "user_repository": Mock(),
+                    "submit_answer_command_handler": Mock(),
+                    "start_practice_command_handler": Mock(),
+                },
+            ),
         ]
 
         for screen_class, kwargs in screen_classes:
@@ -142,18 +157,16 @@ class TestCSSCrashPrevention:
     def test_trainer_app_screens_registration(self):
         """Test that TrainerApp has all required screens registered."""
         container = Mock()
-        container.get_event_bus.return_value = Mock()
-        container.get_session_workflow.return_value = Mock()
-        container.get_query_service.return_value = Mock()
-        container.get_analytics_service.return_value = Mock()
-        container.get_user_container.return_value.get_repository.return_value = Mock()
+        mock_event_bus = Mock()
+        mock_session_workflow = Mock()
+        mock_query_service = Mock()
+        mock_user_repository = Mock()
 
         app = TrainerApp(
-            event_bus=container.get_event_bus(),
-            session_workflow=container.get_session_workflow(),
-            query_service=container.get_query_service(),
-            analytics_service=container.get_analytics_service(),
-            user_repository=container.get_user_container().get_repository(),
+            event_bus=mock_event_bus,
+            session_workflow=mock_session_workflow,
+            query_service=mock_query_service,
+            user_repository=mock_user_repository,
             container=container,
         )
 
@@ -237,7 +250,12 @@ class TestCSSCrashPrevention:
 
         for mode in modes:
             try:
-                screen = PracticeScreen(practice_mode=mode)
+                screen = PracticeScreen(
+                    practice_mode=mode,
+                    user_repository=Mock(),
+                    submit_answer_command_handler=Mock(),
+                    start_practice_command_handler=Mock(),
+                )
                 assert screen.practice_mode == mode
                 assert screen.session_id is None  # Should be None initially
                 assert hasattr(screen, "_create_practice_session")
@@ -254,12 +272,16 @@ class TestCSSRegressionPrevention:
     def test_settings_screen_constructor_compatibility(self):
         """Test that SettingsScreen constructor is compatible with caller expectations."""
         event_bus = Mock()
-        user_repository = Mock()
+        load_user_settings_handler = Mock()
+        save_user_settings_handler = Mock()
+        toggle_developer_mode_handler = Mock()
 
         # This should not raise any errors
         screen = SettingsScreen(
             event_bus=event_bus,
-            user_repository=user_repository,
+            load_user_settings_query_handler=load_user_settings_handler,
+            save_user_settings_command_handler=save_user_settings_handler,
+            toggle_developer_mode_command_handler=toggle_developer_mode_handler,
         )
 
         # Verify the screen can be composed without errors
@@ -285,13 +307,19 @@ class TestCSSRegressionPrevention:
         )
 
         event_bus = Mock()
-        user_repository = Mock()
+
+        # Create mock handlers
+        enhanced_question_handler = Mock()
+        load_user_settings_handler = Mock()
+        submit_answer_handler = Mock()
 
         # Test with session_id
         widget1 = QuestionWidget(
             question=question,
             event_bus=event_bus,
-            user_repository=user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
+            submit_answer_command_handler=submit_answer_handler,
             session_id=123,
         )
         assert widget1.session_id == 123
@@ -300,6 +328,8 @@ class TestCSSRegressionPrevention:
         widget2 = QuestionWidget(
             question=question,
             event_bus=event_bus,
-            user_repository=user_repository,
+            enhanced_question_query_handler=enhanced_question_handler,
+            load_user_settings_query_handler=load_user_settings_handler,
+            submit_answer_command_handler=submit_answer_handler,
         )
         assert widget2.session_id is None

@@ -396,11 +396,11 @@ COMMON_CSS_BASE = """
 }
 
 .min-height-10 {
-    min-height: 10;
+    min-height: 5;
 }
 
 .min-height-15 {
-    min-height: 15;
+    min-height: 8;
 }
 
 .no-margin {
@@ -432,9 +432,9 @@ COMMON_CSS_BASE = """
     grid-size: 2 2;
     grid-gutter: 1 2;
     width: 100%;
-    margin: 2 0;
+    margin: 1 0;
     height: auto;
-    min-height: 30;
+    min-height: 15;
 }
 
 .image-option-container {
@@ -516,8 +516,8 @@ COMMON_CSS_BASE = """
 .answer-buttons-column {
     width: 100%;
     height: auto;
-    min-height: 30;
-    padding: 2;
+    min-height: 15;
+    padding: 1;
 }
 
 .answer-buttons-column Button {

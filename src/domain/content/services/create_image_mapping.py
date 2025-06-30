@@ -10,8 +10,7 @@ from src.domain.content.models.answer_models import (
     QuestionImageMappingRequest,
     QuestionImageMappingResult,
 )
-from src.domain.shared.services import DomainService
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.domain.shared.services import DomainService, EventBusInterface
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class CreateImageMapping(
 ):
     """Domain service for creating comprehensive question-to-image mappings."""
 
-    def __init__(self, event_bus: EventBus):
+    def __init__(self, event_bus: EventBusInterface):
         """Initialize the image mapping service."""
         super().__init__(event_bus)
         # Known manual corrections for specific questions

@@ -1,297 +1,310 @@
 # Developer Guide
 
-This guide is for developers and contributors working on the Integran project. Regular users don't need this information.
-
-## 🎯 Current Status: CQRS Architecture Implementation
-
-**Current Focus**: Implementing proper CQRS architecture with repository abstraction layer to fix domain/infrastructure dependencies.
-
-**Architecture Status:**
-- ✅ **Domain Layer**: All 5 bounded contexts with proper domain services
-- ✅ **Infrastructure**: EventBus, database operations working correctly  
-- ✅ **Terminal UI**: Complete Rich/Textual implementation
-- 🔧 **Repository Layer**: Abstract interfaces created, concrete implementations in progress
-- 🔧 **CQRS Compliance**: Fixing domain services that directly access DatabaseManager
-- 📋 **Next**: Update domain services to use repository interfaces
-
-## 📈 Production Performance Metrics (Phase 7 - June 17, 2025)
-
-### **Comprehensive Testing Results**
-
-The Integran system has undergone extensive quality assurance testing with outstanding results across all performance, security, and reliability metrics.
-
-#### **✅ User Flow Testing**
-- **Terminal UI**: Successfully launches with main menu and all navigation working
-- **Database Setup**: User configuration and persistence verified working correctly  
-- **Settings Management**: Real-time settings updates and persistence confirmed
-- **Developer Mode**: Toggle functionality and access control validated
-
-#### **✅ Event Flow Validation**
-- **YAML Loading**: 27 events and 5 flows loaded successfully from `docs/event-flows.yaml`
-- **Circular Dependency Detection**: Working correctly - caught actual circular dependency and resolved
-- **Flow Monitoring**: EventFlowOrchestrator functioning properly with full DAG validation
-- **Performance**: <1ms event validation overhead - extremely efficient
-
-#### **✅ Developer Mode Security**
-- **Service Restrictions**: All 3 content services (BuildDataset, GenerateAnswer, ProcessImage) properly check developer mode before API usage
-- **Error Messages**: Clear, user-friendly messages about API costs (~$50-80) and feature requirements
-- **Cost Protection**: Default developer mode = false, explicit warnings before API usage, no accidental charges
-- **Access Control**: Cannot use Gemini services without explicit developer mode enablement
-
-#### **✅ Performance Testing Results**
-
-| Component | Performance | Target | Status |
-|-----------|------------|---------|---------|
-| Database Loading | 27.8ms for 460 questions (0.06ms/question) | <1000ms | ✅ EXCELLENT |
-| Question Retrieval | 0.33ms average | <10ms | ✅ EXCELLENT |
-| Event Publishing | 0.006ms average | <1ms | ✅ EXCELLENT |
-| Statistics Generation | 2.96ms average | <100ms | ✅ EXCELLENT |
-| UI Responsiveness | 0.32ms average | <50ms | ✅ EXCELLENT |
-
-**Summary**: All performance targets exceeded by significant margins. The system demonstrates exceptional speed and responsiveness.
-
-#### **✅ Memory Testing Results**
-- **Event Publishing**: 52.6ms for 1000 events with perfect handler execution (100% success rate)
-- **Handler Cleanup**: Perfect cleanup demonstrated (1→0 handlers, no memory leaks)
-- **Large Events**: 0.026ms average for 1KB payloads - extremely memory efficient
-- **Multi-handler Performance**: 0.111ms for 10 handlers per event - excellent scalability
-- **Flow Validation Memory**: 27 events and 5 flows loaded with no memory issues
-
-#### **✅ UI Responsiveness Testing**
-- **Real-time Updates**: 0.09ms average for 300 events (target: <50ms) - EXCELLENT
-- **Background Processing**: 5.54ms total for 10 concurrent tasks - NON-BLOCKING  
-- **UI State Changes**: 1.14ms average (target: <20ms) - SMOOTH
-- **Database-triggered Updates**: 3.77ms average (target: <10ms) - FAST
-- **Multi-handler Events**: 0.043ms average (target: <1ms) - EXTREMELY EFFICIENT
-
-#### **✅ Error Scenario Testing**
-- **Database Corruption**: Gracefully handled with proper DatabaseError exceptions
-- **User Input Validation**: All 6 invalid input types properly caught and handled with clear error messages
-- **Business Rule Violations**: Domain exceptions properly raised and managed without system crashes
-- **Event Flow Violations**: Handler errors don't crash the system - graceful degradation
-- **File System Errors**: Proper FileNotFoundError and PermissionError handling with user-friendly messages
-- **Network/API Errors**: All 5 common network scenarios handled gracefully with appropriate fallbacks
-- **Resource Cleanup**: Working correctly even after handler failures - no resource leaks
-
-### **🏆 Performance Summary**
-
-**Database Performance:**
-- Loading 460 questions: 27.8ms (0.06ms per question) - **EXCEPTIONAL**
-- Question retrieval: 0.33ms average - **INSTANT**
-- Statistics generation: 2.96ms average - **VERY FAST**
-
-**Event System Performance:**
-- Event publishing: 0.006ms average - **EXTREMELY FAST**
-- Event flow validation: <1ms overhead - **NEGLIGIBLE**
-- Multi-handler distribution: 0.043ms average - **EXCELLENT**
-
-**UI Responsiveness:**
-- Real-time updates: 0.09ms average - **EXCELLENT**
-- Background processing: Non-blocking concurrent execution - **SMOOTH**
-- State changes: 1.14ms average - **INSTANT**
-
-**Memory Management:**
-- Efficient event processing with proper cleanup
-- No memory leaks detected in stress testing
-- Excellent performance even with large payloads (1KB+ events)
-
-**Error Handling:**
-- Comprehensive coverage of all error scenarios
-- Graceful degradation instead of crashes
-- User-friendly error messages with actionable guidance
-- Proper resource cleanup in error conditions
-
-### **🔒 Security Validation**
-- **Developer Mode Protection**: All API-powered services require explicit developer mode enablement
-- **Cost Protection**: Clear warnings about API costs (~$50-80 for dataset building) before any charges
-- **Default Security**: New installations default to safe mode (developer_mode = false)
-- **Access Control**: Cannot accidentally trigger API usage without explicit permission
-
-### **⚡ System Status**
-**PRODUCTION READY** - The system demonstrates:
-- Outstanding performance (all metrics exceed targets by significant margins)
-- Robust security (comprehensive developer mode protection)
-- Excellent reliability (graceful error handling and recovery)
-- Memory efficiency (no leaks, optimal resource usage)
-- UI responsiveness (sub-millisecond response times)
+This guide provides architecture guidelines and technical reference for developers working on the Integran project.
 
 ## 🏗️ Architecture Overview
 
-Integran is a **Domain-Driven Design (DDD)** application with **CQRS** patterns and **event-driven** communication.
+Integran follows **Domain-Driven Design (DDD)** with **CQRS** patterns and **event-driven** communication for clean separation of concerns.
+
+## 🏗️ CQRS Architecture Principles
+
+Integran implements a clean CQRS architecture with strict layer separation and dependency inversion.
 
 ### Core Principles
 1. **Domain-Driven Design**: Business logic in domain services with single responsibilities
 2. **CQRS**: Separate command (write) and query (read) operations
 3. **Event-Driven**: Async communication between bounded contexts
-4. **Local-First**: SQLite storage, no cloud dependencies
-5. **Scientific Learning**: FSRS algorithm for spaced repetition
+4. **Dependency Inversion**: Domain defines interfaces, infrastructure implements
+5. **Local-First**: SQLite storage, no cloud dependencies
+
+### Layer Responsibilities
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        PRESENTATION LAYER                           │
+│  • UI Components (Terminal/Web/Mobile)                              │
+│  • User Input Handling                                              │
+│  • Display Results                                                  │
+│  • NO Business Logic                                                │
+│  • MUST use Application Commands/Queries ONLY                       │
+└─────────────────────────────────────────────────────────────────────┘
+                                  ↓ Commands/Queries
+┌─────────────────────────────────────────────────────────────────────┐
+│                        APPLICATION LAYER                            │
+│  • Command Handlers (execute/handle methods)                        │
+│  • Query Handlers (handle methods)                                  │
+│  • Event Handlers (cross-context coordination)                      │
+│  • Thin Coordinators (< 50 lines)                                   │
+│  • NO Business Logic                                                │
+└─────────────────────────────────────────────────────────────────────┘
+                                  ↓ Domain Services
+┌─────────────────────────────────────────────────────────────────────┐
+│                          DOMAIN LAYER                               │
+│  • Business Logic (ALL business rules here)                         │
+│  • Domain Services (call method)                                    │
+│  • Domain Events (DomainEvent base class)                           │
+│  • Repository Interfaces (owned by domain)                          │
+│  • MUST NOT import from infrastructure                              │
+└─────────────────────────────────────────────────────────────────────┘
+                                  ↓ Interface Implementation
+┌─────────────────────────────────────────────────────────────────────┐
+│                      INFRASTRUCTURE LAYER                           │
+│  • Database Implementation (SQLite)                                 │
+│  • Event Bus Implementation                                         │
+│  • Repository Implementations                                       │
+│  • External APIs                                                    │
+│  • Configuration                                                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ### Bounded Contexts
-- **Learning**: FSRS scheduling, session management, progress tracking
+- **Learning**: Spaced repetition scheduling, session management, progress tracking
 - **Content**: Question management, multilingual answers, image processing  
-- **Analytics**: Performance tracking, leech detection, interleaving optimization
+- **Analytics**: Performance tracking, difficulty analysis, optimization
 - **User**: User configuration, preferences, developer mode control
-- **Infrastructure**: EventBus, database, repositories, external APIs
 
-### Current Architecture Status
+### Directory Structure
 
 ```
 src/
-├── domain/                        # ✅ COMPLETE - Domain Layer
+├── domain/                        # Domain Layer - Business Logic
 │   ├── learning/services/          # ScheduleCard, CompleteLearningSession
 │   ├── content/services/           # GenerateAnswer, ProcessImage, BuildDataset
-│   ├── analytics/services/         # AnalyzePerformance, DetectLeech, OptimizeInterleaving
-│   ├── user/                      # 📋 NEW - User configuration domain
-│   └── shared/                     # Base classes, events, domain service interface
-├── application/                    # ✅ COMPLETE - Thin Application Layer
-│   ├── commands/                   # Thin coordinators (< 50 lines each)
-│   ├── queries/                    # Read operations (direct database access)
+│   ├── analytics/services/         # Performance analysis, optimization
+│   ├── user/services/              # User configuration, preferences
+│   └── shared/                     # Base classes, events, interfaces
+├── application/                    # Application Layer - Coordination
+│   ├── commands/                   # Command handlers (write operations)
+│   ├── queries/                    # Query handlers (read operations) 
 │   ├── events/handlers/            # Cross-context event handling
-│   ├── workflows/                  # Thin coordinators (< 60 lines each)
-│   └── projections/                # Read model projections
-├── infrastructure/                 # ✅ COMPLETE - Infrastructure Layer
-│   ├── database/database.py        # DatabaseManager, SQLite operations
-│   ├── messaging/event_bus.py      # EventBus implementation
-│   └── repositories/               # Data access
-└── presentation/                   # ✅ COMPLETE - Presentation Layer
-    ├── terminal/                   # Rich/Textual implementation
+│   └── workflows/                  # Complex workflow coordination
+├── infrastructure/                 # Infrastructure Layer - Implementation
+│   ├── database/                   # SQLite database operations
+│   ├── messaging/                  # Event bus implementation
+│   ├── repositories/               # Repository implementations
+│   └── config/                     # Configuration and settings
+└── presentation/                   # Presentation Layer - UI
+    ├── terminal/                   # Terminal UI implementation
     └── cli/                        # Command-line interfaces
 ```
 
-## 🎯 Phase 6: User Configuration & Event Flow Design
+## 🔄 Data Flow Patterns
 
-**Current Priority**: Implement comprehensive user configuration system and explicit event flow management for cross-platform compatibility.
+### CORRECT CQRS Data Flow
 
-### Phase 6.1: User Configuration Domain
-#### New Bounded Context: User Configuration
-- **Create** `src/domain/user/` with models, services, events
-- **Add** `UserSettings` aggregate with developer mode, preferences
-- **Implement** `SaveUserSettings` and `LoadUserSettings` domain services
-- **Add** persistence through SQLite user_settings table
-
-### Phase 6.2: Developer Mode Control
-#### Service Access Control
-- **Modify** content services to check developer mode before using Gemini
-- **Add** `DeveloperModeRequiredError` for restricted operations
-- **Update** `BuildDataset` and `ProcessImage` to require developer mode
-- **Default**: `developer_mode = false`, `use_gemini = false`
-
-### Phase 6.3: Event Flow DAG Design
-#### Explicit Event Flow Management
-- **Created** `docs/event-flows.yaml` for explicit event definition
-- **Event Categories**: System, User, Learning, Content, Analytics, Developer
-- **Flow Validation**: DAG compliance, dependency checking, circular detection
-- **Cross-Platform**: Same events work across terminal, mobile, desktop, web
-
-### Phase 6.4: User Flow Implementation
-#### Core User Flows
-1. **First-time Setup Flow**: Language → Developer Mode → Tutorial → Main Menu
-2. **Daily Usage Flow**: Settings Load → Session Start → Learning Loop → Progress
-3. **Settings Management Flow**: Open Settings → Change Prefs → Save → Update UI
-4. **Developer Operations Flow**: Enable Dev Mode → API Operations → Dataset Generation
-
-#### ✅ What's Already Working (Phase 4.1 & 5 Complete)
-- **Domain Layer**: All 5 bounded contexts with proper domain services
-- **Infrastructure**: EventBus, database, repositories working correctly
-- **Application Layer**: Thin coordinators with proper DDD separation
-- **Terminal UI**: Complete Rich/Textual implementation
-- **Test Coverage**: 416+ tests passing, all quality checks green
-
-## 🎯 Phase 6 Implementation Plan
-
-### Step 1: User Configuration Domain (1-2 days)
-
-#### Create User Bounded Context
-- **New Directory**: `src/domain/user/`
-- **Models**: `UserSettings`, `DeveloperMode`, `UserPreferences`
-- **Services**: `SaveUserSettings`, `LoadUserSettings`, `ToggleDeveloperMode`
-- **Events**: `UserSettingsChangedEvent`, `DeveloperModeToggledEvent`
-- **Repository**: `UserSettingsRepository` with SQLite persistence
-
-#### Database Schema Extensions
-- **Extend** `user_settings` table with `developer_mode` boolean
-- **Add** `user_preferences` JSON column for flexible settings
-- **Add** `first_time_setup` flag for onboarding state
-- **Add** `user_flow_state` for resume capabilities
-
-### Step 2: Event Flow DAG Implementation (1-2 days)
-
-#### Event Flow Engine
-- **Create** `EventFlowOrchestrator` for DAG validation
-- **Load** event definitions from `docs/event-flows.yaml`
-- **Validate** event dependencies and prevent circular flows
-- **Add** event sequence tracking and health monitoring
-
-#### Event System Enhancements
-- **Add** event flow validation to EventBus
-- **Implement** event replay capabilities for debugging
-- **Add** event dependency metadata storage
-- **Create** event flow health check reports
-
-### Step 3: Developer Mode Integration (1 day)
-
-#### Service Access Control
-- **Modify** `BuildDataset` to check developer mode before Gemini usage
-- **Modify** `ProcessImage` to require developer mode for API calls
-- **Add** `DeveloperModeRequiredError` exception
-- **Default** all new installations to `developer_mode = false`
-
-#### User-Friendly Error Messages
-- **Add** clear messaging when developer features attempted without mode enabled
-- **Guide** users to enable developer mode through settings
-- **Protect** against accidental API usage and costs
-
-### Target Architecture (After Phase 6 Implementation)
-
-**Enhanced Domain Layer with User Configuration:**
 ```
-src/domain/
-├── learning/services/
-│   ├── schedule_card.py            # FSRS algorithm
-│   └── complete_learning_session.py  # Session business logic
-├── content/services/
-│   ├── generate_answer.py          # Multilingual generation (dev mode check)
-│   ├── process_image.py            # Image processing (dev mode check)
-│   └── build_dataset.py            # Dataset building (dev mode check)
-├── analytics/services/
-│   ├── analyze_performance.py      # Performance analysis
-│   ├── detect_leech.py             # Leech detection
-│   └── optimize_interleaving.py    # Interleaving optimization
-├── user/                           # NEW: User Configuration Context
-│   ├── models/
-│   │   ├── user_settings.py        # UserSettings aggregate
-│   │   └── developer_mode.py       # DeveloperMode value object
-│   ├── services/
-│   │   ├── save_user_settings.py   # Save preferences
-│   │   ├── load_user_settings.py   # Load preferences
-│   │   └── toggle_developer_mode.py # Developer mode control
-│   └── events/
-│       └── user_events.py          # User configuration events
-└── shared/
-    ├── events.py                   # Enhanced with user events
-    └── services.py                 # Base classes with developer mode checks
+USER ACTION
+     │
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ PRESENTATION: UI Component                                          │
+│  1. User clicks answer button                                       │
+│  2. Calls Application Command Handler                               │
+└─────────────────────────────────────────────────────────────────────┘
+     │ command.execute() or command.handle()
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ APPLICATION: Command Handler                                        │
+│  1. Validates input                                                 │
+│  2. Creates domain service request                                  │
+│  3. Calls domain service                                            │
+│  4. Returns result                                                  │
+└─────────────────────────────────────────────────────────────────────┘
+     │ domain_service.call(request)
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ DOMAIN: Domain Service                                              │
+│  1. Applies business rules                                          │
+│  2. Uses repository interfaces                                      │
+│  3. Updates state                                                   │
+│  4. Publishes domain events                                         │
+└─────────────────────────────────────────────────────────────────────┘
+     │ repository.save() + event_bus.publish()
+     ↓
+┌─────────────────────────────────────────────────────────────────────┐
+│ INFRASTRUCTURE: Repositories + Event Bus                           │
+│  1. Saves to database                                               │
+│  2. Distributes events to handlers                                  │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Event Flow Management:**
-```
-docs/
-├── event-flows.yaml                # Explicit event flow definitions
-└── event-flow-diagrams/            # Auto-generated flow visualizations
+### ❌ PROBLEMATIC Patterns 
 
-src/infrastructure/messaging/
-├── event_bus.py                    # Enhanced with flow validation
-├── event_flow_orchestrator.py     # NEW: DAG validation and monitoring
-└── event_flow_health_checker.py   # NEW: Flow health monitoring
+```
+❌ WRONG: Presentation → Domain (Bypassing Application)
+┌─────────────────┐    ┌─────────────────┐
+│  Presentation   │───→│     Domain      │  
+└─────────────────┘    └─────────────────┘
+                                │
+                                ↓
+                       ┌─────────────────┐
+                       │ Infrastructure  │
+                       └─────────────────┘
+
+❌ WRONG: Domain → Infrastructure (Direct Import)
+┌─────────────────┐    ┌─────────────────┐
+│     Domain      │───→│ Infrastructure  │  
+└─────────────────┘    └─────────────────┘
+   from src.infrastructure.messaging import EventBus
+
+❌ WRONG: Missing CQRS Methods
+┌─────────────────┐
+│   Commands      │  Missing execute() or handle() methods
+└─────────────────┘
+┌─────────────────┐
+│    Queries      │  Missing handle() methods  
+└─────────────────┘
 ```
 
-**Enhanced Terminal UI with Settings:**
+### ✅ CORRECT Patterns (Target Architecture)
+
 ```
-src/presentation/terminal/
-├── trainer_app.py                  # Main menu with settings option
-├── settings_view.py                # NEW: Settings management screen
-├── developer_view.py               # NEW: Developer operations screen
-├── first_time_setup_view.py        # NEW: Onboarding wizard
-└── base.py                         # Event-aware components
+✅ CORRECT: Full CQRS Flow
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Presentation   │───→│  Application    │───→│     Domain      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                        │
+                                                        ↓
+                                               ┌─────────────────┐
+                                               │ Infrastructure  │
+                                               └─────────────────┘
+
+✅ CORRECT: Dependency Inversion
+┌─────────────────┐    ┌─────────────────┐
+│     Domain      │───→│   Interfaces    │  
+└─────────────────┘    └─────────────────┘
+                                ↑
+                                │ implements
+                       ┌─────────────────┐
+                       │ Infrastructure  │
+                       └─────────────────┘
+
+✅ CORRECT: CQRS Methods
+┌─────────────────┐
+│   Commands      │  execute() or handle() methods ✓
+└─────────────────┘
+┌─────────────────┐
+│    Queries      │  handle() methods ✓
+└─────────────────┘
+```
+
+## 🔧 CQRS Implementation Guidelines
+
+### Command Pattern Implementation
+
+All commands must implement either `execute()` or `handle()` methods:
+
+```python
+@dataclass
+class SaveUserSettingsCommand:
+    """Command to save user settings."""
+    user_id: int
+    settings: dict[str, Any]
+
+class SaveUserSettingsCommandHandler:
+    """Command handler with proper CQRS pattern."""
+    
+    def __init__(self, user_repository: UserRepository, event_bus: EventBusInterface):
+        self.save_settings_service = SaveUserSettings(event_bus, user_repository)
+        
+    async def handle(self, command: SaveUserSettingsCommand) -> SaveUserSettingsCommandResult:
+        """Handle command using domain service."""
+        request = SaveUserSettingsRequest(
+            user_id=command.user_id,
+            settings=command.settings
+        )
+        result = await self.save_settings_service.call(request)
+        return SaveUserSettingsCommandResult(
+            success=result.success,
+            error_message=result.error_message
+        )
+```
+
+### Query Pattern Implementation
+
+All queries must implement `handle()` methods for read operations:
+
+```python
+@dataclass
+class GetUserPreferencesQuery:
+    """Query to get user preferences."""
+    user_id: int
+
+class GetUserPreferencesQueryHandler:
+    """Query handler with direct database access."""
+    
+    def __init__(self, user_repository: UserRepository):
+        self.user_repository = user_repository
+        
+    async def handle(self, query: GetUserPreferencesQuery) -> GetUserPreferencesResult:
+        """Handle query with direct repository access."""
+        user_settings = await self.user_repository.get_user_settings(query.user_id)
+        return GetUserPreferencesResult(
+            success=True,
+            preferences=user_settings
+        )
+```
+
+### Domain Event Implementation
+
+Domain events must be defined in the domain layer, not infrastructure:
+
+```python
+# ✅ CORRECT: In src/domain/shared/events.py
+@dataclass
+class DomainEvent(ABC):
+    """Base class for all domain events."""
+    event_id: str
+    occurred_at: datetime
+    
+    def __post_init__(self):
+        if not self.event_id:
+            self.event_id = str(uuid.uuid4())
+        if not self.occurred_at:
+            self.occurred_at = datetime.now(UTC)
+
+# ✅ CORRECT: In src/domain/user/events/user_events.py  
+@dataclass
+class UserSettingsChangedEvent(DomainEvent):
+    """Event published when user settings change."""
+    user_id: int
+    setting_key: str
+    old_value: Any
+    new_value: Any
+```
+
+### Repository Interface Pattern
+
+Domain must own repository interfaces, infrastructure implements them:
+
+```python
+# ✅ CORRECT: In src/domain/shared/repositories.py
+from abc import ABC, abstractmethod
+
+class UserRepository(ABC):
+    """User repository interface owned by domain."""
+    
+    @abstractmethod
+    async def get_user_settings(self, user_id: int) -> UserSettings | None:
+        """Get user settings by ID."""
+        pass
+        
+    @abstractmethod
+    async def save_user_settings(self, user_id: int, settings: dict) -> UserSettings:
+        """Save user settings."""
+        pass
+
+# ✅ CORRECT: In src/infrastructure/repositories/user_repository.py
+class UserRepositoryImpl(UserRepository):
+    """User repository implementation."""
+    
+    def __init__(self, db_manager: DatabaseManager):
+        self.db = db_manager
+        
+    async def get_user_settings(self, user_id: int) -> UserSettings | None:
+        """Implementation of interface method."""
+        # Database implementation
+        pass
 ```
 
 ## 📊 Data Overview
@@ -817,92 +830,430 @@ if not card:
 5. **Event Flow**: Domain services publish events → Event bus distributes → Handlers process
 6. **CQRS Pattern**: Commands go through domain services, queries go direct to database
 
-## 🔄 Event Flow Management
+## 📋 Adding Commands and Queries - Developer Guide
 
-### Event Flow Definition File
+### 🎯 CQRS Implementation Guidelines
 
-The application uses an explicit event flow definition system through `docs/event-flows.yaml`:
+This section provides a step-by-step guide for adding new commands and queries while respecting the CQRS architecture flow and event-driven patterns.
 
-```yaml
-# Example event definition
-events:
-  AppStartedEvent:
-    category: system
-    triggers: [FirstTimeSetupEvent, UserSettingsLoadedEvent]
-    dependencies: []
-    description: "Application startup initialization"
-
-# Example flow definition  
-flows:
-  first_time_setup:
-    name: "First Time User Setup"
-    sequence:
-      - AppStartedEvent
-      - FirstTimeSetupEvent
-      - LanguageSelectedEvent
-      - DeveloperModeToggledEvent
+#### **RESPECT ARCHITECTURE FLOW:**
+```
+Domain Layer (Services/Models) defines interface
+     ↓ 
+Application Layer (Commands/Queries) uses domain interfaces correctly
+     ↓
+Domain service populates all required attributes and publishes events
+     ↓
+Event handlers process cross-context communication
 ```
 
-### Benefits of Explicit Event Flow Definition
+### ✅ Step-by-Step: Adding a New Command
 
-1. **Cross-Platform Consistency**: Same event flows work across terminal, mobile, desktop, web
-2. **DAG Validation**: Prevents circular dependencies and ensures proper event ordering
-3. **Documentation**: Self-documenting event relationships and user flows
-4. **Debugging**: Event sequence tracking and flow health monitoring
-5. **Validation**: Runtime validation of event flow compliance
+#### Step 1: Define Domain Models and Events
+```python
+# In src/domain/[context]/events/[context]_events.py
+@dataclass
+class UserSettingsChangedEvent(DomainEvent):
+    """Event published when user settings are updated."""
+    user_id: int
+    setting_key: str
+    old_value: Any
+    new_value: Any
+    
+    def __post_init__(self):
+        super().__init__()
+```
 
-### Event Categories
+#### Step 2: Create Domain Service
+```python
+# In src/domain/[context]/services/[service_name].py
+@dataclass
+class SaveUserSettingsRequest:
+    """Request to save user settings."""
+    user_id: int
+    settings: dict[str, Any]
+    updated_by: str = "system"
 
-- **System**: Application lifecycle (startup, shutdown, migration)
-- **User**: User actions and preferences (settings, developer mode)
-- **Learning**: FSRS scheduling and session management
-- **Content**: Question processing and dataset generation
-- **Analytics**: Performance tracking and analysis
-- **Developer**: Developer-only operations (API usage, dataset building)
+@dataclass 
+class SaveUserSettingsResult:
+    """Result of saving user settings."""
+    success: bool
+    user_id: int
+    updated_settings: dict[str, Any] | None = None
+    error_message: str | None = None
 
-### User Flow Patterns
+class SaveUserSettings(DomainService[SaveUserSettingsRequest, SaveUserSettingsResult]):
+    """Domain service for saving user settings with business logic."""
+    
+    def __init__(self, event_bus: EventBus, user_repository: UserRepository):
+        super().__init__(event_bus)
+        self.user_repository = user_repository
+        
+    async def call(self, request: SaveUserSettingsRequest) -> SaveUserSettingsResult:
+        """Save user settings and publish events."""
+        try:
+            # 1. Validate business rules
+            if not request.settings:
+                return SaveUserSettingsResult(
+                    success=False,
+                    user_id=request.user_id,
+                    error_message="Settings cannot be empty"
+                )
+            
+            # 2. Get current settings for comparison
+            current_settings = await self.user_repository.get_user_settings(request.user_id)
+            
+            # 3. Apply business logic
+            updated_settings = await self.user_repository.save_user_settings(
+                request.user_id, request.settings
+            )
+            
+            # 4. Publish domain events for changed settings
+            for key, new_value in request.settings.items():
+                old_value = current_settings.get(key)
+                if old_value != new_value:
+                    event = UserSettingsChangedEvent(
+                        user_id=request.user_id,
+                        setting_key=key,
+                        old_value=old_value,
+                        new_value=new_value
+                    )
+                    await self.publish_event(event)
+            
+            return SaveUserSettingsResult(
+                success=True,
+                user_id=request.user_id,
+                updated_settings=updated_settings
+            )
+            
+        except Exception as e:
+            return SaveUserSettingsResult(
+                success=False,
+                user_id=request.user_id,
+                error_message=str(e)
+            )
+```
 
-1. **First-time Setup**: `AppStarted` → `FirstTimeSetup` → `LanguageSelected` → `DeveloperModeToggled`
-2. **Daily Usage**: `AppStarted` → `UserSettingsLoaded` → `SessionStarted` → Learning Loop
-3. **Settings Management**: `SettingsOpened` → `UserSettingsChanged` → `SettingsSaved`
-4. **Developer Operations**: `DeveloperModeToggled` → `DatasetBuildStarted` → AI Processing
+#### Step 3: Create Application Command
+```python
+# In src/application/commands/save_user_settings_command.py
+@dataclass
+class SaveUserSettingsCommand:
+    """Command to save user settings."""
+    user_id: int
+    settings: dict[str, Any]
+    updated_by: str = "user"
+
+@dataclass
+class SaveUserSettingsCommandResult:
+    """Result of save user settings command."""
+    success: bool
+    error_message: str | None = None
+
+class SaveUserSettingsCommandHandler:
+    """Thin application layer handler that coordinates domain service."""
+    
+    def __init__(self, user_repository: UserRepository, event_bus: EventBus):
+        self.save_settings_service = SaveUserSettings(event_bus, user_repository)
+        
+    async def handle(self, command: SaveUserSettingsCommand) -> SaveUserSettingsCommandResult:
+        """Handle save user settings command using domain service."""
+        request = SaveUserSettingsRequest(
+            user_id=command.user_id,
+            settings=command.settings,
+            updated_by=command.updated_by
+        )
+        
+        result = await self.save_settings_service.call(request)
+        
+        return SaveUserSettingsCommandResult(
+            success=result.success,
+            error_message=result.error_message
+        )
+```
+
+#### Step 4: Create Event Handler (If Cross-Context Communication Needed)
+```python
+# In src/application/events/handlers/user_settings_changed_handler.py
+class UserSettingsChangedHandler:
+    """Handle user settings changes for cross-context updates."""
+    
+    def __init__(self, analytics_repository: AnalyticsRepository):
+        self.analytics_repository = analytics_repository
+        
+    async def handle(self, event: UserSettingsChangedEvent) -> None:
+        """Handle user settings changed event."""
+        # Update analytics when language preference changes
+        if event.setting_key == "language":
+            await self.analytics_repository.record_language_change(
+                event.user_id, event.old_value, event.new_value
+            )
+```
+
+#### Step 5: Register in Container
+```python
+# In src/infrastructure/containers/main_container.py
+def _setup_event_handlers(self) -> None:
+    """Register all event handlers."""
+    # ... existing handlers ...
+    
+    # Register new handler
+    user_settings_handler = UserSettingsChangedHandler(self._analytics_repository)
+    self._event_subscription_manager.subscribe(
+        UserSettingsChangedEvent, 
+        user_settings_handler.handle
+    )
+
+def get_save_user_settings_command_handler(self) -> SaveUserSettingsCommandHandler:
+    """Get save user settings command handler."""
+    return SaveUserSettingsCommandHandler(
+        user_repository=self._user_repository,
+        event_bus=self._event_bus
+    )
+```
+
+### ✅ Step-by-Step: Adding a New Query
+
+#### Step 1: Create Query Models
+```python
+# In src/application/queries/get_user_preferences_query.py
+@dataclass
+class GetUserPreferencesQuery:
+    """Query to get user preferences."""
+    user_id: int
+    include_defaults: bool = True
+
+@dataclass
+class UserPreferencesData:
+    """User preferences data."""
+    user_id: int
+    language: Language
+    developer_mode: bool
+    custom_settings: dict[str, Any]
+    last_updated: datetime
+
+@dataclass
+class GetUserPreferencesResult:
+    """Result of get user preferences query."""
+    success: bool
+    preferences: UserPreferencesData | None = None
+    error_message: str | None = None
+```
+
+#### Step 2: Create Query Handler (Direct Database Access - CQRS Read Side)
+```python
+class GetUserPreferencesQueryHandler:
+    """Query handler for user preferences - direct database access."""
+    
+    def __init__(self, user_repository: UserRepository):
+        self.user_repository = user_repository
+        
+    async def handle(self, query: GetUserPreferencesQuery) -> GetUserPreferencesResult:
+        """Handle get user preferences query."""
+        try:
+            # Direct database query - no domain logic needed for reads
+            user_settings = await self.user_repository.get_user_settings(query.user_id)
+            
+            if not user_settings:
+                if query.include_defaults:
+                    # Return default preferences
+                    preferences = UserPreferencesData(
+                        user_id=query.user_id,
+                        language=Language.ENGLISH,
+                        developer_mode=False,
+                        custom_settings={},
+                        last_updated=datetime.now(UTC)
+                    )
+                    return GetUserPreferencesResult(success=True, preferences=preferences)
+                else:
+                    return GetUserPreferencesResult(
+                        success=False,
+                        error_message="User preferences not found"
+                    )
+            
+            # Convert to preferences data
+            preferences = UserPreferencesData(
+                user_id=user_settings.user_id,
+                language=user_settings.language,
+                developer_mode=user_settings.developer_mode,
+                custom_settings=user_settings.custom_settings,
+                last_updated=user_settings.updated_at
+            )
+            
+            return GetUserPreferencesResult(success=True, preferences=preferences)
+            
+        except Exception as e:
+            return GetUserPreferencesResult(
+                success=False,
+                error_message=str(e)
+            )
+```
+
+### ⚡ CQRS Best Practices
+
+#### Commands (Write Operations)
+1. **Always go through Domain Services** - Commands must use domain services for business logic
+2. **Publish Domain Events** - Domain services publish events for cross-context communication
+3. **Thin Application Layer** - Command handlers should be < 50 lines, just coordination
+4. **Validate in Domain** - Business rule validation happens in domain services
+
+#### Queries (Read Operations)  
+1. **Direct Database Access** - Queries can bypass domain layer for performance
+2. **No Business Logic** - Queries just format and return data
+3. **Projection-Friendly** - Design for read models and projections
+4. **Fast and Simple** - Optimize for read performance
+
+#### Events (Cross-Context Communication)
+1. **Domain Events Only** - Only domain services publish events
+2. **Async Handlers** - Event handlers run asynchronously
+3. **Error Isolation** - Handler failures don't affect other handlers
+4. **Event Sourcing Ready** - Events contain all necessary data
+
+### 🔍 Architecture Verification Checklist
+
+Before submitting code, verify:
+
+✅ **Domain Layer Compliance:**
+- [ ] Domain service defines clear request/result interfaces
+- [ ] Business logic is in domain service, not application layer
+- [ ] Domain events are published for important state changes
+- [ ] No infrastructure dependencies in domain layer
+
+✅ **Application Layer Compliance:**
+- [ ] Command handlers are thin coordinators (< 50 lines)
+- [ ] Queries bypass domain for direct database access
+- [ ] Event handlers process cross-context communication
+- [ ] No business logic in application layer
+
+✅ **Event Flow Compliance:**
+- [ ] Domain services publish events, not UI components
+- [ ] Event handlers are registered in MainContainer
+- [ ] Events contain all necessary data for handlers
+- [ ] Event flow respects dependencies defined in `docs/event-flows.yaml`
+
+### 📝 Testing Guidelines
+
+#### Test Domain Services
+```python
+@pytest.mark.asyncio
+async def test_save_user_settings_success():
+    """Test successful user settings save."""
+    # Arrange
+    mock_repo = AsyncMock()
+    mock_event_bus = AsyncMock()
+    service = SaveUserSettings(mock_event_bus, mock_repo)
+    
+    request = SaveUserSettingsRequest(
+        user_id=1,
+        settings={"language": "german", "developer_mode": True}
+    )
+    
+    # Act
+    result = await service.call(request)
+    
+    # Assert
+    assert result.success is True
+    mock_event_bus.publish.assert_called()  # Verify event published
+```
+
+#### Test Application Handlers
+```python
+@pytest.mark.asyncio
+async def test_command_handler_coordinates_domain_service():
+    """Test command handler coordinates domain service correctly."""
+    # Arrange
+    mock_repo = AsyncMock()
+    mock_event_bus = AsyncMock()
+    handler = SaveUserSettingsCommandHandler(mock_repo, mock_event_bus)
+    
+    command = SaveUserSettingsCommand(user_id=1, settings={"theme": "dark"})
+    
+    # Act
+    result = await handler.handle(command)
+    
+    # Assert
+    assert result.success is True
+    # Verify domain service was called (indirectly through mocks)
+```
+
+## ✅ Architecture Validation Checklist
+
+Before submitting any code changes, verify CQRS/DDD compliance:
+
+### Domain Layer Compliance
+- [ ] **No Infrastructure Imports**: Domain files must not import from `src.infrastructure`
+- [ ] **Domain Events in Domain**: All `DomainEvent` classes must be in `src/domain`
+- [ ] **Repository Interfaces**: Domain owns repository interfaces in `src/domain/shared/repositories.py`
+- [ ] **Business Logic**: All business rules are in domain services, not application layer
+- [ ] **Event Publishing**: Domain services publish domain events for state changes
+
+### Application Layer Compliance  
+- [ ] **Command Methods**: All commands have `execute()` or `handle()` methods
+- [ ] **Query Methods**: All queries have `handle()` methods
+- [ ] **Thin Coordinators**: Command/query handlers are < 50 lines
+- [ ] **No Business Logic**: Application layer only coordinates, no business rules
+- [ ] **Domain Service Usage**: Commands use domain services, not direct repository access
+
+### CQRS Pattern Compliance
+- [ ] **Command Separation**: Write operations go through commands + domain services
+- [ ] **Query Separation**: Read operations can access repositories directly
+- [ ] **Event Handling**: Cross-context communication uses domain events
+- [ ] **Layer Flow**: Presentation → Application → Domain → Infrastructure
+
+### Dependency Inversion Compliance
+- [ ] **Interface Ownership**: Domain owns interfaces, infrastructure implements
+- [ ] **EventBus Interface**: Domain services use `EventBusInterface`, not concrete `EventBus`
+- [ ] **Repository Abstraction**: Domain services use repository interfaces
+- [ ] **No Outward Dependencies**: Domain layer has no dependencies on outer layers
+
+### Testing Verification
+```bash
+# Run architecture tests to verify compliance
+pytest tests/unit/architecture/ -v
+
+# Run all quality checks
+make check-all
+
+# Should be 0 failing tests for clean architecture
+```
+
+## 🔧 Development Setup
+
+### Quick Start
+```bash
+# Clone and setup environment
+git clone <repository>
+cd integran
+make env-create
+conda activate integran
+make install
+
+# Run quality checks
+make check-all  # Must be green before any commits
+```
+
+### Making Changes
+1. **Read TODO.md** - Check current critical issues and priorities
+2. **Run Architecture Tests** - `pytest tests/unit/architecture/ -v`
+3. **Follow CQRS Patterns** - Use examples in this guide
+4. **Validate Changes** - `make check-all` must pass
+5. **Update Tests** - Add/update tests for new functionality
+
+### Key Commands
+```bash
+make lint        # Code linting with ruff
+make format      # Code formatting
+make typecheck   # Type checking with mypy  
+make test        # Run test suite
+make check-all   # Run all quality checks
+```
 
 ## 📚 Additional Resources
 
-- **[Event Flow Definition](./event-flows.yaml)** - Complete event flow specifications
-- **[Dataset Generation Guide](./dataset-generation-guide.md)** - Complete workflow for generating final_dataset.json
-- [Integration Exam Research](./integration_exam_research.md) - Background research
-
-For questions or support, please open an issue on GitHub.
+- **[Event Flow Definition](./event-flows.yaml)** - Event flow specifications
+- **[Dataset Generation Guide](./dataset-generation-guide.md)** - Dataset workflow
+- [TODO.md](../TODO.md) - Current priorities and critical issues
 
 ---
 
-## 📋 Quick Start for New Developers
-
-### Architecture Status
-- **Domain Layer**: Complete with 4 bounded contexts, User context in development
-- **Infrastructure**: EventBus, database, repositories working correctly  
-- **Application Layer**: Thin coordinators with proper DDD separation (Phase 4.1 ✅ Complete)
-- **CQRS Structure**: Commands, queries, events, workflows properly organized
-- **Terminal UI**: Complete Rich/Textual implementation (Phase 5 ✅ Complete)
-- **Event Flow System**: Explicit YAML definition created, validation engine planned
-- **Quality Assurance**: 416+ tests passing, all linting and type checks green
-- **Current Phase**: User Configuration & Event Flow DAG (Phase 6) - in progress
-
-### For Different Developer Roles
-- **New Contributors**: Focus on user configuration domain and event flow validation
-- **Domain Developers**: Implement User bounded context, extend event flow system
-- **UI Developers**: Add settings screens and first-time setup wizard to terminal UI
-- **Platform Developers**: Use event flow YAML for mobile/desktop/web implementations
-- **Algorithm Developers**: FSRS implementation complete, ready for user preference integration
-
-### Current Development Priorities
-1. **User Configuration Domain**: Create UserSettings aggregate and domain services
-2. **Developer Mode Control**: Implement access restrictions for Gemini services
-3. **Event Flow Validation**: Build DAG validation engine from YAML definitions
-4. **Settings UI**: Add configuration screens to terminal interface
-5. **Cross-Platform Events**: Ensure event flows work across all target platforms
-
----
-
-**Last Updated**: June 17, 2025 - Phase 7 Complete: PRODUCTION READY with Comprehensive Performance Metrics
+This guide provides the foundation for maintaining clean CQRS/DDD architecture. Always refer to failing architecture tests in TODO.md for current issues that need addressing.

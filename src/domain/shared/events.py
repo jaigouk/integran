@@ -8,10 +8,40 @@ for optimal performance in local-first applications.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
-from src.infrastructure.messaging.enhanced_event_bus import DomainEvent
+
+class DomainEvent:
+    """Base class for all domain events.
+
+    All domain events must inherit from this class and will automatically
+    get an event_id and occurred_at timestamp.
+
+    Note: This is not a dataclass to avoid issues with inheritance
+    when child classes have required fields.
+    """
+
+    def __init__(self, event_id: str = "", occurred_at: datetime | None = None):
+        """Initialize domain event with auto-generated ID and timestamp.
+
+        Args:
+            event_id: Unique event identifier (auto-generated if empty)
+            occurred_at: Event timestamp (auto-generated if None)
+        """
+        self.event_id = event_id or str(uuid4())
+        self.occurred_at = occurred_at or datetime.now(UTC)
+
+    def __str__(self) -> str:
+        """Return string representation of the event."""
+        return f"{self.__class__.__name__}(event_id={self.event_id})"
+
+    @property
+    def event_name(self) -> str:
+        """Get the event name for flow orchestration."""
+        return self.__class__.__name__
+
 
 # =============================================================================
 # Learning Context Events

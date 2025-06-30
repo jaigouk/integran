@@ -98,6 +98,7 @@ class SessionProgressWidget(EventAwareWidget):
 
     async def setup_event_subscriptions(self) -> None:
         """Setup event subscriptions for this widget."""
+        # Domain events are part of the shared kernel and can be imported
         from src.domain.shared.events import (
             CardScheduledEvent,
             SessionCompletedEvent,
@@ -550,36 +551,14 @@ class SessionScreen(Screen):
         logger.info(f"Starting {self.practice_mode} session")
 
         try:
-            # Create session configuration based on practice mode
-            from src.domain.learning.services.complete_learning_session import (
-                SessionConfig,
-                SessionType,
+            # Create session through application layer command
+            # The practice mode will be handled by the session workflow
+
+            # For now, we'll use the workflow directly since it handles the session creation
+            # In a full CQRS implementation, this would go through a command handler
+            result = await self.session_workflow.start_session(
+                practice_mode=self.practice_mode, max_questions=20, user_id=1
             )
-
-            # Map practice mode to session type
-            session_type_map = {
-                "review": SessionType.REVIEW,
-                "learn": SessionType.LEARN,
-                "random": SessionType.MIXED,
-                "quiz": SessionType.QUIZ,
-                "weak": SessionType.WEAK_FOCUS,
-            }
-
-            session_type = session_type_map.get(self.practice_mode, SessionType.MIXED)
-
-            # Create session configuration
-            config = SessionConfig(
-                session_type=session_type,
-                max_reviews=20,  # Reasonable session size
-                max_new_cards=10,
-                target_retention=0.9,
-                time_limit_minutes=30,  # 30 minute sessions
-                categories=None,  # Use all categories
-                shuffle_questions=True,
-            )
-
-            # Start session using workflow
-            result = await self.session_workflow.start_session(config, user_id=1)
 
             if result["success"]:
                 self.session_active = True
@@ -604,7 +583,7 @@ class SessionScreen(Screen):
                 start_button.disabled = True
 
                 self.notify(
-                    f"Started {session_type.value} session with {len(self.session_questions)} questions"
+                    f"Started {self.practice_mode} session with {len(self.session_questions)} questions"
                 )
             else:
                 self.notify("Failed to start session", severity="error")

@@ -6,7 +6,6 @@ import logging
 
 from src.application.events import EventHandler
 from src.domain.content.events.content_events import BatchContentProcessedEvent
-from src.infrastructure.database.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +13,8 @@ logger = logging.getLogger(__name__)
 class ContentProcessedHandler(EventHandler[BatchContentProcessedEvent]):
     """Handles content processing events for progress tracking and notifications."""
 
-    def __init__(self, db_manager: DatabaseManager):
-        self.db_manager = db_manager
+    def __init__(self) -> None:
+        pass
 
     async def handle(self, event: BatchContentProcessedEvent) -> None:
         """Handle batch content processed event."""

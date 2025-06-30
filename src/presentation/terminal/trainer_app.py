@@ -15,7 +15,8 @@ from src.application.queries.get_session_progress_query import (
     GetSessionProgressQueryHandler,
 )
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
-from src.domain.analytics.services.analyze_performance import ProgressAnalytics
+
+# Analytics is now accessed through application layer queries
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareApp
 from src.presentation.terminal.progress_view import ProgressScreen
@@ -79,7 +80,7 @@ class MainMenuScreen(Screen):
         ("1", "random_practice", "Random Practice"),
         ("2", "sequential_practice", "Sequential Practice"),
         ("3", "category_practice", "Category Practice"),
-        ("4", "review_practice", "Review Failed"),
+        ("4", "failed_practice", "Review Failed"),
         ("5", "images_practice", "Image Questions"),
         ("s", "show_stats", "Statistics"),
         ("t", "show_settings", "Settings"),
@@ -102,7 +103,7 @@ class MainMenuScreen(Screen):
                         "2. Sequential Practice", id="sequential", variant="success"
                     ),
                     Button("3. Category Practice", id="category", variant="warning"),
-                    Button("4. Review Failed Questions", id="review", variant="error"),
+                    Button("4. Review Failed Questions", id="failed", variant="error"),
                     Button("5. Image Questions Only", id="images", variant="primary"),
                     Button("Statistics & Progress", id="stats", variant="default"),
                     Button("Settings", id="settings", variant="default"),
@@ -160,11 +161,11 @@ class MainMenuScreen(Screen):
         )
         self.app.push_screen(practice_screen)
 
-    @on(Button.Pressed, "#review")
-    def action_review_practice(self) -> None:
+    @on(Button.Pressed, "#failed")
+    def action_failed_practice(self) -> None:
         """Review failed questions."""
         practice_screen = PracticeScreen(
-            practice_mode="review",
+            practice_mode="failed",
             user_repository=self.app.user_repository,
             submit_answer_command_handler=self.app.container.get_submit_answer_command_handler()
             if hasattr(self.app, "container")
@@ -197,6 +198,9 @@ class MainMenuScreen(Screen):
             learning_stats_query_handler=self.app.container.get_learning_stats_query_handler()
             if hasattr(self.app, "container")
             else None,
+            fsrs_analytics_query_handler=self.app.container.get_fsrs_analytics_query_handler()
+            if hasattr(self.app, "container")
+            else None,
             reset_command_handler=self.app.container.get_reset_progress_command_handler()
             if hasattr(self.app, "container")
             else None,
@@ -212,7 +216,9 @@ class MainMenuScreen(Screen):
         """Show settings screen (keyboard shortcut 't')."""
         settings_screen = SettingsScreen(
             event_bus=self.app.event_bus,
-            user_repository=self.app.user_repository,
+            load_user_settings_query_handler=self.app.container.get_load_user_settings_query_handler(),
+            save_user_settings_command_handler=self.app.container.get_save_user_settings_command_handler(),
+            toggle_developer_mode_command_handler=self.app.container.get_toggle_developer_mode_command_handler(),
         )
         self.app.push_screen(settings_screen)
 
@@ -305,7 +311,6 @@ class TrainerApp(EventAwareApp):
         event_bus: EventBus,
         session_workflow: SessionWorkflow,
         query_service: GetSessionProgressQueryHandler,
-        analytics_service: ProgressAnalytics,
         user_repository=None,
         container=None,
         **kwargs: Any,
@@ -318,7 +323,6 @@ class TrainerApp(EventAwareApp):
 
         self.session_workflow = session_workflow
         self.query_service = query_service
-        self.analytics_service = analytics_service
         self.user_repository = user_repository
         self.container = container  # Store the container for service access
 
@@ -328,6 +332,7 @@ class TrainerApp(EventAwareApp):
 
     async def setup_event_handlers(self) -> None:
         """Setup global event handlers for the app."""
+        # Domain events are part of the shared kernel and can be imported
         from src.domain.shared.events import CardScheduledEvent, LeechDetectedEvent
 
         # Subscribe to card scheduled events for UI updates

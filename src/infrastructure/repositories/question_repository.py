@@ -55,6 +55,35 @@ class SQLAlchemyQuestionRepository(QuestionRepository):
 
         return await self._run_in_executor(_get_image_questions)
 
+    async def get_questions_by_state(self, state: str | None = None) -> list[Question]:
+        """Get questions filtered by federal state.
+
+        Args:
+            state: Federal state name (e.g., "Baden-Württemberg").
+                  If None, returns general questions (no state restriction).
+
+        Returns:
+            List of questions for the specified state or general questions.
+        """
+
+        def _get_questions_by_state() -> list[Question]:
+            with self.db_manager.get_session() as session:
+                if state is None:
+                    # Return general questions (where state is null or question_type is 'general')
+                    return (
+                        session.query(Question)
+                        .filter(
+                            (Question.state.is_(None))
+                            | (Question.question_type == "general")
+                        )
+                        .all()
+                    )
+                else:
+                    # Return questions for specific state
+                    return session.query(Question).filter(Question.state == state).all()
+
+        return await self._run_in_executor(_get_questions_by_state)
+
     async def save_question(self, question: Question) -> Question:
         """Save or update a question."""
 
@@ -93,3 +122,88 @@ class SQLAlchemyQuestionRepository(QuestionRepository):
                     return question
 
         return await self._run_in_executor(_save_question)
+
+    async def get_questions_for_active_learning(
+        self,
+        user_id: int = 1,
+        desired_retention: float = 0.90,  # noqa: ARG002
+        stability_threshold: int = 30,
+        retrievability_threshold: float = 0.9,
+        include_leeches: bool = True,
+        limit: int = 100,
+    ) -> list[Question]:
+        """Get questions that need active learning (excludes well-mastered questions)."""
+
+        def _get_questions_for_active_learning() -> list[Question]:
+            with self.db_manager.get_session() as session:
+                import math
+                from datetime import UTC, datetime
+
+                from src.domain.learning.models.learning_models import FSRSCard
+                from src.domain.shared.models import FSRSState
+
+                now = datetime.now(UTC).timestamp()
+                results = []
+
+                # Get all questions
+                all_questions = session.query(Question).all()
+
+                for question in all_questions:
+                    # Look up FSRS card for this question
+                    fsrs_card = (
+                        session.query(FSRSCard)
+                        .filter(
+                            FSRSCard.question_id == question.id,
+                            FSRSCard.user_id == user_id,
+                        )
+                        .first()
+                    )
+
+                    # If no FSRS card exists, this is a NEW question - include it
+                    if fsrs_card is None:
+                        results.append((question, 0))  # Priority 0 = highest (NEW)
+                        continue
+
+                    # Calculate current retrievability
+                    if fsrs_card.last_review_date and fsrs_card.stability > 0:
+                        elapsed_days = (now - fsrs_card.last_review_date) / 86400
+                        retrievability = math.exp(-elapsed_days / fsrs_card.stability)
+                    else:
+                        retrievability = 1.0
+
+                    # Check if question should be excluded (well-mastered)
+                    if (
+                        fsrs_card.stability > stability_threshold
+                        and retrievability > retrievability_threshold
+                        and fsrs_card.state == FSRSState.REVIEW.value
+                    ):
+                        continue  # Skip well-mastered questions
+
+                    # Include leeches if enabled
+                    if include_leeches and fsrs_card.lapse_count >= 8:
+                        results.append((question, 1))  # Priority 1 = high (LEECHES)
+                        continue
+
+                    # Include questions in learning states
+                    if fsrs_card.state in [
+                        FSRSState.NEW.value,
+                        FSRSState.LEARNING.value,
+                    ]:
+                        results.append((question, 1))  # Priority 1 = high
+                        continue
+
+                    # Include relearning questions
+                    if fsrs_card.state == FSRSState.RELEARNING.value:
+                        results.append((question, 2))  # Priority 2 = medium
+                        continue
+
+                    # Include due review questions
+                    if fsrs_card.next_review_date <= now:
+                        results.append((question, 3))  # Priority 3 = low
+                        continue
+
+                # Sort by priority (lower number = higher priority) and limit
+                results.sort(key=lambda x: x[1])
+                return [question for question, _ in results[:limit]]
+
+        return await self._run_in_executor(_get_questions_for_active_learning)

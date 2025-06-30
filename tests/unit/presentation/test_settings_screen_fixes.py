@@ -4,6 +4,15 @@ from unittest.mock import Mock
 
 import pytest
 
+from src.application.commands.save_user_settings_command import (
+    SaveUserSettingsCommandHandler,
+)
+from src.application.commands.toggle_developer_mode_command import (
+    ToggleDeveloperModeCommandHandler,
+)
+from src.application.queries.load_user_settings_query import (
+    LoadUserSettingsQueryHandler,
+)
 from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.settings_view import SettingsScreen
@@ -24,6 +33,21 @@ class TestSettingsScreenFixes:
         return Mock(spec=UserSettingsRepository)
 
     @pytest.fixture
+    def mock_load_user_settings_handler(self):
+        """Create a mock load user settings query handler."""
+        return Mock(spec=LoadUserSettingsQueryHandler)
+
+    @pytest.fixture
+    def mock_save_user_settings_handler(self):
+        """Create a mock save user settings command handler."""
+        return Mock(spec=SaveUserSettingsCommandHandler)
+
+    @pytest.fixture
+    def mock_toggle_developer_mode_handler(self):
+        """Create a mock toggle developer mode command handler."""
+        return Mock(spec=ToggleDeveloperModeCommandHandler)
+
+    @pytest.fixture
     def mock_app(self, mock_event_bus, mock_user_repository):
         """Create a mock app with event bus and user repository."""
         app = Mock()
@@ -33,33 +57,53 @@ class TestSettingsScreenFixes:
         return app
 
     def test_settings_screen_constructor_accepts_required_parameters(
-        self, mock_event_bus, mock_user_repository
+        self,
+        mock_event_bus,
+        mock_load_user_settings_handler,
+        mock_save_user_settings_handler,
+        mock_toggle_developer_mode_handler,
     ):
         """Test that SettingsScreen constructor accepts required parameters."""
         # Arrange & Act
         screen = SettingsScreen(
             event_bus=mock_event_bus,
-            user_repository=mock_user_repository,
+            load_user_settings_query_handler=mock_load_user_settings_handler,
+            save_user_settings_command_handler=mock_save_user_settings_handler,
+            toggle_developer_mode_command_handler=mock_toggle_developer_mode_handler,
         )
 
         # Assert
         assert screen.event_bus is mock_event_bus
-        assert screen.user_repository is mock_user_repository
+        assert (
+            screen.load_user_settings_query_handler is mock_load_user_settings_handler
+        )
+        assert (
+            screen.save_user_settings_command_handler is mock_save_user_settings_handler
+        )
+        assert (
+            screen.toggle_developer_mode_command_handler
+            is mock_toggle_developer_mode_handler
+        )
 
     def test_settings_screen_constructor_fails_without_event_bus(
-        self, mock_user_repository
+        self,
+        mock_load_user_settings_handler,
+        mock_save_user_settings_handler,
+        mock_toggle_developer_mode_handler,
     ):
         """Test that SettingsScreen constructor fails without event_bus."""
         # Arrange & Act & Assert
         with pytest.raises(TypeError, match="missing.*required.*event_bus"):
-            SettingsScreen(user_repository=mock_user_repository)
+            SettingsScreen(
+                load_user_settings_query_handler=mock_load_user_settings_handler,
+                save_user_settings_command_handler=mock_save_user_settings_handler,
+                toggle_developer_mode_command_handler=mock_toggle_developer_mode_handler,
+            )
 
-    def test_settings_screen_constructor_fails_without_user_repository(
-        self, mock_event_bus
-    ):
-        """Test that SettingsScreen constructor fails without user_repository."""
+    def test_settings_screen_constructor_fails_without_handlers(self, mock_event_bus):
+        """Test that SettingsScreen constructor fails without required handlers."""
         # Arrange & Act & Assert
-        with pytest.raises(TypeError, match="missing.*required.*user_repository"):
+        with pytest.raises(TypeError, match="missing.*required"):
             SettingsScreen(event_bus=mock_event_bus)
 
     def test_main_menu_action_show_settings_creates_screen_correctly(self, mock_app):  # noqa: ARG002
@@ -85,13 +129,19 @@ class TestSettingsScreenFixes:
         # The actual behavior requires an app context which is tested in integration tests
 
     def test_settings_screen_composes_settings_widget(
-        self, mock_event_bus, mock_user_repository
+        self,
+        mock_event_bus,
+        mock_load_user_settings_handler,
+        mock_save_user_settings_handler,
+        mock_toggle_developer_mode_handler,
     ):
         """Test that SettingsScreen composes SettingsWidget with correct parameters."""
         # Arrange
         screen = SettingsScreen(
             event_bus=mock_event_bus,
-            user_repository=mock_user_repository,
+            load_user_settings_query_handler=mock_load_user_settings_handler,
+            save_user_settings_command_handler=mock_save_user_settings_handler,
+            toggle_developer_mode_command_handler=mock_toggle_developer_mode_handler,
         )
 
         # Act
@@ -102,7 +152,7 @@ class TestSettingsScreenFixes:
         settings_widget = composed_widgets[0]
         # Verify it's a SettingsWidget with correct parameters
         assert hasattr(settings_widget, "event_bus")
-        assert hasattr(settings_widget, "user_repository")
+        assert hasattr(settings_widget, "load_user_settings_query_handler")
 
 
 class TestMainMenuScreenActions:
@@ -126,7 +176,8 @@ class TestMainMenuScreenActions:
             "action_random_practice",
             "action_sequential_practice",
             "action_category_practice",
-            "action_review_practice",
+            "action_failed_practice",
+            "action_images_practice",
             "action_show_stats",
             "action_show_settings",
             "action_confirm_quit",
@@ -147,7 +198,8 @@ class TestMainMenuScreenActions:
             ("action_random_practice", "random"),
             ("action_sequential_practice", "sequential"),
             ("action_category_practice", "category"),
-            ("action_review_practice", "review"),
+            ("action_failed_practice", "failed"),
+            ("action_images_practice", "images"),
         ]
 
         for action_name, _expected_mode in practice_actions:

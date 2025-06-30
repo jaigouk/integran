@@ -50,14 +50,14 @@ class TestPracticeMode:
         assert PracticeMode.RANDOM == "random"
         assert PracticeMode.SEQUENTIAL == "sequential"
         assert PracticeMode.CATEGORY == "category"
-        assert PracticeMode.REVIEW == "review"
+        assert PracticeMode.FAILED == "failed"
 
     def test_practice_mode_membership(self):
         """Test practice mode enum membership."""
         assert "random" in PracticeMode
         assert "sequential" in PracticeMode
         assert "category" in PracticeMode
-        assert "review" in PracticeMode
+        assert "failed" in PracticeMode
         assert "invalid" not in PracticeMode
 
     def test_practice_mode_iteration(self):
@@ -67,7 +67,7 @@ class TestPracticeMode:
         assert PracticeMode.RANDOM in values
         assert PracticeMode.SEQUENTIAL in values
         assert PracticeMode.CATEGORY in values
-        assert PracticeMode.REVIEW in values
+        assert PracticeMode.FAILED in values
         assert PracticeMode.IMAGES in values
 
 

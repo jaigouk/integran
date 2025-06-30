@@ -506,3 +506,283 @@ class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
                 return result
 
         return await asyncio.get_event_loop().run_in_executor(None, _execute)
+
+    async def get_fsrs_card_statistics(self, user_id: int) -> dict[str, Any]:
+        """Get FSRS card state distribution statistics."""
+
+        def _execute():
+            with self._db_manager.get_session() as session:
+                # Query FSRS cards for state distribution
+                fsrs_query = session.query(FSRSCard).filter_by(user_id=user_id)
+
+                total_cards = fsrs_query.count()
+                new_cards = fsrs_query.filter(FSRSCard.state == 0).count()  # New
+                learning_cards = fsrs_query.filter(
+                    FSRSCard.state == 1
+                ).count()  # Learning
+                review_cards = fsrs_query.filter(FSRSCard.state == 2).count()  # Review
+                relearning_cards = fsrs_query.filter(
+                    FSRSCard.state == 3
+                ).count()  # Relearning
+
+                return {
+                    "total_cards": total_cards,
+                    "new_cards": new_cards,
+                    "learning_cards": learning_cards,
+                    "review_cards": review_cards,
+                    "relearning_cards": relearning_cards,
+                }
+
+        return await asyncio.get_event_loop().run_in_executor(None, _execute)
+
+    async def get_stability_distribution(self, user_id: int) -> dict[str, Any]:
+        """Get stability distribution for FSRS cards."""
+
+        def _execute():
+            with self._db_manager.get_session() as session:
+                # Query FSRS cards with stability data
+                cards = session.query(FSRSCard).filter_by(user_id=user_id).all()
+
+                if not cards:
+                    return {
+                        "below_7_days": 0,
+                        "7_to_30_days": 0,
+                        "30_to_90_days": 0,
+                        "above_90_days": 0,
+                        "average_stability": 0.0,
+                        "median_stability": 0.0,
+                    }
+
+                # Categorize by stability ranges
+                below_7 = sum(1 for card in cards if card.stability < 7.0)
+                days_7_to_30 = sum(1 for card in cards if 7.0 <= card.stability < 30.0)
+                days_30_to_90 = sum(
+                    1 for card in cards if 30.0 <= card.stability < 90.0
+                )
+                above_90 = sum(1 for card in cards if card.stability >= 90.0)
+
+                # Calculate average and median
+                stabilities: list[float] = [float(card.stability) for card in cards]
+                average_stability = sum(stabilities) / len(stabilities)
+                sorted_stabilities = sorted(stabilities)
+                median_stability = sorted_stabilities[len(sorted_stabilities) // 2]
+
+                return {
+                    "below_7_days": below_7,
+                    "7_to_30_days": days_7_to_30,
+                    "30_to_90_days": days_30_to_90,
+                    "above_90_days": above_90,
+                    "average_stability": round(average_stability, 2),
+                    "median_stability": round(median_stability, 2),
+                }
+
+        return await asyncio.get_event_loop().run_in_executor(None, _execute)
+
+    async def get_retrievability_distribution(self, user_id: int) -> dict[str, Any]:
+        """Get retrievability distribution for FSRS cards."""
+
+        def _execute():
+            import math
+            from datetime import UTC, datetime
+
+            with self._db_manager.get_session() as session:
+                # Query FSRS cards with retrievability calculation
+                cards = session.query(FSRSCard).filter_by(user_id=user_id).all()
+
+                if not cards:
+                    return {
+                        "below_80_percent": 0,
+                        "80_to_90_percent": 0,
+                        "above_90_percent": 0,
+                        "average_retrievability": 0.0,
+                        "due_today": 0,
+                    }
+
+                now = datetime.now(UTC).timestamp()
+                retrievabilities = []
+                due_today = 0
+
+                for card in cards:
+                    # Calculate current retrievability
+                    if card.last_review_date and card.stability > 0:
+                        elapsed_days = (now - card.last_review_date) / 86400
+                        retrievability = math.exp(-elapsed_days / card.stability)
+                    else:
+                        retrievability = 1.0
+
+                    retrievabilities.append(retrievability)
+
+                    # Check if due today
+                    if card.next_review_date <= now:
+                        due_today += 1
+
+                # Categorize by retrievability ranges
+                below_80 = sum(1 for r in retrievabilities if r < 0.8)
+                from_80_to_90 = sum(1 for r in retrievabilities if 0.8 <= r < 0.9)
+                above_90 = sum(1 for r in retrievabilities if r >= 0.9)
+
+                average_retrievability = sum(retrievabilities) / len(retrievabilities)
+
+                return {
+                    "below_80_percent": below_80,
+                    "80_to_90_percent": from_80_to_90,
+                    "above_90_percent": above_90,
+                    "average_retrievability": round(average_retrievability, 3),
+                    "due_today": due_today,
+                }
+
+        return await asyncio.get_event_loop().run_in_executor(None, _execute)
+
+    async def get_leech_statistics(self, user_id: int) -> dict[str, Any]:
+        """Get leech card statistics and analysis."""
+
+        def _execute():
+            with self._db_manager.get_session() as session:
+                from src.domain.content.models.question_models import Question
+
+                # Query cards with high lapse counts (leeches)
+                leech_threshold = 8
+                leech_cards = (
+                    session.query(FSRSCard)
+                    .filter_by(user_id=user_id)
+                    .filter(FSRSCard.lapse_count >= leech_threshold)
+                    .all()
+                )
+
+                if not leech_cards:
+                    return {
+                        "total_leeches": 0,
+                        "leeches_by_category": {},
+                        "average_lapses": 0.0,
+                        "most_difficult": [],
+                    }
+
+                # Get question details for leeches
+                leech_question_ids = [card.question_id for card in leech_cards]
+                questions = (
+                    session.query(Question)
+                    .filter(Question.id.in_(leech_question_ids))
+                    .all()
+                )
+
+                # Group by category
+                leeches_by_category = {}
+                for question in questions:
+                    category = question.category or "Unknown"
+                    leeches_by_category[category] = (
+                        leeches_by_category.get(category, 0) + 1
+                    )
+
+                # Calculate average lapses
+                average_lapses = sum(card.lapse_count for card in leech_cards) / len(
+                    leech_cards
+                )
+
+                # Get most difficult questions (highest lapse count)
+                most_difficult = []
+                sorted_cards = sorted(
+                    leech_cards, key=lambda c: c.lapse_count, reverse=True
+                )
+                for card in sorted_cards[:5]:  # Top 5 most difficult
+                    question = next(
+                        (q for q in questions if q.id == card.question_id), None
+                    )
+                    if question:
+                        most_difficult.append(
+                            {
+                                "question_id": question.id,
+                                "question_text": question.question[:100] + "..."
+                                if len(question.question) > 100
+                                else question.question,
+                                "category": question.category,
+                                "lapse_count": card.lapse_count,
+                                "stability": round(card.stability, 2),
+                            }
+                        )
+
+                return {
+                    "total_leeches": len(leech_cards),
+                    "leeches_by_category": leeches_by_category,
+                    "average_lapses": round(average_lapses, 1),
+                    "most_difficult": most_difficult,
+                }
+
+        return await asyncio.get_event_loop().run_in_executor(None, _execute)
+
+    async def get_performance_trends(self, user_id: int) -> dict[str, Any]:
+        """Get FSRS performance trends over time."""
+
+        def _execute():
+            with self._db_manager.get_session() as session:
+                from src.domain.learning.models.learning_models import ReviewHistory
+
+                # Calculate time windows
+                now = datetime.now(UTC)
+                week_ago = now - timedelta(days=7)
+                month_ago = now - timedelta(days=30)
+
+                # Query review history for trends - join with FSRSCard to access user_id
+                reviews_7_days = (
+                    session.query(ReviewHistory)
+                    .join(FSRSCard)
+                    .filter(
+                        FSRSCard.user_id == user_id,
+                        ReviewHistory.review_date >= week_ago.timestamp(),
+                    )
+                    .all()
+                )
+
+                reviews_30_days = (
+                    session.query(ReviewHistory)
+                    .join(FSRSCard)
+                    .filter(
+                        FSRSCard.user_id == user_id,
+                        ReviewHistory.review_date >= month_ago.timestamp(),
+                    )
+                    .all()
+                )
+
+                # Calculate retention rates
+                retention_7_days = 0.0
+                if reviews_7_days:
+                    correct_7_days = sum(
+                        1 for r in reviews_7_days if r.rating >= 3
+                    )  # Good or better
+                    retention_7_days = (correct_7_days / len(reviews_7_days)) * 100
+
+                retention_30_days = 0.0
+                if reviews_30_days:
+                    correct_30_days = sum(1 for r in reviews_30_days if r.rating >= 3)
+                    retention_30_days = (correct_30_days / len(reviews_30_days)) * 100
+
+                # Calculate interval growth (simplified)
+                interval_growth = 1.5  # Default growth factor
+
+                # Count cards graduated (moved from Learning to Review state)
+                cards_graduated_week = 0
+                cards_graduated_month = 0
+
+                # Query FSRS cards that graduated recently
+                graduated_cards = (
+                    session.query(FSRSCard)
+                    .filter_by(user_id=user_id, state=2)  # Review state
+                    .all()
+                )
+
+                for card in graduated_cards:
+                    if card.last_review_date:
+                        last_review = datetime.fromtimestamp(card.last_review_date, UTC)
+                        if last_review >= week_ago:
+                            cards_graduated_week += 1
+                        if last_review >= month_ago:
+                            cards_graduated_month += 1
+
+                return {
+                    "retention_7_days": round(retention_7_days, 1),
+                    "retention_30_days": round(retention_30_days, 1),
+                    "interval_growth": round(interval_growth, 2),
+                    "graduated_week": cards_graduated_week,
+                    "graduated_month": cards_graduated_month,
+                }
+
+        return await asyncio.get_event_loop().run_in_executor(None, _execute)
