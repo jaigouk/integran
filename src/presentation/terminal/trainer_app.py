@@ -17,7 +17,7 @@ from src.application.queries.get_session_progress_query import (
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
 
 # Analytics is now accessed through application layer queries
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.domain.shared.services import EventBusInterface
 from src.presentation.terminal.base import EventAwareApp
 from src.presentation.terminal.progress_view import ProgressScreen
 from src.presentation.terminal.question_view import PracticeScreen
@@ -308,7 +308,7 @@ class TrainerApp(EventAwareApp):
 
     def __init__(
         self,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         session_workflow: SessionWorkflow,
         query_service: GetSessionProgressQueryHandler,
         user_repository=None,

@@ -207,7 +207,7 @@ class TestScheduleCardService:
     ) -> None:
         """Test successful card scheduling with FSRS algorithm."""
         # Setup mocks - IMPORTANT: Use AsyncMock for async methods
-        mock_learning_repository.get_fsrs_card = AsyncMock(
+        mock_learning_repository.get_fsrs_card_by_id = AsyncMock(
             return_value=sample_fsrs_card
         )
         mock_learning_repository.save_fsrs_card = AsyncMock(
@@ -241,7 +241,7 @@ class TestScheduleCardService:
         assert result.lapse_count_updated is False
 
         # Verify repository interactions
-        mock_learning_repository.get_fsrs_card.assert_called_once_with(123, user_id=1)
+        mock_learning_repository.get_fsrs_card_by_id.assert_called_once_with(123)
         # save_fsrs_card is only called for new cards, not existing ones
         # For existing cards, the service uses direct db_manager calls (CQRS violation to be fixed)
 
@@ -262,7 +262,7 @@ class TestScheduleCardService:
     ) -> None:
         """Test that lapsed cards (rating=AGAIN) increment lapse count."""
         # Setup mocks for new repository methods
-        mock_learning_repository.get_fsrs_card = AsyncMock(
+        mock_learning_repository.get_fsrs_card_by_id = AsyncMock(
             return_value=sample_fsrs_card
         )
         mock_learning_repository.update_fsrs_card_state = AsyncMock()
@@ -293,7 +293,7 @@ class TestScheduleCardService:
     ) -> None:
         """Test that missing card raises BusinessRuleViolationError."""
         # Setup mock to return None (card not found)
-        mock_learning_repository.get_fsrs_card = AsyncMock(return_value=None)
+        mock_learning_repository.get_fsrs_card_by_id = AsyncMock(return_value=None)
 
         request = ScheduleCardRequest(
             card_id=999,
@@ -350,7 +350,7 @@ class TestScheduleCardService:
     ) -> None:
         """Test FSRS difficulty calculation accuracy."""
         # Setup mocks
-        mock_learning_repository.get_fsrs_card = AsyncMock(
+        mock_learning_repository.get_fsrs_card_by_id = AsyncMock(
             return_value=sample_fsrs_card
         )
         mock_learning_repository.update_fsrs_card_state = AsyncMock()
@@ -396,7 +396,7 @@ class TestScheduleCardService:
     ) -> None:
         """Test FSRS stability calculation for different ratings."""
         # Setup mocks
-        mock_learning_repository.get_fsrs_card = AsyncMock(
+        mock_learning_repository.get_fsrs_card_by_id = AsyncMock(
             return_value=sample_fsrs_card
         )
         mock_learning_repository.update_fsrs_card_state = AsyncMock()
@@ -440,7 +440,7 @@ class TestScheduleCardService:
         new_card.lapse_count = 0
 
         # Setup mocks
-        mock_learning_repository.get_fsrs_card = AsyncMock(return_value=new_card)
+        mock_learning_repository.get_fsrs_card_by_id = AsyncMock(return_value=new_card)
         mock_learning_repository.update_fsrs_card_state = AsyncMock()
         mock_learning_repository.record_review_history = AsyncMock()
         mock_learning_repository.increment_lapse_count = AsyncMock()
@@ -500,7 +500,7 @@ class TestScheduleCardService:
     ) -> None:
         """Test that CardScheduledEvent is published with correct data."""
         # Setup mocks
-        mock_learning_repository.get_fsrs_card = AsyncMock(
+        mock_learning_repository.get_fsrs_card_by_id = AsyncMock(
             return_value=sample_fsrs_card
         )
         mock_learning_repository.update_fsrs_card_state = AsyncMock()
@@ -539,7 +539,7 @@ class TestScheduleCardService:
     ) -> None:
         """Test that database errors are handled gracefully."""
         # Setup mocks with database error in repository method
-        mock_learning_repository.get_fsrs_card = AsyncMock(
+        mock_learning_repository.get_fsrs_card_by_id = AsyncMock(
             return_value=sample_fsrs_card
         )
         mock_learning_repository.update_fsrs_card_state = AsyncMock(
@@ -573,7 +573,7 @@ class TestScheduleCardService:
         """Test service performance with large stability values."""
         # Setup card with very high stability
         sample_fsrs_card.stability = 365.0  # 1 year stability
-        mock_learning_repository.get_fsrs_card = AsyncMock(
+        mock_learning_repository.get_fsrs_card_by_id = AsyncMock(
             return_value=sample_fsrs_card
         )
         mock_learning_repository.update_fsrs_card_state = AsyncMock()

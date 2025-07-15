@@ -261,6 +261,7 @@ class TestDomainServicePatterns:
                     "toggle",
                     "enhance",
                     "display",
+                    "submit",
                 ]
 
                 has_action_verb = any(verb in service_name for verb in action_verbs)

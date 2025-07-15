@@ -19,6 +19,11 @@ from src.domain.shared.repositories import (
     LearningRepository,
     QuestionRepository,
 )
+from src.domain.shared.services import (
+    DomainService,
+    EventBusInterface,
+    ValidationError,
+)
 
 
 class InterleavingStrategy(str, Enum):
@@ -77,8 +82,166 @@ class InterleavingSession:
     adaptation_history: list[str] = field(default_factory=list)
 
 
+@dataclass
+class OptimizeInterleavingRequest:
+    """Request to optimize interleaving for a session."""
+
+    user_id: int
+    target_questions: int = 20
+    categories: list[str] | None = None
+    strategy: InterleavingStrategy = InterleavingStrategy.CATEGORY_ROUND_ROBIN
+    force_analysis: bool = False
+
+
+@dataclass
+class OptimizeInterleavingResult:
+    """Result of interleaving optimization."""
+
+    success: bool
+    session: InterleavingSession | None = None
+    analysis: dict[str, Any] | None = None
+    error_message: str | None = None
+
+
+class OptimizeInterleaving(
+    DomainService[OptimizeInterleavingRequest, OptimizeInterleavingResult]
+):
+    """Domain service to optimize interleaving practice following DDD patterns."""
+
+    def __init__(
+        self,
+        analytics_repository: AnalyticsRepository,
+        learning_repository: LearningRepository,
+        question_repository: QuestionRepository,
+        event_bus: EventBusInterface,
+    ):
+        """Initialize with repositories and event bus."""
+        super().__init__(event_bus)
+        self.analytics_repository = analytics_repository
+        self.learning_repository = learning_repository
+        self.question_repository = question_repository
+
+        # Initialize the legacy manager for business logic
+        self._manager = InterleavingManager(
+            analytics_repository=analytics_repository,
+            learning_repository=learning_repository,
+            question_repository=question_repository,
+        )
+
+    async def call(
+        self, request: OptimizeInterleavingRequest
+    ) -> OptimizeInterleavingResult:
+        """Optimize interleaving practice and return session or analysis."""
+        try:
+            # Validate request
+            if not self._validate_request(request):
+                raise ValidationError("Invalid optimize interleaving request")
+
+            # Create default config for the strategy
+            config = InterleavingConfig(
+                strategy=request.strategy,
+                difficulty_balance=DifficultyBalance.MIXED,
+                category_weights={},
+            )
+
+            # Create interleaved session using the manager
+            session = await self._manager.create_interleaved_session(
+                user_id=request.user_id,
+                config=config,
+                target_questions=request.target_questions,
+                categories=request.categories,
+            )
+
+            # Get analysis if requested
+            analysis = None
+            if request.force_analysis:
+                analysis = await self._manager.analyze_interleaving_effectiveness(
+                    user_id=request.user_id
+                )
+
+            # Publish domain events
+            await self._publish_interleaving_session_created_event(request, session)
+            await self._publish_interleaving_optimized_event(request, session, analysis)
+
+            return OptimizeInterleavingResult(
+                success=True,
+                session=session,
+                analysis=analysis,
+            )
+
+        except Exception as e:
+            return OptimizeInterleavingResult(
+                success=False,
+                error_message=f"Failed to optimize interleaving: {e}",
+            )
+
+    def _validate_request(self, request: OptimizeInterleavingRequest) -> bool:
+        """Validate the optimize interleaving request."""
+        return (
+            request.user_id > 0
+            and request.target_questions > 0
+            and request.target_questions <= 100
+        )
+
+    async def _publish_interleaving_optimized_event(
+        self,
+        request: OptimizeInterleavingRequest,
+        session: InterleavingSession,
+        analysis: dict[str, Any] | None,
+    ) -> None:
+        """Publish InterleavingOptimizedEvent."""
+        # Import here to avoid circular imports
+        from src.domain.analytics.events.analytics_events import (
+            InterleavingOptimizedEvent,
+        )
+
+        # Calculate category distribution
+        category_distribution = {}
+        for question, _ in session.question_sequence:
+            category = str(question.category)
+            category_distribution[category] = category_distribution.get(category, 0) + 1
+
+        event = InterleavingOptimizedEvent(
+            user_id=request.user_id,
+            session_id=session.session_id,
+            strategy=request.strategy.value,
+            questions_optimized=len(session.question_sequence),
+            category_distribution=category_distribution,
+            estimated_effectiveness=analysis.get("improvement_factor", 0.75)
+            if analysis
+            else 0.75,
+            optimization_duration_ms=100,  # Simplified - could be measured
+        )
+        await self.event_bus.publish(event)
+
+    async def _publish_interleaving_session_created_event(
+        self,
+        request: OptimizeInterleavingRequest,
+        session: InterleavingSession,
+    ) -> None:
+        """Publish InterleavingSessionCreatedEvent."""
+        # Import here to avoid circular imports
+        from src.domain.analytics.events.analytics_events import (
+            InterleavingSessionCreatedEvent,
+        )
+
+        event = InterleavingSessionCreatedEvent(
+            user_id=request.user_id,
+            session_id=session.session_id,
+            strategy=request.strategy.value,
+            target_questions=request.target_questions,
+            categories_included=request.categories or [],
+            difficulty_balance=session.config.difficulty_balance.value,
+            estimated_duration_minutes=request.target_questions
+            * 30
+            // 60,  # ~30 seconds per question
+        )
+        await self.event_bus.publish(event)
+
+
+# DEPRECATED: Legacy class - use OptimizeInterleaving domain service instead
 class InterleavingManager:
-    """Advanced interleaved practice management system."""
+    """DEPRECATED: Use OptimizeInterleaving domain service instead."""
 
     def __init__(
         self,

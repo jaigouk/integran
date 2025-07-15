@@ -11,7 +11,7 @@ from textual.screen import Screen
 from textual.widgets import Button, ProgressBar, Static
 
 from src.application.workflows.complete_learning_session_workflow import SessionWorkflow
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.domain.shared.services import EventBusInterface
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import COMMON_CSS_BASE
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class SessionProgressWidget(EventAwareWidget):
     """Widget for displaying rich session progress and analytics."""
 
-    def __init__(self, event_bus: EventBus, **kwargs: Any):
+    def __init__(self, event_bus: EventBusInterface, **kwargs: Any):
         super().__init__(event_bus=event_bus, **kwargs)
         self.questions_answered = 0
         self.total_questions = 0

@@ -21,6 +21,8 @@ from textual.widgets import (
     Switch,
 )
 
+from src.domain.shared.repositories import UserRepository
+from src.domain.shared.services import EventBusInterface
 from src.domain.user.models.user_models import (
     Language,
     SaveUserSettingsRequest,
@@ -30,8 +32,6 @@ from src.domain.user.models.user_models import (
 )
 from src.domain.user.services.load_user_settings import LoadUserSettings
 from src.domain.user.services.save_user_settings import SaveUserSettings
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
-from src.infrastructure.repositories.user_repository import UserSettingsRepository
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import COMMON_CSS_BASE
 
@@ -43,8 +43,8 @@ class FirstTimeSetupWidget(EventAwareWidget):
 
     def __init__(
         self,
-        event_bus: EventBus,
-        user_repository: UserSettingsRepository,
+        event_bus: EventBusInterface,
+        user_repository: UserRepository,
         **kwargs: Any,
     ):
         super().__init__(event_bus=event_bus, **kwargs)
@@ -646,8 +646,8 @@ class FirstTimeSetupScreen(Screen[None]):
 
     def __init__(
         self,
-        event_bus: EventBus,
-        user_repository: UserSettingsRepository,
+        event_bus: EventBusInterface,
+        user_repository: UserRepository,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)

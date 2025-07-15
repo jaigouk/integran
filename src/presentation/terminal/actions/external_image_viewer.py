@@ -160,16 +160,43 @@ class ExternalImageViewer:
         question_id: int,
         question_text: str | None,
     ) -> PILImage.Image:
-        """Create 2x2 grid composite of images."""
+        """Create composite of images with dynamic layout based on image count."""
         # Get max dimensions from actual images
         max_width = max(img.width for img in pil_images)
         max_height = max(img.height for img in pil_images)
+        num_images = len(pil_images)
 
         # Create composite with padding
         padding = 30
         title_height = 80
-        composite_width = max_width * 2 + padding * 3
-        composite_height = max_height * 2 + padding * 3 + title_height
+
+        # Dynamic layout based on number of images
+        if num_images == 1:
+            # Single image: centered, full size
+            composite_width = max_width + padding * 2
+            composite_height = max_height + padding * 2 + title_height
+            positions = [(padding, title_height + padding)]
+        elif num_images == 2:
+            # Two images: horizontal layout
+            composite_width = max_width * 2 + padding * 3
+            composite_height = max_height + padding * 2 + title_height
+            positions = [
+                (padding, title_height + padding),  # A - left
+                (max_width + padding * 2, title_height + padding),  # B - right
+            ]
+        else:
+            # 3 or 4 images: 2x2 grid layout
+            composite_width = max_width * 2 + padding * 3
+            composite_height = max_height * 2 + padding * 3 + title_height
+            positions = [
+                (padding, title_height + padding),  # A - top left
+                (max_width + padding * 2, title_height + padding),  # B - top right
+                (padding, title_height + max_height + padding * 2),  # C - bottom left
+                (
+                    max_width + padding * 2,
+                    title_height + max_height + padding * 2,
+                ),  # D - bottom right
+            ]
 
         composite = PILImage.new("RGB", (composite_width, composite_height), "white")
 
@@ -194,7 +221,9 @@ class ExternalImageViewer:
         )
 
         # Add instruction
-        instruction = "Select the correct image"
+        instruction = (
+            "Select the correct image" if num_images > 1 else "Image for this question"
+        )
         draw.text(
             (composite_width // 2, 50),
             instruction,
@@ -203,17 +232,7 @@ class ExternalImageViewer:
             anchor="mm",
         )
 
-        # Position images in 2x2 grid
-        positions = [
-            (padding, title_height + padding),  # A - top left
-            (max_width + padding * 2, title_height + padding),  # B - top right
-            (padding, title_height + max_height + padding * 2),  # C - bottom left
-            (
-                max_width + padding * 2,
-                title_height + max_height + padding * 2,
-            ),  # D - bottom right
-        ]
-
+        # Position images according to dynamic layout
         for img, pos in zip(pil_images, positions, strict=False):
             composite.paste(img, pos)
 

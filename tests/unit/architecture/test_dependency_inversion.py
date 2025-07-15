@@ -349,10 +349,12 @@ class TestDependencyInjection:
         """Test that application services properly inject dependencies into domain services."""
         # Check command handlers
         from src.application.commands.submit_answer_with_rating_command import (
-            SubmitAnswerWithRatingCommand,
+            SubmitAnswerWithRatingCommandHandler,
         )
 
-        init_signature = inspect.signature(SubmitAnswerWithRatingCommand.__init__)
+        init_signature = inspect.signature(
+            SubmitAnswerWithRatingCommandHandler.__init__
+        )
         parameters = list(init_signature.parameters.keys())
 
         # Should inject repository interfaces and event bus for domain service creation

@@ -44,7 +44,7 @@ from src.domain.content.events.content_events import (
     DatasetBuildProgressEvent,
     DatasetBuildStartedEvent,
 )
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.domain.shared.services import EventBusInterface
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import COMMON_CSS_BASE
 
@@ -56,7 +56,7 @@ class DeveloperOperationsWidget(EventAwareWidget):
 
     def __init__(
         self,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         load_user_settings_query_handler: LoadUserSettingsQueryHandler,
         toggle_developer_mode_command_handler: ToggleDeveloperModeCommandHandler,
         start_dataset_build_command_handler: StartDatasetBuildCommandHandler,
@@ -949,7 +949,7 @@ class DeveloperOperationsScreen(Screen[None]):
 
     def __init__(
         self,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         load_user_settings_query_handler,
         toggle_developer_mode_command_handler,
         start_dataset_build_command_handler,
