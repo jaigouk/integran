@@ -135,36 +135,26 @@ class ScheduleCard(DomainService[ScheduleCardRequest, ScheduleCardResult]):
             await self._validate_request(request)
 
             # Get current card state or create new one
-            card = await self.learning_repository.get_fsrs_card(
-                request.card_id, user_id=1
-            )
+            card = await self.learning_repository.get_fsrs_card_by_id(request.card_id)
             if not card:
-                # Auto-create new FSRS card for this question
-                self.logger.info(
-                    f"Creating new FSRS card for question {request.card_id}"
+                # Card not found - this shouldn't happen if the command layer is working correctly
+                self.logger.error(f"FSRS card with card_id {request.card_id} not found")
+                return ScheduleCardResult(
+                    success=False,
+                    card_id=request.card_id,
+                    question_id=None,  # We don't know the question_id from just the card_id
+                    difficulty_before=0.0,
+                    stability_before=0.0,
+                    retrievability_before=0.0,
+                    state_before=FSRSState.NEW,
+                    difficulty_after=0.0,
+                    stability_after=0.0,
+                    retrievability_after=0.0,
+                    state_after=FSRSState.NEW,
+                    next_review_date=datetime.now(UTC),
+                    next_interval_days=0.0,
+                    error_message=f"FSRS card with card_id {request.card_id} not found",
                 )
-                card = FSRSCard.create_new(question_id=request.card_id, user_id=1)
-                card = await self.learning_repository.save_fsrs_card(card)
-                if not card:
-                    self.logger.error(
-                        f"Failed to create card for question {request.card_id}"
-                    )
-                    return ScheduleCardResult(
-                        success=False,
-                        card_id=request.card_id,
-                        question_id=request.card_id,
-                        difficulty_before=0.0,
-                        stability_before=0.0,
-                        retrievability_before=0.0,
-                        state_before=FSRSState.NEW,
-                        difficulty_after=0.0,
-                        stability_after=0.0,
-                        retrievability_after=0.0,
-                        state_after=FSRSState.NEW,
-                        next_review_date=datetime.now(UTC),
-                        next_interval_days=0.0,
-                        error_message=f"Failed to create card for question {request.card_id}",
-                    )
 
             # Calculate current retrievability
             now = datetime.now(UTC)

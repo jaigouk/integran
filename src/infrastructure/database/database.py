@@ -923,6 +923,9 @@ class DatabaseManager:
                 stability=1.0,  # Initial stability (1 day)
                 retrievability=1.0,  # Perfect retrievability for new cards
                 state=0,  # New state
+                review_count=0,  # Initial review count
+                lapse_count=0,  # Initial lapse count
+                success_count=0,  # Initial success count
             )
 
             session.add(card)

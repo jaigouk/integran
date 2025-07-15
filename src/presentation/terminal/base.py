@@ -14,7 +14,7 @@ from textual.app import App
 from textual.widget import Widget
 
 from src.domain.shared.events import DomainEvent
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.domain.shared.services import EventBusInterface
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class EventAwareWidget(Widget):
     """Base widget class with event subscription support."""
 
-    def __init__(self, event_bus: EventBus, **kwargs: Any) -> None:
+    def __init__(self, event_bus: EventBusInterface, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.event_bus = event_bus
         self._event_subscriptions: list[tuple[type[DomainEvent], Callable]] = []
@@ -65,7 +65,7 @@ class EventAwareWidget(Widget):
 class EventAwareApp(App):
     """Base application class with event bus integration."""
 
-    def __init__(self, event_bus: EventBus, **kwargs: Any) -> None:
+    def __init__(self, event_bus: EventBusInterface, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.event_bus = event_bus
         self.console = Console()

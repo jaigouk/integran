@@ -23,7 +23,7 @@ from src.application.queries.get_fsrs_analytics_query import (
     GetFSRSAnalyticsQuery,
     GetFSRSAnalyticsQueryHandler,
 )
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
+from src.domain.shared.services import EventBusInterface
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import (
     COMMON_CSS_BASE,
@@ -40,7 +40,7 @@ class StatsWidget(Static):
     def __init__(
         self,
         learning_stats_query_handler,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         reset_command_handler: ResetUserProgressCommandHandler | None = None,
         fsrs_analytics_query_handler: GetFSRSAnalyticsQueryHandler | None = None,
         **kwargs: Any,
@@ -246,7 +246,7 @@ class FSRSAnalyticsWidget(Static):
     def __init__(
         self,
         fsrs_analytics_query_handler: GetFSRSAnalyticsQueryHandler,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         **kwargs: Any,
     ):
         super().__init__(
@@ -398,7 +398,7 @@ class PerformanceTrendsWidget(Static):
     def __init__(
         self,
         analytics_repository,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         **kwargs: Any,
     ):
         super().__init__(
@@ -553,7 +553,7 @@ class CategoryProgressWidget(EventAwareWidget):
     """Widget for displaying category-specific progress."""
 
     def __init__(
-        self, learning_stats_query_handler, event_bus: EventBus, **kwargs: Any
+        self, learning_stats_query_handler, event_bus: EventBusInterface, **kwargs: Any
     ):
         super().__init__(event_bus=event_bus, **kwargs)
         self.learning_stats_query_handler = learning_stats_query_handler

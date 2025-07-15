@@ -58,6 +58,13 @@ from src.domain.learning.services.complete_learning_session import (
     CompleteLearningSession,
 )
 from src.domain.learning.services.schedule_card import ScheduleCard
+from src.domain.shared.repositories import (
+    AnalyticsRepository,
+    LearningRepository,
+    QuestionRepository,
+    SessionRepository,
+    UserRepository,
+)
 from src.infrastructure.containers.content_container import ContentContainer
 from src.infrastructure.containers.user_container import UserContainer
 from src.infrastructure.database.database import DatabaseManager
@@ -248,23 +255,23 @@ class MainContainer:
         """Get the reset progress command handler."""
         return self._reset_progress_command_handler
 
-    def get_question_repository(self) -> SQLAlchemyQuestionRepository:
+    def get_question_repository(self) -> QuestionRepository:
         """Get the question repository."""
         return self._question_repository
 
-    def get_user_repository(self) -> SQLAlchemyUserRepository:
+    def get_user_repository(self) -> UserRepository:
         """Get the user repository."""
         return self._user_repository
 
-    def get_learning_repository(self) -> SQLAlchemyLearningRepository:
+    def get_learning_repository(self) -> LearningRepository:
         """Get the learning repository."""
         return self._learning_repository
 
-    def get_analytics_repository(self) -> SQLAlchemyAnalyticsRepository:
+    def get_analytics_repository(self) -> AnalyticsRepository:
         """Get the analytics repository."""
         return self._analytics_repository
 
-    def get_session_repository(self) -> SQLAlchemySessionRepository:
+    def get_session_repository(self) -> SessionRepository:
         """Get the session repository."""
         return self._session_repository
 

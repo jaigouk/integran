@@ -36,6 +36,7 @@ from src.application.queries.load_user_settings_query import (
     LoadUserSettingsQuery,
     LoadUserSettingsQueryHandler,
 )
+from src.domain.shared.services import EventBusInterface
 from src.domain.user.models.user_models import (
     FederalState,
     Language,
@@ -43,7 +44,6 @@ from src.domain.user.models.user_models import (
     UserPreferences,
     UserSettings,
 )
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import COMMON_CSS_BASE
 
@@ -55,7 +55,7 @@ class SettingsWidget(EventAwareWidget):
 
     def __init__(
         self,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         load_user_settings_query_handler: LoadUserSettingsQueryHandler,
         save_user_settings_command_handler: SaveUserSettingsCommandHandler,
         toggle_developer_mode_command_handler: ToggleDeveloperModeCommandHandler,
@@ -781,7 +781,7 @@ class SettingsScreen(Screen[None]):
 
     def __init__(
         self,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         load_user_settings_query_handler: LoadUserSettingsQueryHandler,
         save_user_settings_command_handler: SaveUserSettingsCommandHandler,
         toggle_developer_mode_command_handler: ToggleDeveloperModeCommandHandler,

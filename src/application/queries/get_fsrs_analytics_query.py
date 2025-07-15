@@ -21,13 +21,7 @@ class FSRSCardStateDistribution:
     review_cards: int = 0
     relearning_cards: int = 0
     total_cards: int = 0
-
-    @property
-    def mastery_percentage(self) -> float:
-        """Percentage of cards in review state (mastered)."""
-        if self.total_cards == 0:
-            return 0.0
-        return (self.review_cards / self.total_cards) * 100
+    mastery_percentage: float = 0.0  # Pre-calculated in repository
 
 
 @dataclass
@@ -176,12 +170,20 @@ class GetFSRSAnalyticsQueryHandler:
                 user_id
             )
 
+            # Calculate mastery percentage (cards in review state)
+            review_cards = fsrs_stats.get("review_cards", 0)
+            total_cards = fsrs_stats.get("total_cards", 0)
+            mastery_percentage = (
+                (review_cards / total_cards * 100) if total_cards > 0 else 0.0
+            )
+
             return FSRSCardStateDistribution(
                 new_cards=fsrs_stats.get("new_cards", 0),
                 learning_cards=fsrs_stats.get("learning_cards", 0),
-                review_cards=fsrs_stats.get("review_cards", 0),
+                review_cards=review_cards,
                 relearning_cards=fsrs_stats.get("relearning_cards", 0),
-                total_cards=fsrs_stats.get("total_cards", 0),
+                total_cards=total_cards,
+                mastery_percentage=mastery_percentage,
             )
         except Exception as e:
             logger.warning(f"Failed to get card state distribution: {e}")

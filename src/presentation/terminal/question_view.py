@@ -22,8 +22,8 @@ from src.application.queries.load_user_settings_query import (
 )
 from src.domain.content.models.question_models import Question
 from src.domain.content.services.enhanced_question_display import EnhancedQuestionData
+from src.domain.shared.services import EventBusInterface
 from src.domain.user.models.user_models import Language
-from src.infrastructure.messaging.enhanced_event_bus import EventBus
 from src.presentation.terminal.base import EventAwareWidget
 from src.presentation.terminal.themes import COMMON_CSS_BASE
 
@@ -36,7 +36,7 @@ class QuestionWidget(EventAwareWidget):
     def __init__(
         self,
         question: Question,
-        event_bus: EventBus,
+        event_bus: EventBusInterface,
         enhanced_question_query_handler: EnhancedQuestionContentQueryHandler,
         load_user_settings_query_handler: LoadUserSettingsQueryHandler,
         learning_repository=None,
@@ -640,13 +640,8 @@ class QuestionWidget(EventAwareWidget):
     async def on_menu_button_pressed(self, event: Button.Pressed) -> None:  # noqa: ARG002
         """Handle Menu button press to go back to main menu."""
         try:
-            # Get the parent screen (PracticeScreen) and call its cleanup method
-            screen = self.screen
-            if hasattr(screen, "action_cleanup_and_exit"):
-                await screen.action_cleanup_and_exit()
-            else:
-                # Fallback: just pop the screen
-                self.app.pop_screen()
+            # Call our own cleanup method defined in this widget
+            await self.action_cleanup_and_exit()
         except Exception as e:
             logger.error(f"Error in menu button handler: {e}")
             # Ensure we can still navigate back even if cleanup fails
@@ -918,8 +913,6 @@ class QuestionWidget(EventAwareWidget):
                 selected_answer=self.selected_answer or "",
                 correct_answer=self.question.correct,
                 fsrs_rating=rating,
-                learning_repository=self._learning_repository,
-                event_bus=self.event_bus,
                 user_id=1,  # Default user
                 session_id=self.session_id,  # Pass session ID for progress tracking
             )
@@ -955,6 +948,10 @@ class QuestionWidget(EventAwareWidget):
 
 class PracticeScreen(Screen):
     """Screen for practicing questions."""
+
+    BINDINGS = [
+        ("escape", "back_to_menu", "Back to Menu"),
+    ]
 
     CSS = (
         COMMON_CSS_BASE
@@ -1514,23 +1511,8 @@ class PracticeScreen(Screen):
             import traceback
 
             logger.error(f"Traceback: {traceback.format_exc()}")
-            # Don't raise - return with error display instead
-            error_container = Container(
-                Static("[red]Failed to load question:[/red]", classes="text-title"),
-                Static(f"{str(e)}", classes="error-text"),
-                Static(
-                    "Press Escape to return to menu or click the button below:",
-                    classes="text-help",
-                ),
-                Button(
-                    "📋 Back to Main Menu",
-                    id="back_to_menu",
-                    variant="primary",
-                    classes="menu-btn",
-                ),
-                classes="container-centered",
-            )
-            await self.mount(error_container)
+            # Create a simple error screen and replace the current screen
+            await self._show_error_screen(str(e))
             return
 
         # Get submit answer command handler or fallback
@@ -1911,6 +1893,42 @@ class PracticeScreen(Screen):
             logger.error(f"Error loading session state: {e}")
             # Continue with default state
             self._state_loaded = True
+
+    async def _show_error_screen(self, error_message: str) -> None:
+        """Show an error screen with working navigation."""
+        from textual.containers import Container
+        from textual.widgets import Button, Static
+
+        # Clear existing content
+        await self.remove_children()
+
+        # Create error display with proper key bindings
+        error_widget = Container(
+            Static("[red]Failed to load question:[/red]", classes="text-title"),
+            Static(f"{error_message}", classes="error-text"),
+            Static(
+                "Press Escape to return to menu or click the button below:",
+                classes="text-help",
+            ),
+            Button(
+                "📋 Back to Main Menu",
+                id="error_back_to_menu",
+                variant="primary",
+            ),
+            classes="container-centered",
+        )
+
+        # Mount the error widget
+        await self.mount(error_widget)
+
+        # Focus the button so keyboard events work
+        button = self.query_one("#error_back_to_menu", Button)
+        button.focus()
+
+    @on(Button.Pressed, "#error_back_to_menu")
+    async def on_error_back_button_pressed(self, event: Button.Pressed) -> None:  # noqa: ARG002
+        """Handle error screen back button press."""
+        await self.action_cleanup_and_exit()
 
     async def _save_session_state(self) -> None:
         """Save current session state to user settings for resume capability."""
