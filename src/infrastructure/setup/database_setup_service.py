@@ -53,7 +53,11 @@ async def main_async(force: bool, questions_file: Path | None, language: str) ->
 
         # Initialize database
         console.print("[blue]📄 Initializing database...[/blue]")
-        db_manager = DatabaseManager()
+        db_manager = DatabaseManager(
+            enable_async=False,  # Disable async for CLI setup
+            enable_optimizations=True,  # Keep optimizations for better performance
+            enable_indexing=True,  # Keep indexing for better performance
+        )
 
         # Determine questions file path
         if questions_file is None:

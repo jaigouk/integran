@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.engine import Engine
+from sqlalchemy import create_engine, event, pool, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 # Import domain-specific models
 from src.domain.analytics.models.analytics_models import (
@@ -42,40 +41,108 @@ logger = logging.getLogger(__name__)
 
 
 class DatabaseManager:
-    """Manages database connections and operations for Phase 1.8 multilingual support."""
+    """Manages database connections and operations with performance optimizations."""
 
-    def __init__(self, db_path: str | Path = "data/trainer.db") -> None:
+    def __init__(
+        self,
+        db_path: str | Path = "data/trainer.db",
+        enable_optimizations: bool = True,
+        enable_async: bool = True,
+        enable_indexing: bool = True,
+        pool_size: int = 10,
+        max_overflow: int = 20,
+        timeout: int = 30,
+    ) -> None:
         """Initialize database manager.
 
         Args:
             db_path: Path to the SQLite database file.
+            enable_optimizations: Enable SQLite performance optimizations.
+            enable_async: Enable async database operations.
+            enable_indexing: Enable database indexing for better query performance.
+            pool_size: Number of connections to maintain in pool.
+            max_overflow: Maximum overflow connections.
+            timeout: Connection timeout in seconds.
         """
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.enable_optimizations = enable_optimizations
+        self.enable_async = enable_async
+        self.enable_indexing = enable_indexing
 
         # Create engine with proper SQLite configuration
-        self.engine = create_engine(
-            f"sqlite:///{self.db_path}",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
-            echo=False,
-        )
+        engine_kwargs = {
+            "connect_args": {
+                "check_same_thread": False,
+                "timeout": timeout,
+            },
+            "echo": False,
+        }
 
-        # Enable foreign keys for SQLite
-        @event.listens_for(Engine, "connect")
+        if enable_optimizations:
+            engine_kwargs.update(
+                {
+                    "poolclass": pool.QueuePool,
+                    "pool_size": pool_size,
+                    "max_overflow": max_overflow,
+                    "pool_pre_ping": True,
+                }
+            )
+        else:
+            engine_kwargs["poolclass"] = pool.StaticPool
+
+        self.engine = create_engine(f"sqlite:///{self.db_path}", **engine_kwargs)
+
+        # Enable foreign keys and performance optimizations for SQLite
+        @event.listens_for(self.engine, "connect")
         def set_sqlite_pragma(dbapi_connection: Any, _: Any) -> None:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
+
+            if enable_optimizations:
+                # Performance optimizations
+                cursor.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging
+                cursor.execute("PRAGMA synchronous=NORMAL")  # Faster writes
+                cursor.execute("PRAGMA cache_size=10000")  # Larger cache (10MB)
+                cursor.execute("PRAGMA temp_store=MEMORY")  # Use memory for temp tables
+                cursor.execute("PRAGMA mmap_size=268435456")  # 256MB memory-mapped I/O
+
             cursor.close()
 
         self.SessionLocal = sessionmaker(bind=self.engine, expire_on_commit=False)
+
+        # Create async engine if enabled
+        if enable_async:
+            self.async_engine = create_async_engine(
+                f"sqlite+aiosqlite:///{self.db_path}",
+                connect_args={
+                    "check_same_thread": False,
+                    "timeout": timeout,
+                },
+                pool_pre_ping=True,
+                echo=False,
+            )
+            self.async_session_maker = async_sessionmaker(
+                self.async_engine,
+                class_=AsyncSession,
+                expire_on_commit=False,
+            )
+        else:
+            self.async_engine = None
+            self.async_session_maker = None
+
         self._create_tables()
+        self._ensure_default_user()
+
+        if enable_indexing:
+            self._create_indexes()
 
     def _create_tables(self) -> None:
         """Create all database tables."""
         # Import User domain models to register them with SQLAlchemy metadata
         try:
             from src.domain.user.models.user_models import UserSettingsDB  # noqa: F401
+            from src.infrastructure.database.models import UserDB  # noqa: F401
 
             # This import registers the model with Base.metadata
             logger.debug(
@@ -91,6 +158,28 @@ class DatabaseManager:
         self.migrate_user_configuration_schema()
 
         logger.info(f"Database initialized at {self.db_path}")
+
+    def _ensure_default_user(self) -> None:
+        """Ensure a default user exists with ID=1."""
+        with self.get_session() as session:
+            from src.infrastructure.database.models import UserDB
+
+            # Check if user with ID=1 exists
+            user = session.query(UserDB).filter_by(id=1).first()
+            if not user:
+                # Create default user
+                default_user = UserDB(
+                    id=1,
+                    username="default",
+                    email=None,
+                    created_at=datetime.now(UTC).replace(tzinfo=None),
+                    last_active=datetime.now(UTC).replace(tzinfo=None),
+                    study_streak=0,
+                    is_active=True,
+                )
+                session.add(default_user)
+                session.commit()
+                logger.info("Created default user with ID=1")
 
     @contextmanager
     def get_session(self) -> Generator[Session, None, None]:
@@ -1464,3 +1553,144 @@ class DatabaseManager:
                 practice_session.new_cards_count = new_cards
                 practice_session.review_cards_count = review_cards
                 session.commit()
+
+    # ============================================================================
+    # Performance Optimization Methods
+    # ============================================================================
+
+    def _create_indexes(self) -> None:
+        """Create database indexes for better query performance."""
+        with self.engine.begin() as conn:
+            indexes = [
+                # Question indexes
+                ("idx_questions_category", "questions", "category"),
+                ("idx_questions_state", "questions", "state"),
+                ("idx_questions_type_state", "questions", "question_type, state"),
+                ("idx_questions_image", "questions", "is_image_question"),
+                # FSRS card indexes
+                (
+                    "idx_fsrs_cards_user_review",
+                    "fsrs_cards",
+                    "user_id, next_review_date",
+                ),
+                ("idx_fsrs_cards_question_user", "fsrs_cards", "question_id, user_id"),
+                # Session indexes
+                ("idx_sessions_user_status", "practice_sessions", "user_id, status"),
+                ("idx_sessions_started", "practice_sessions", "started_at"),
+                # Question attempts index
+                ("idx_attempts_session", "question_attempts", "session_id"),
+                ("idx_attempts_question", "question_attempts", "question_id"),
+                # User settings index
+                ("idx_user_settings_user", "user_settings", "user_id"),
+            ]
+
+            for index_name, table_name, columns in indexes:
+                try:
+                    conn.execute(
+                        text(
+                            f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name}({columns})"
+                        )
+                    )
+                except Exception as e:
+                    # Table might not exist yet, which is fine
+                    logger.debug(f"Could not create index {index_name}: {e}")
+
+            logger.info("Database indexes created/verified")
+
+    @asynccontextmanager
+    async def get_async_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Get async database session for high-performance operations.
+
+        Yields:
+            Async database session
+        """
+        if not self.async_session_maker:
+            raise RuntimeError(
+                "Async support not enabled. Initialize with enable_async=True"
+            )
+
+        async with self.async_session_maker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+    def analyze_database(self) -> None:
+        """Run ANALYZE to update SQLite query planner statistics."""
+        with self.engine.begin() as conn:
+            conn.execute(text("ANALYZE"))
+            logger.info("Database statistics updated")
+
+    def vacuum_database(self) -> None:
+        """Vacuum database to reclaim space and optimize structure."""
+        # Note: VACUUM cannot be run within a transaction
+        with self.engine.connect() as conn:
+            conn.execute(text("VACUUM"))
+            logger.info("Database vacuumed")
+
+    def get_database_stats(self) -> dict[str, Any]:
+        """Get database performance statistics.
+
+        Returns:
+            Dictionary of database statistics
+        """
+        stats = {}
+
+        with self.engine.begin() as conn:
+            # Get page count and size
+            result = conn.execute(text("PRAGMA page_count"))
+            page_count = result.scalar()
+
+            result = conn.execute(text("PRAGMA page_size"))
+            page_size = result.scalar()
+
+            # Get cache statistics
+            result = conn.execute(text("PRAGMA cache_size"))
+            cache_size = result.scalar()
+
+            # Get table sizes
+            result = conn.execute(
+                text(
+                    """
+                    SELECT
+                        name as table_name,
+                        SUM(pgsize) as size_bytes
+                    FROM dbstat
+                    GROUP BY name
+                    ORDER BY size_bytes DESC
+                    """
+                )
+            )
+            table_sizes = {row[0]: row[1] for row in result}
+
+            stats.update(
+                {
+                    "database_size_mb": round(
+                        (page_count * page_size) / 1024 / 1024, 2
+                    ),
+                    "page_count": page_count,
+                    "page_size": page_size,
+                    "cache_pages": abs(cache_size),  # Negative means KB
+                    "table_sizes": table_sizes,
+                }
+            )
+
+        return stats
+
+    def optimize_query(self, query: str) -> list[dict[str, Any]]:
+        """Analyze query execution plan for optimization.
+
+        Args:
+            query: SQL query to analyze
+
+        Returns:
+            Query execution plan
+        """
+        with self.engine.begin() as conn:
+            result = conn.execute(text(f"EXPLAIN QUERY PLAN {query}"))
+            plan = [dict(row._mapping) for row in result]
+            return plan

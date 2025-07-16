@@ -90,7 +90,11 @@ def main(
         setup_logging()
 
         # Initialize database
-        db_manager = DatabaseManager()
+        db_manager = DatabaseManager(
+            enable_async=False,  # CLI doesn't need async support
+            enable_optimizations=True,  # Keep optimizations for better performance
+            enable_indexing=True,  # Keep indexing for better performance
+        )
 
         # Handle special flags first
         if reset:

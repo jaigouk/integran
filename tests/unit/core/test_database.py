@@ -34,7 +34,12 @@ def temp_db() -> Path:
 @pytest.fixture
 def db_manager(temp_db: Path) -> DatabaseManager:
     """Create a database manager with temporary database."""
-    return DatabaseManager(temp_db)
+    return DatabaseManager(
+        temp_db,
+        enable_async=False,  # Disable async for tests (aiosqlite not available)
+        enable_optimizations=False,  # Disable for simpler testing
+        enable_indexing=False,  # Disable indexing for tests
+    )
 
 
 @pytest.fixture

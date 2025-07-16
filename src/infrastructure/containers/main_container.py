@@ -91,7 +91,7 @@ class MainContainer:
         """Initialize the main container with all dependencies."""
         # Core infrastructure
         self._event_bus = EnhancedEventBus.create_basic()
-        self._db_manager = DatabaseManager()
+        self._db_manager = DatabaseManager(enable_async=False)
 
         # Repository layer
         self._question_repository = SQLAlchemyQuestionRepository(self._db_manager)

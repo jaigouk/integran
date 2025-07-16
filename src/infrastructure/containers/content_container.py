@@ -32,9 +32,11 @@ class ContentContainer:
 
         # Initialize repositories
         self._content_repository = ContentRepository()
-        self._question_repository = SQLAlchemyQuestionRepository(DatabaseManager())
+        self._question_repository = SQLAlchemyQuestionRepository(
+            DatabaseManager(enable_async=False)
+        )
         self._user_repository = user_repository or UserSettingsRepository(
-            database_manager=DatabaseManager()
+            database_manager=DatabaseManager(enable_async=False)
         )
 
         # Lazy initialization for Gemini-dependent services

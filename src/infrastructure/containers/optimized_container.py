@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from src.domain.shared.repositories import QuestionRepository
 from src.infrastructure.caching import CachedQuestionRepository, ImageCache
 from src.infrastructure.containers.main_container import MainContainer
-from src.infrastructure.database.optimized_database import OptimizedDatabaseManager
+from src.infrastructure.database.database import DatabaseManager
 from src.infrastructure.monitoring import PerformanceMonitor
 from src.infrastructure.repositories.question_repository import (
     SQLAlchemyQuestionRepository,
@@ -45,7 +45,12 @@ class OptimizedDIContainer(MainContainer):
         super().__init__()
 
         # Replace with optimized database manager
-        self._db_manager = OptimizedDatabaseManager(db_path)
+        self._db_manager = DatabaseManager(
+            db_path=db_path,
+            enable_optimizations=True,
+            enable_async=True,
+            enable_indexing=True,
+        )
 
         # Setup caching if enabled
         if enable_caching:
@@ -109,7 +114,7 @@ class OptimizedDIContainer(MainContainer):
 
     def optimize_database(self) -> None:
         """Run database optimization tasks."""
-        if isinstance(self._db_manager, OptimizedDatabaseManager):
+        if hasattr(self._db_manager, "analyze_database"):
             logger.info("Running database optimization...")
             self._db_manager.analyze_database()
             logger.info("Database optimization complete")
@@ -123,7 +128,7 @@ class OptimizedDIContainer(MainContainer):
         stats = {}
 
         # Database stats
-        if isinstance(self._db_manager, OptimizedDatabaseManager):
+        if hasattr(self._db_manager, "get_database_stats"):
             stats["database"] = self._db_manager.get_database_stats()
 
         # Cache stats

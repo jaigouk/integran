@@ -45,7 +45,12 @@ def test_database_fresh_setup():
 
     try:
         # Initialize database manager with temp database
-        db_manager = DatabaseManager(tmp_db_path)
+        db_manager = DatabaseManager(
+            tmp_db_path,
+            enable_async=False,
+            enable_optimizations=False,
+            enable_indexing=False,
+        )
 
         # Verify database was created and has expected tables
         with db_manager.get_session() as session:
@@ -78,7 +83,12 @@ async def test_user_flow_cycle():
 
     try:
         # Initialize services
-        db_manager = DatabaseManager(tmp_db_path)
+        db_manager = DatabaseManager(
+            tmp_db_path,
+            enable_async=False,
+            enable_optimizations=False,
+            enable_indexing=False,
+        )
         event_bus = EventBus()
         user_repository = UserSettingsRepository(db_manager)
 
@@ -124,7 +134,12 @@ async def test_developer_mode_toggle():
 
     try:
         # Initialize services
-        db_manager = DatabaseManager(tmp_db_path)
+        db_manager = DatabaseManager(
+            tmp_db_path,
+            enable_async=False,
+            enable_optimizations=False,
+            enable_indexing=False,
+        )
         event_bus = EventBus()
         user_repository = UserSettingsRepository(db_manager)
 
@@ -178,7 +193,12 @@ async def test_error_handling():
 
     try:
         # Initialize services
-        db_manager = DatabaseManager(tmp_db_path)
+        db_manager = DatabaseManager(
+            tmp_db_path,
+            enable_async=False,
+            enable_optimizations=False,
+            enable_indexing=False,
+        )
         event_bus = EventBus()
         user_repository = UserSettingsRepository(db_manager)
 
@@ -230,7 +250,12 @@ async def test_performance_regression():
 
     try:
         # Initialize services
-        db_manager = DatabaseManager(tmp_db_path)
+        db_manager = DatabaseManager(
+            tmp_db_path,
+            enable_async=False,
+            enable_optimizations=False,
+            enable_indexing=False,
+        )
         event_bus = EventBus()
         user_repository = UserSettingsRepository(db_manager)
 

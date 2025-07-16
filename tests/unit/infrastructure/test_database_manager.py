@@ -24,7 +24,12 @@ class TestDatabaseManager:
     @pytest.fixture
     def db_manager(self, temp_db_file: Path) -> DatabaseManager:
         """Create DatabaseManager with temp database."""
-        return DatabaseManager(str(temp_db_file))
+        return DatabaseManager(
+            str(temp_db_file),
+            enable_async=False,  # Disable async for tests (aiosqlite not available)
+            enable_optimizations=False,  # Disable for simpler testing
+            enable_indexing=False,  # Disable indexing for tests
+        )
 
     @pytest.fixture
     def questions_data(self) -> list[dict]:
@@ -50,12 +55,19 @@ class TestDatabaseManager:
 
     def test_initialization_default_path(self) -> None:
         """Test DatabaseManager initialization with default path."""
-        db = DatabaseManager()
+        db = DatabaseManager(
+            enable_async=False, enable_optimizations=False, enable_indexing=False
+        )
         assert "data/trainer.db" in str(db.db_path)
 
     def test_initialization_custom_path(self, temp_db_file: Path) -> None:
         """Test DatabaseManager initialization with custom path."""
-        db = DatabaseManager(str(temp_db_file))
+        db = DatabaseManager(
+            str(temp_db_file),
+            enable_async=False,
+            enable_optimizations=False,
+            enable_indexing=False,
+        )
         assert str(db.db_path) == str(temp_db_file)
 
     def test_get_session(self, db_manager: DatabaseManager) -> None:
@@ -194,3 +206,72 @@ class TestDatabaseManager:
         # Test nonexistent question
         question = db_manager.get_question(999)
         assert question is None
+
+    def test_ensure_default_user_creates_user(
+        self, db_manager: DatabaseManager
+    ) -> None:
+        """Test that _ensure_default_user creates a user with ID=1."""
+        # Verify user exists after initialization
+        with db_manager.get_session() as session:
+            from src.infrastructure.database.models import UserDB
+
+            user = session.query(UserDB).filter_by(id=1).first()
+            assert user is not None
+            assert user.id == 1
+            assert user.username == "default"
+            assert user.is_active is True
+            assert user.study_streak == 0
+
+    def test_ensure_default_user_idempotent(self, db_manager: DatabaseManager) -> None:
+        """Test that _ensure_default_user doesn't create duplicate users."""
+        # Call _ensure_default_user multiple times
+        db_manager._ensure_default_user()
+        db_manager._ensure_default_user()
+
+        # Verify only one user exists
+        with db_manager.get_session() as session:
+            from src.infrastructure.database.models import UserDB
+
+            user_count = session.query(UserDB).filter_by(id=1).count()
+            assert user_count == 1
+
+    def test_ensure_default_user_preserves_existing(
+        self, db_manager: DatabaseManager
+    ) -> None:
+        """Test that _ensure_default_user doesn't modify existing user."""
+        # Modify the default user
+        with db_manager.get_session() as session:
+            from src.infrastructure.database.models import UserDB
+
+            user = session.query(UserDB).filter_by(id=1).first()
+            user.username = "modified_user"
+            user.study_streak = 10
+            session.commit()
+
+        # Call _ensure_default_user again
+        db_manager._ensure_default_user()
+
+        # Verify user wasn't reset
+        with db_manager.get_session() as session:
+            user = session.query(UserDB).filter_by(id=1).first()
+            assert user.username == "modified_user"
+            assert user.study_streak == 10
+
+    def test_sessions_can_be_created_with_default_user(
+        self, db_manager: DatabaseManager
+    ) -> None:
+        """Test that sessions can be created after default user exists."""
+        # Create a session (this would fail without user ID=1)
+        session_id = db_manager.create_session("random", user_id=1)
+        assert session_id is not None
+
+        # Verify session was created
+        with db_manager.get_session() as session:
+            from src.domain.content.models.question_models import PracticeSession
+
+            practice_session = (
+                session.query(PracticeSession).filter_by(id=session_id).first()
+            )
+            assert practice_session is not None
+            assert practice_session.user_id == 1
+            assert practice_session.mode == "random"
