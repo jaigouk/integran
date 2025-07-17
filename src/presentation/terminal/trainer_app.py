@@ -19,6 +19,7 @@ from src.application.workflows.complete_learning_session_workflow import Session
 # Analytics is now accessed through application layer queries
 from src.domain.shared.services import EventBusInterface
 from src.presentation.terminal.base import EventAwareApp
+from src.presentation.terminal.bookmark_view import BookmarkScreen
 from src.presentation.terminal.progress_view import ProgressScreen
 from src.presentation.terminal.question_view import PracticeScreen
 from src.presentation.terminal.session_view import SessionScreen
@@ -82,6 +83,7 @@ class MainMenuScreen(Screen):
         ("3", "category_practice", "Category Practice"),
         ("4", "failed_practice", "Review Failed"),
         ("5", "images_practice", "Image Questions"),
+        ("6", "bookmark_practice", "Bookmark Practice"),
         ("s", "show_stats", "Statistics"),
         ("t", "show_settings", "Settings"),
         ("q", "quit", "Quit"),
@@ -105,6 +107,7 @@ class MainMenuScreen(Screen):
                     Button("3. Category Practice", id="category", variant="warning"),
                     Button("4. Review Failed Questions", id="failed", variant="error"),
                     Button("5. Image Questions Only", id="images", variant="primary"),
+                    Button("6. Bookmark Practice", id="bookmark", variant="warning"),
                     Button("Statistics & Progress", id="stats", variant="default"),
                     Button("Settings", id="settings", variant="default"),
                     classes="buttons-vertical",
@@ -128,6 +131,12 @@ class MainMenuScreen(Screen):
             start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
             if hasattr(self.app, "container")
             else None,
+            bookmark_command_handler=self.app.container.get_bookmark_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+            bookmark_status_handler=self.app.container.get_bookmark_status_query_handler()
+            if hasattr(self.app, "container")
+            else None,
         )
         self.app.push_screen(practice_screen)
 
@@ -141,6 +150,12 @@ class MainMenuScreen(Screen):
             if hasattr(self.app, "container")
             else None,
             start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+            bookmark_command_handler=self.app.container.get_bookmark_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+            bookmark_status_handler=self.app.container.get_bookmark_status_query_handler()
             if hasattr(self.app, "container")
             else None,
         )
@@ -158,6 +173,12 @@ class MainMenuScreen(Screen):
             start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
             if hasattr(self.app, "container")
             else None,
+            bookmark_command_handler=self.app.container.get_bookmark_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+            bookmark_status_handler=self.app.container.get_bookmark_status_query_handler()
+            if hasattr(self.app, "container")
+            else None,
         )
         self.app.push_screen(practice_screen)
 
@@ -171,6 +192,12 @@ class MainMenuScreen(Screen):
             if hasattr(self.app, "container")
             else None,
             start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+            bookmark_command_handler=self.app.container.get_bookmark_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+            bookmark_status_handler=self.app.container.get_bookmark_status_query_handler()
             if hasattr(self.app, "container")
             else None,
         )
@@ -188,8 +215,27 @@ class MainMenuScreen(Screen):
             start_practice_command_handler=self.app.container.get_start_practice_session_command_handler()
             if hasattr(self.app, "container")
             else None,
+            bookmark_command_handler=self.app.container.get_bookmark_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+            bookmark_status_handler=self.app.container.get_bookmark_status_query_handler()
+            if hasattr(self.app, "container")
+            else None,
         )
         self.app.push_screen(practice_screen)
+
+    @on(Button.Pressed, "#bookmark")
+    def action_bookmark_practice(self) -> None:
+        """Open bookmark management screen."""
+        bookmark_screen = BookmarkScreen(
+            bookmark_query_handler=self.app.container.get_bookmark_query_handler()
+            if hasattr(self.app, "container")
+            else None,
+            bookmark_command_handler=self.app.container.get_bookmark_command_handler()
+            if hasattr(self.app, "container")
+            else None,
+        )
+        self.app.push_screen(bookmark_screen)
 
     @on(Button.Pressed, "#stats")
     def action_show_stats(self) -> None:
@@ -295,6 +341,101 @@ class TrainerApp(EventAwareApp):
         min-width: 20;
         padding: 1 2;
     }
+
+    /* Bookmark screen specific styling */
+    .bookmark-container {
+        align: center middle;
+        width: 95vw;
+        max-width: 120;
+        height: auto;
+        max-height: 80vh;
+        background: $surface;
+        border: solid white;
+        padding: 2;
+        margin: 1;
+    }
+
+    .bookmark-scroll {
+        width: 100%;
+        height: auto;
+        max-height: 50vh;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+        margin: 1 0;
+    }
+
+    .bookmark-list {
+        width: 100%;
+        height: auto;
+    }
+
+    .bookmark-item {
+        width: 100%;
+        height: auto;
+        border: solid $primary;
+        margin: 0 0 1 0;
+        padding: 1;
+        background: $surface;
+    }
+
+    .bookmark-text {
+        width: 100%;
+        color: $text;
+        margin-bottom: 1;
+    }
+
+    .bookmark-actions {
+        align: right middle;
+        width: 100%;
+        height: auto;
+    }
+
+    .bookmark-actions Button {
+        width: auto;
+        margin: 0 1;
+        min-width: 10;
+    }
+
+    .bookmark-buttons {
+        align: center middle;
+        width: 100%;
+        height: auto;
+        margin-top: 2;
+    }
+
+    .bookmark-buttons Button {
+        width: 1fr;
+        margin: 0 1;
+        min-width: 15;
+    }
+
+    .loading-container,
+    .empty-container,
+    .error-container {
+        align: center middle;
+        width: 100%;
+        height: auto;
+        padding: 3;
+        display: none;
+    }
+
+    .text-error {
+        color: $error;
+        text-align: center;
+        width: 100%;
+    }
+
+    /* Bookmark toggle button styling */
+    .bookmark-toggle {
+        width: auto;
+        margin: 0 1;
+        padding: 0 2;
+    }
+
+    .bookmark-toggle.bookmarked {
+        background: $warning;
+        color: $text;
+    }
     """
     )
 
@@ -304,6 +445,7 @@ class TrainerApp(EventAwareApp):
         "session": SessionScreen,
         "stats": ProgressScreen,
         "settings": SettingsScreen,
+        "bookmarks": BookmarkScreen,
     }
 
     def __init__(

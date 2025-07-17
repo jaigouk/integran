@@ -10,8 +10,11 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
+    Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, relationship
 
@@ -105,3 +108,24 @@ class SessionDB(Base):
 
     # Relationships
     user = relationship("UserDB", back_populates="sessions")
+
+
+class BookmarkModel(Base):
+    """Bookmark database model."""
+
+    __tablename__ = "bookmarks"
+
+    id: Mapped[int] = Column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = Column(Integer, ForeignKey("users.id"), nullable=False)
+    question_id: Mapped[int] = Column(Integer, nullable=False)
+    notes: Mapped[str | None] = Column(Text, nullable=True)
+    created_at: Mapped[datetime] = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+
+    # Constraints and indexes
+    __table_args__ = (
+        UniqueConstraint("user_id", "question_id", name="_user_question_bookmark_uc"),
+        Index("idx_user_bookmarks", "user_id", "created_at"),
+        Index("idx_bookmark_question", "question_id"),
+    )

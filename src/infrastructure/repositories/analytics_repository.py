@@ -786,3 +786,52 @@ class SQLAlchemyAnalyticsRepository(AnalyticsRepository):
                 }
 
         return await asyncio.get_event_loop().run_in_executor(None, _execute)
+
+    async def record_bookmark_activity(
+        self,
+        user_id: int,
+        question_id: int | None,
+        activity_type: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Record bookmark activity for analytics."""
+        # No-op implementation for now
+        pass
+
+    async def update_user_engagement_metrics(
+        self, user_id: int, activity_type: str, timestamp: Any
+    ) -> None:
+        """Update user engagement metrics."""
+        # No-op implementation for now
+        pass
+
+    async def increment_question_bookmark_count(self, question_id: int) -> None:
+        """Increment bookmark count for a question."""
+        # No-op implementation for now
+        pass
+
+    async def decrement_question_bookmark_count(self, question_id: int) -> None:
+        """Decrement bookmark count for a question."""
+        # No-op implementation for now
+        pass
+
+    async def record_practice_session_start(
+        self, user_id: int, practice_mode: str, question_count: int, timestamp: Any
+    ) -> None:
+        """Record practice session start."""
+        # No-op implementation for now
+        pass
+
+    async def record_feature_usage(
+        self, user_id: int, feature: str, context: dict[str, Any], timestamp: Any
+    ) -> None:
+        """Record feature usage."""
+        # No-op implementation for now
+        pass
+
+    async def record_empty_state_view(
+        self, user_id: int, feature: str, timestamp: Any
+    ) -> None:
+        """Record empty state view."""
+        # No-op implementation for now
+        pass

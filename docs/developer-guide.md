@@ -1,6 +1,15 @@
 # Developer Guide
 
+> **📚 Related Documentation**  
+> - **[Bookmark Feature Guide](./bookmark-feature-guide.md)** - **⭐ CANONICAL EXAMPLE** of CQRS/DDD implementation  
+> - **[Event Flows](./event-flows.yaml)** - System-wide event flow specifications  
+> - **[Dataset Generation Guide](./dataset-generation-guide.md)** - Dataset workflow and AI extraction  
+
+---
+
 This guide provides architecture guidelines and technical reference for developers working on the Integran project.
+
+**🎯 For practical implementation examples**, see the **[Bookmark Feature Guide](./bookmark-feature-guide.md)** which demonstrates every CQRS/DDD pattern used in this guide.
 
 ## 🏗️ Architecture Overview
 
@@ -89,7 +98,18 @@ Integran implements a clean CQRS architecture with strict layer separation and d
 - **Learning**: Spaced repetition scheduling, session management, progress tracking
 - **Content**: Question management, multilingual answers, image processing
 - **Analytics**: Performance tracking, difficulty analysis, optimization
-- **User**: User configuration, preferences, developer mode control
+- **User**: User configuration, preferences, developer mode control, **bookmarks**
+
+> **📖 Complete Implementation Example**  
+> The **[Bookmark Feature](./bookmark-feature-guide.md)** demonstrates a complete User context implementation with:
+> - Full CQRS command/query separation
+> - Rich domain models with business logic
+> - Event-driven cross-context communication  
+> - Repository pattern with dependency inversion
+> - Thread pool async/sync bridging
+> - Comprehensive testing strategies
+>
+> **Use this as your template** for implementing new features in any bounded context.
 
 ### Directory Structure
 
@@ -222,6 +242,8 @@ USER ACTION
 
 All commands must implement either `execute()` or `handle()` methods:
 
+> **📋 See Complete Example**: [Bookmark Commands](./bookmark-feature-guide.md#command-implementation) - Shows AddBookmarkCommand, UpdateBookmarkNotesCommand with factory methods pattern
+
 ```python
 @dataclass
 class SaveUserSettingsCommand:
@@ -251,6 +273,8 @@ class SaveUserSettingsCommandHandler:
 ### Query Pattern Implementation
 
 All queries must implement `handle()` methods for read operations:
+
+> **📋 See Complete Example**: [Bookmark Queries](./bookmark-feature-guide.md#query-implementation) - Shows GetBookmarksQuery with BookmarkCollection value objects
 
 ```python
 @dataclass
@@ -323,6 +347,8 @@ class DetectLeech(DomainService[DetectLeechRequest, DetectLeechResult]):
 
 Domain events must be defined in the domain layer, not infrastructure:
 
+> **📋 See Complete Example**: [Bookmark Events](./bookmark-feature-guide.md#event-driven-architecture) - Shows BookmarkAddedEvent, conditional event handling, and error scenarios
+
 ```python
 # ✅ CORRECT: In src/domain/shared/events.py
 @dataclass
@@ -350,6 +376,8 @@ class UserSettingsChangedEvent(DomainEvent):
 ### Repository Interface Pattern
 
 Domain must own repository interfaces, infrastructure implements them:
+
+> **📋 See Complete Example**: [Bookmark Repository](./bookmark-feature-guide.md#infrastructure-implementation) - Shows interface design, thread pool pattern, and model conversion
 
 ```python
 # ✅ CORRECT: In src/domain/shared/repositories.py
@@ -969,11 +997,58 @@ if not card:
 5. **Event Flow**: Domain services publish events → Event bus distributes → Handlers process
 6. **CQRS Pattern**: Commands go through domain services, queries go direct to database
 
+## 🏗️ Architecture Reference Implementation: Bookmark Feature
+
+### 🎯 Complete CQRS/DDD Example
+
+The **[Bookmark Feature](./bookmark-feature-guide.md)** serves as the **canonical reference** for all architectural patterns used in Integran. Before implementing any new feature, study this complete example.
+
+**Why the Bookmark Feature is the Perfect Reference:**
+
+| **Architecture Pattern** | **Bookmark Implementation** | **What You'll Learn** |
+|---------------------------|----------------------------|----------------------|
+| **Rich Domain Models** | `Bookmark` entity with `age_in_days()`, `is_recent()` methods | How to embed business logic in domain entities |
+| **Value Objects** | `BookmarkCollection` with analytics and pagination | How to create sophisticated collection behavior |
+| **Command Pattern** | `AddBookmarkCommand`, `UpdateBookmarkNotesCommand` | CQRS write operations with validation |
+| **Query Pattern** | `GetBookmarksQuery` with direct repository access | CQRS read operations with optimization |
+| **Domain Events** | `BookmarkAddedEvent` with conditional processing | Event-driven cross-context communication |
+| **Repository Pattern** | `BookmarkRepository` interface and implementation | Dependency inversion with async/sync bridging |
+| **Factory Methods** | Result objects with `success_result()`, `error_result()` | Clean result object creation patterns |
+| **Event Handlers** | Analytics updates, conditional logic, error resilience | Robust event processing patterns |
+| **Thread Pool Pattern** | `_run_in_executor` for SQLite operations | Async/sync bridging for blocking databases |
+| **Testing Strategy** | Unit, integration, and architecture tests | Comprehensive testing approaches |
+
+### 📚 How to Use the Bookmark Feature as a Template
+
+**Step 1**: Read the complete **[Bookmark Feature Guide](./bookmark-feature-guide.md)**
+
+**Step 2**: Identify the patterns you need for your feature:
+- **Simple CRUD?** → Use `AddBookmarkCommand` + `GetBookmarksQuery` patterns
+- **Complex domain logic?** → Study `BookmarkCollection` value object patterns  
+- **Cross-context communication?** → Follow `BookmarkAddedEvent` → Analytics flow
+- **Async database operations?** → Copy `_run_in_executor` thread pool pattern
+
+**Step 3**: Copy and adapt the bookmark patterns to your bounded context
+
+**Step 4**: Validate against the checklist in [Architecture Validation](#architecture-validation-checklist)
+
+### 🎯 Key Architectural Insights from Bookmark Feature
+
+1. **100% CQRS Compliance**: Perfect separation of read/write operations
+2. **Rich Domain Models**: Business logic embedded in entities and value objects  
+3. **Event-Driven Design**: Cross-context communication via domain events
+4. **Clean Infrastructure**: Thread pool pattern bridges async/sync cleanly
+5. **Comprehensive Testing**: Every layer tested in isolation and integration
+
+> **🚀 Pro Tip**: When in doubt about any architectural decision, check how the bookmark feature handles it. This implementation has been validated against all CQRS/DDD principles and serves as the gold standard.
+
 ## 📋 Adding Commands and Queries - Developer Guide
 
 ### 🎯 CQRS Implementation Guidelines
 
 This section provides a step-by-step guide for adding new commands and queries while respecting the CQRS architecture flow and event-driven patterns.
+
+> **⚠️ Important**: Follow the patterns established in the **[Bookmark Feature Guide](./bookmark-feature-guide.md)** - don't reinvent the wheel!
 
 #### **RESPECT ARCHITECTURE FLOW:**
 
@@ -1411,12 +1486,46 @@ make test        # Run test suite
 make check-all   # Run all quality checks
 ```
 
+## 🚀 Next Steps for New Developers
+
+### 🎯 Learning Path
+
+1. **Start Here**: Read this Developer Guide for architectural principles
+2. **Study the Example**: Deep dive into the **[Bookmark Feature Guide](./bookmark-feature-guide.md)**
+3. **Practice**: Implement a simple feature following bookmark patterns
+4. **Validate**: Run architecture tests to ensure compliance
+
+### 📖 Implementing Your First Feature
+
+**Template Checklist**:
+- [ ] Read **[Bookmark Feature Guide](./bookmark-feature-guide.md)** completely
+- [ ] Identify which bookmark patterns apply to your feature
+- [ ] Copy and adapt the relevant command/query/event patterns
+- [ ] Follow the domain model patterns (entities, value objects, repositories)
+- [ ] Implement the infrastructure layer (async/sync bridging)
+- [ ] Add comprehensive tests following bookmark test patterns
+- [ ] Validate with `pytest tests/unit/architecture/ -v`
+
+### 🏗️ Architecture References by Use Case
+
+| **Use Case** | **Bookmark Pattern to Study** | **Key Files** |
+|--------------|-------------------------------|---------------|
+| **Simple CRUD operations** | Add/Remove bookmark commands | `bookmark_commands.py` |
+| **Complex business logic** | BookmarkCollection value object | `bookmark_models.py` |
+| **Cross-context communication** | BookmarkAddedEvent → Analytics | Event handlers |
+| **Async database operations** | Thread pool `_run_in_executor` | `bookmark_repository.py` |
+| **Rich domain models** | Bookmark entity with methods | Domain models |
+| **Factory patterns** | Result object creation | Command results |
+| **Event-driven architecture** | Event publishing and handling | Event flow |
+| **Repository interfaces** | Domain-owned interfaces | Repository patterns |
+
 ## 📚 Additional Resources
 
+- **⭐ [Bookmark Feature Guide](./bookmark-feature-guide.md)** - **Primary architectural reference**
 - **[Event Flow Definition](./event-flows.yaml)** - Event flow specifications
 - **[Dataset Generation Guide](./dataset-generation-guide.md)** - Dataset workflow
 - [TODO.md](../TODO.md) - Current priorities and critical issues
 
 ---
 
-This guide provides the foundation for maintaining clean CQRS/DDD architecture. Always refer to failing architecture tests in TODO.md for current issues that need addressing.
+This guide provides the foundation for maintaining clean CQRS/DDD architecture. **The [Bookmark Feature Guide](./bookmark-feature-guide.md) is your primary reference** for all implementation details. Always refer to failing architecture tests in TODO.md for current issues that need addressing.

@@ -29,6 +29,7 @@ class PracticeMode(str, Enum):
     CATEGORY = "category"
     FAILED = "failed"  # Previously failed questions for remedial practice
     IMAGES = "images"
+    BOOKMARKS = "bookmarks"  # User bookmarked questions for focused review
 
 
 class AnswerStatus(str, Enum):

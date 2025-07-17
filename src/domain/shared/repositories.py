@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from src.domain.content.models.question_models import Question
     from src.domain.learning.models.learning_models import FSRSCard, LearningSession
+    from src.domain.user.models.bookmark_models import Bookmark, BookmarkCollection
     from src.domain.user.models.user_models import UserSettings
 
 
@@ -342,6 +343,55 @@ class AnalyticsRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    async def record_bookmark_activity(
+        self,
+        user_id: int,
+        question_id: int | None,
+        activity_type: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Record bookmark activity for analytics."""
+        pass
+
+    @abstractmethod
+    async def update_user_engagement_metrics(
+        self, user_id: int, activity_type: str, timestamp: Any
+    ) -> None:
+        """Update user engagement metrics."""
+        pass
+
+    @abstractmethod
+    async def increment_question_bookmark_count(self, question_id: int) -> None:
+        """Increment bookmark count for a question."""
+        pass
+
+    @abstractmethod
+    async def decrement_question_bookmark_count(self, question_id: int) -> None:
+        """Decrement bookmark count for a question."""
+        pass
+
+    @abstractmethod
+    async def record_practice_session_start(
+        self, user_id: int, practice_mode: str, question_count: int, timestamp: Any
+    ) -> None:
+        """Record practice session start."""
+        pass
+
+    @abstractmethod
+    async def record_feature_usage(
+        self, user_id: int, feature: str, context: dict[str, Any], timestamp: Any
+    ) -> None:
+        """Record feature usage."""
+        pass
+
+    @abstractmethod
+    async def record_empty_state_view(
+        self, user_id: int, feature: str, timestamp: Any
+    ) -> None:
+        """Record empty state view."""
+        pass
+
 
 class SessionRepository(ABC):
     """Repository interface for session-related data operations."""
@@ -424,4 +474,163 @@ class ImageRepository(ABC):
     @abstractmethod
     async def list_available_images(self, directory: str = "data/images") -> list[str]:
         """List all available image files in directory."""
+        pass
+
+
+class BookmarkRepository(ABC):
+    """Repository interface for bookmark-related data operations."""
+
+    @abstractmethod
+    async def add_bookmark(
+        self, user_id: int, question_id: int, notes: str | None = None
+    ) -> Bookmark:
+        """Add a new bookmark for a user and question.
+
+        Args:
+            user_id: User ID
+            question_id: Question ID to bookmark
+            notes: Optional notes for the bookmark
+
+        Returns:
+            The created bookmark
+
+        Raises:
+            RepositoryError: If bookmark already exists or other database error
+        """
+        pass
+
+    @abstractmethod
+    async def remove_bookmark(self, user_id: int, question_id: int) -> bool:
+        """Remove a bookmark for a user and question.
+
+        Args:
+            user_id: User ID
+            question_id: Question ID to unbookmark
+
+        Returns:
+            True if bookmark was removed, False if it didn't exist
+
+        Raises:
+            RepositoryError: If database error occurs
+        """
+        pass
+
+    @abstractmethod
+    async def get_bookmarks(
+        self, user_id: int, limit: int | None = None, offset: int = 0
+    ) -> BookmarkCollection:
+        """Get user's bookmarks with optional pagination.
+
+        Args:
+            user_id: User ID
+            limit: Maximum number of bookmarks to return (None for all)
+            offset: Number of bookmarks to skip
+
+        Returns:
+            BookmarkCollection containing user's bookmarks
+
+        Raises:
+            RepositoryError: If database error occurs
+        """
+        pass
+
+    @abstractmethod
+    async def is_bookmarked(self, user_id: int, question_id: int) -> bool:
+        """Check if a question is bookmarked by user.
+
+        Args:
+            user_id: User ID
+            question_id: Question ID
+
+        Returns:
+            True if question is bookmarked, False otherwise
+
+        Raises:
+            RepositoryError: If database error occurs
+        """
+        pass
+
+    @abstractmethod
+    async def get_bookmark_by_question(
+        self, user_id: int, question_id: int
+    ) -> Bookmark | None:
+        """Get bookmark for a specific question.
+
+        Args:
+            user_id: User ID
+            question_id: Question ID
+
+        Returns:
+            Bookmark if exists, None otherwise
+
+        Raises:
+            RepositoryError: If database error occurs
+        """
+        pass
+
+    @abstractmethod
+    async def get_bookmark_count(self, user_id: int) -> int:
+        """Get total number of bookmarks for a user.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Total bookmark count
+
+        Raises:
+            RepositoryError: If database error occurs
+        """
+        pass
+
+    @abstractmethod
+    async def get_bookmarks_by_question_ids(
+        self, user_id: int, question_ids: list[int]
+    ) -> list[Bookmark]:
+        """Get bookmarks for specific questions.
+
+        Args:
+            user_id: User ID
+            question_ids: List of question IDs
+
+        Returns:
+            List of bookmarks for the specified questions
+
+        Raises:
+            RepositoryError: If database error occurs
+        """
+        pass
+
+    @abstractmethod
+    async def update_bookmark_notes(
+        self, user_id: int, question_id: int, notes: str | None
+    ) -> bool:
+        """Update notes for an existing bookmark.
+
+        Args:
+            user_id: User ID
+            question_id: Question ID
+            notes: New notes (None to clear notes)
+
+        Returns:
+            True if bookmark was updated, False if not found
+
+        Raises:
+            RepositoryError: If database error occurs
+        """
+        pass
+
+    @abstractmethod
+    async def delete_user_bookmarks(self, user_id: int) -> int:
+        """Delete all bookmarks for a user.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Number of bookmarks deleted
+
+        Raises:
+            RepositoryError: If database error occurs
+        """
         pass

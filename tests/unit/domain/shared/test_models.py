@@ -63,12 +63,13 @@ class TestPracticeMode:
     def test_practice_mode_iteration(self):
         """Test iterating over practice mode values."""
         values = list(PracticeMode)
-        assert len(values) == 5
+        assert len(values) == 6  # Updated to include BOOKMARKS mode
         assert PracticeMode.RANDOM in values
         assert PracticeMode.SEQUENTIAL in values
         assert PracticeMode.CATEGORY in values
         assert PracticeMode.FAILED in values
         assert PracticeMode.IMAGES in values
+        assert PracticeMode.BOOKMARKS in values
 
 
 class TestAnswerStatus:

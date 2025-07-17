@@ -12,6 +12,15 @@ from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import Button, Collapsible, Static, TabbedContent, TabPane
 
+from src.application.commands.bookmark_commands import (
+    AddBookmarkCommand,
+    AddBookmarkCommandHandler,
+    RemoveBookmarkCommand,
+)
+from src.application.queries.bookmark_queries import (
+    GetBookmarkStatusQuery,
+    GetBookmarkStatusQueryHandler,
+)
 from src.application.queries.enhanced_question_content_query import (
     EnhancedQuestionContentQuery,
     EnhancedQuestionContentQueryHandler,
@@ -41,8 +50,11 @@ class QuestionWidget(EventAwareWidget):
         load_user_settings_query_handler: LoadUserSettingsQueryHandler,
         learning_repository=None,
         submit_answer_command_handler=None,
+        bookmark_command_handler: AddBookmarkCommandHandler | None = None,
+        bookmark_status_handler: GetBookmarkStatusQueryHandler | None = None,
         preferred_language: Language = Language.ENGLISH,
         session_id: int | None = None,
+        user_id: int = 1,
         **kwargs: Any,
     ):
         super().__init__(event_bus=event_bus, **kwargs)
@@ -51,12 +63,16 @@ class QuestionWidget(EventAwareWidget):
         self.load_user_settings_query_handler = load_user_settings_query_handler
         self._learning_repository = learning_repository
         self.submit_answer_command_handler = submit_answer_command_handler
+        self.bookmark_command_handler = bookmark_command_handler
+        self.bookmark_status_handler = bookmark_status_handler
         self.preferred_language = preferred_language
         self.session_id = session_id
+        self.user_id = user_id
         self.selected_answer: str | None = None
         self.answer_revealed = False
         self.enhanced_data: EnhancedQuestionData | None = None
         self.user_preferences = None  # Will be loaded from user settings
+        self.is_bookmarked = False  # Track bookmark status
 
     async def on_mount(self) -> None:
         """Called when widget is mounted - setup event subscriptions."""
@@ -64,6 +80,9 @@ class QuestionWidget(EventAwareWidget):
 
         self._component_ready_time = time.time()
         await self.setup_event_subscriptions()
+
+        # Check bookmark status for this question
+        await self._check_bookmark_status()
 
     def compose(self) -> ComposeResult:
         """Compose the enhanced question widget with tab-based navigation."""
@@ -167,6 +186,12 @@ class QuestionWidget(EventAwareWidget):
                     id="rating_4",
                     variant="primary",
                     classes="rating-btn",
+                ),
+                Button(
+                    "📖 Bookmark",
+                    id="bookmark_toggle",
+                    variant="warning",
+                    classes="bookmark-btn",
                 ),
                 Button(
                     "Menu",
@@ -646,6 +671,67 @@ class QuestionWidget(EventAwareWidget):
             logger.error(f"Error in menu button handler: {e}")
             # Ensure we can still navigate back even if cleanup fails
             self.app.pop_screen()
+
+    @on(Button.Pressed, ".bookmark-btn")
+    async def on_bookmark_button_pressed(self, event: Button.Pressed) -> None:  # noqa: ARG002
+        """Handle bookmark button press to toggle bookmark status."""
+        if not self.bookmark_command_handler:
+            logger.warning("Bookmark command handler not available")
+            return
+
+        try:
+            if self.is_bookmarked:
+                # Remove bookmark
+                command = RemoveBookmarkCommand(
+                    user_id=self.user_id, question_id=self.question.id
+                )
+                result = await self.bookmark_command_handler.handle(command)
+                if result.success:
+                    self.is_bookmarked = False
+                    await self._update_bookmark_button()
+                    logger.info(f"Removed bookmark for question {self.question.id}")
+            else:
+                # Add bookmark
+                command = AddBookmarkCommand(
+                    user_id=self.user_id, question_id=self.question.id
+                )
+                result = await self.bookmark_command_handler.handle(command)
+                if result.success:
+                    self.is_bookmarked = True
+                    await self._update_bookmark_button()
+                    logger.info(f"Added bookmark for question {self.question.id}")
+
+        except Exception as e:
+            logger.error(f"Error toggling bookmark: {e}")
+
+    async def _update_bookmark_button(self) -> None:
+        """Update bookmark button appearance based on current status."""
+        try:
+            bookmark_button = self.query_one("#bookmark_toggle", Button)
+            if self.is_bookmarked:
+                bookmark_button.label = "📖 Bookmarked"
+                bookmark_button.variant = "success"
+            else:
+                bookmark_button.label = "📖 Bookmark"
+                bookmark_button.variant = "warning"
+        except Exception as e:
+            logger.error(f"Error updating bookmark button: {e}")
+
+    async def _check_bookmark_status(self) -> None:
+        """Check if this question is already bookmarked."""
+        if not self.bookmark_status_handler:
+            return
+
+        try:
+            query = GetBookmarkStatusQuery(
+                user_id=self.user_id, question_id=self.question.id
+            )
+            result = await self.bookmark_status_handler.handle(query)
+            if result.success:
+                self.is_bookmarked = result.is_bookmarked
+                await self._update_bookmark_button()
+        except Exception as e:
+            logger.error(f"Error checking bookmark status: {e}")
 
     async def reveal_answer(self) -> None:
         """Reveal the correct answer and enhanced multilingual content."""
@@ -1372,6 +1458,8 @@ class PracticeScreen(Screen):
         user_repository=None,
         submit_answer_command_handler=None,
         start_practice_command_handler=None,
+        bookmark_command_handler: AddBookmarkCommandHandler | None = None,
+        bookmark_status_handler: GetBookmarkStatusQueryHandler | None = None,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
@@ -1379,6 +1467,8 @@ class PracticeScreen(Screen):
         self.user_repository = user_repository
         self.submit_answer_command_handler = submit_answer_command_handler
         self.start_practice_command_handler = start_practice_command_handler
+        self.bookmark_command_handler = bookmark_command_handler
+        self.bookmark_status_handler = bookmark_status_handler
         self.current_question: Question | None = None
         self.questions_answered = 0
         self.correct_answers = 0
@@ -1572,6 +1662,8 @@ class PracticeScreen(Screen):
             load_user_settings_query_handler=load_user_settings_query_handler,
             learning_repository=user_repo,
             submit_answer_command_handler=submit_handler,
+            bookmark_command_handler=self.bookmark_command_handler,
+            bookmark_status_handler=self.bookmark_status_handler,
             preferred_language=Language.ENGLISH,  # Will be updated from user settings
             session_id=self.session_id,  # Pass session ID for progress tracking
         )

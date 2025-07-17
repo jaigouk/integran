@@ -314,6 +314,46 @@ class DataImportedEvent(DomainEvent):
         super().__init__()
 
 
+@dataclass
+class BookmarkAddedEvent(DomainEvent):
+    """Event emitted when a user bookmarks a question."""
+
+    user_id: int
+    question_id: int
+    bookmark_id: int
+    notes: str | None = None
+
+    def __post_init__(self) -> None:
+        """Initialize parent DomainEvent fields."""
+        super().__init__()
+
+
+@dataclass
+class BookmarkRemovedEvent(DomainEvent):
+    """Event emitted when a user removes a bookmark."""
+
+    user_id: int
+    question_id: int
+    bookmark_id: int | None = None  # May be None if bookmark wasn't found
+
+    def __post_init__(self) -> None:
+        """Initialize parent DomainEvent fields."""
+        super().__init__()
+
+
+@dataclass
+class BookmarksViewedEvent(DomainEvent):
+    """Event emitted when a user views their bookmarks collection."""
+
+    user_id: int
+    bookmark_count: int
+    view_type: str  # 'list', 'practice', 'manage'
+
+    def __post_init__(self) -> None:
+        """Initialize parent DomainEvent fields."""
+        super().__init__()
+
+
 # =============================================================================
 # System Events
 # =============================================================================
