@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     # Core application dependencies
-    "rich>=13.7.0",
+    "rich>=14.3.4",
     "textual>=0.76.0",
     "click>=8.1.7",
     "pydantic>=2.5.3",
